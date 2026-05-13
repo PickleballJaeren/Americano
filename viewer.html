@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="theme-color" content="#050f1f">
+<link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+<title>Live Turnering</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600&display=swap');
+  :root {
+    --navy:    #050f1f;
+    --navy2:   #0a1628;
+    --navy3:   #0d1e35;
+    --border:  rgba(30,45,69,.8);
+    --border2: rgba(30,45,69,1);
+    --white:   #e8f0f8;
+    --muted:   #4a6080;
+    --muted2:  #7a90a8;
+    --green:   #16a34a;
+    --green2:  #22c55e;
+    --yellow:  #f5c842;
+    --accent:  #3b82f6;
+    --accent2: #60a5fa;
+    --red2:    #ef4444;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--navy); color: var(--white); font-family: 'DM Sans', system-ui, sans-serif; }
+
+  /* ── HEADER ── */
+  .viewer-header {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--navy2);
+    border-bottom: 1px solid var(--border2);
+    padding: calc(var(--safe-top) + 12px) 16px 0;
+  }
+  .header-top {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .turnering-navn {
+    font-family: 'Bebas Neue', cursive;
+    font-size: 24px; letter-spacing: 1.5px; color: var(--yellow);
+  }
+  .live-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: rgba(34,197,94,.12);
+    border: 1px solid rgba(34,197,94,.3);
+    color: var(--green2); font-size: 12px; font-weight: 600;
+    padding: 4px 10px; border-radius: 20px; letter-spacing: .5px;
+  }
+  .live-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--green2);
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+  .ferdig-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: rgba(96,165,250,.12);
+    border: 1px solid rgba(96,165,250,.3);
+    color: var(--accent2); font-size: 12px; font-weight: 600;
+    padding: 4px 10px; border-radius: 20px;
+  }
+
+  /* ── TABS ── */
+  .tab-bar {
+    display: flex; gap: 0;
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .tab-bar::-webkit-scrollbar { display: none; }
+  .tab-btn {
+    flex-shrink: 0; padding: 10px 16px;
+    font-size: 14px; font-weight: 500; color: var(--muted);
+    background: none; border: none; cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color .15s, border-color .15s;
+  }
+  .tab-btn.aktiv { color: var(--yellow); border-bottom-color: var(--yellow); }
+
+  /* ── CONTENT ── */
+  .tab-innhold { display: none; padding: 16px; }
+  .tab-innhold.aktiv { display: block; }
+
+  /* ── FELLES ── */
+  .seksjon-tittel {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px;
+    color: var(--muted2); font-weight: 600; margin: 16px 0 8px;
+  }
+  .kort {
+    background: var(--navy3);
+    border: 1px solid var(--border2);
+    border-radius: 12px; overflow: hidden;
+    margin-bottom: 10px;
+  }
+
+  /* ── BRACKET ── */
+  .bracket-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 8px; }
+  .bracket-nivaa { margin-bottom: 24px; }
+  .nivaa-tittel {
+    font-size: 13px; text-transform: uppercase; letter-spacing: 1.5px;
+    font-weight: 700; margin-bottom: 10px;
+  }
+  .bracket-runder {
+    display: flex; gap: 12px; align-items: flex-start;
+    min-width: max-content;
+  }
+  .runde-kol { min-width: 160px; }
+  .runde-navn {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--muted2); font-weight: 600; margin-bottom: 8px; text-align: center;
+  }
+  .kamp-kort {
+    background: var(--navy3); border: 1px solid var(--border2);
+    border-radius: 10px; overflow: hidden; margin-bottom: 8px;
+  }
+  .kamp-kort.live { border-color: var(--green2); }
+  .kamp-rad {
+    display: flex; align-items: center; padding: 8px 10px; gap: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .kamp-rad:last-child { border-bottom: none; }
+  .kamp-lagnavn { flex: 1; font-size: 14px; color: var(--muted2); }
+  .kamp-lagnavn.vinner { color: var(--white); font-weight: 600; }
+  .kamp-lagnavn.tbd { color: var(--muted); font-style: italic; font-size: 13px; }
+  .kamp-poeng { font-family: 'DM Mono', monospace; font-size: 16px; color: var(--green2); }
+  .kamp-poeng.tap { color: var(--muted2); }
+  .kamp-poeng.venter { color: var(--muted); font-size: 12px; }
+  .kamp-klikkbar { cursor: default; }
+
+  /* ── TABELL ── */
+  .pulje-tabell { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .pulje-tabell th {
+    padding: 8px 10px; text-align: left; font-size: 12px;
+    color: var(--muted2); font-weight: 500; border-bottom: 1px solid var(--border2);
+  }
+  .pulje-tabell td { padding: 10px 10px; border-bottom: 1px solid var(--border); }
+  .pulje-tabell tr:last-child td { border-bottom: none; }
+  .rang-gull { font-family: 'Bebas Neue', cursive; font-size: 18px; color: var(--yellow); }
+  .rang-sølv { font-family: 'Bebas Neue', cursive; font-size: 18px; color: var(--accent2); }
+  .rang-grå  { font-family: 'Bebas Neue', cursive; font-size: 18px; color: var(--muted); }
+  .pd-pos { color: var(--green2); font-family: monospace; }
+  .tb-kant-inn  { border-left: 3px solid var(--accent2); padding-left: 5px; display:inline-block; }
+  .tb-kant-pd   { border-left: 3px solid var(--yellow);  padding-left: 5px; display:inline-block; }
+  .tb-kant-ingen{ display:inline-block; }
+  .tb-fotnote   { font-size: 12px; color: var(--muted2); padding: 8px 12px 10px; display: flex; gap: 14px; flex-wrap: wrap; }
+  .tb-dot       { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+
+  /* ── KAMPSKJEMA ── */
+  .ks-wrap { display: flex; flex-direction: column; width: 100%; }
+
+  /* Fremgangsbar */
+  .ks-prog-rad { display: flex; align-items: center; gap: 8px; padding: 10px 12px 4px; }
+  .ks-prog-bar { flex: 1; height: 3px; background: var(--border2); border-radius: 2px; }
+  .ks-prog-fill { height: 3px; border-radius: 2px; background: var(--yellow); transition: width .4s; }
+  .ks-prog-tekst { font-size: 11px; color: var(--muted2); white-space: nowrap; }
+
+  /* Runde-blokk */
+  .ks-runde-blokk { padding: 10px 12px; border-bottom: 1px solid var(--border2); }
+
+  /* Desktop grid: label + N bane-kolonner */
+  .ks-grid { display: grid; gap: 8px; align-items: stretch; }
+
+  /* Bane-header rad (kun øverste aktive runde, desktop) */
+  .ks-bane-hdr-rad { gap: 8px; padding: 8px 12px 0; display: none; }
+  .ks-bane-hdr-celle { font-family: 'Bebas Neue', cursive; font-size: 13px; letter-spacing: 1px; color: var(--muted2); }
+
+  /* Runde-label */
+  .ks-rl { padding: 4px 2px; display: flex; flex-direction: column; }
+  .ks-rl-over { font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px; color: var(--muted2); }
+  .ks-rl-nr { font-family: 'Bebas Neue', cursive; font-size: 22px; letter-spacing: 1px; color: var(--white); line-height: 1.1; }
+  .ks-rl-status { font-size: 11px; font-weight: 600; margin: 2px 0 4px; }
+  .ks-rl-status.gronn { color: var(--green2); }
+  .ks-rl-status.graa  { color: var(--muted2); }
+  .ks-rl-info { font-size: 10px; color: var(--muted2); line-height: 1.4; }
+
+  /* Kampkort */
+  .ks-kort { background: var(--navy3); border: 1px solid var(--border2); border-radius: 10px; padding: 9px 11px; display: flex; flex-direction: column; gap: 4px; }
+  .ks-kort.gronn-kant { border-color: var(--green2); }
+  .ks-kort.gul-kant   { border-color: var(--yellow); }
+  .ks-kort.ferdig     { opacity: .4; }
+
+  .ks-pulje-merke { font-size: 10px; font-weight: 600; color: var(--muted2); background: rgba(255,255,255,.06); border: 1px solid var(--border2); border-radius: 4px; padding: 1px 6px; align-self: flex-start; white-space: nowrap; }
+  .ks-lag { display: flex; flex-direction: column; gap: 3px; }
+  .ks-spiller { display: flex; align-items: center; gap: 6px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ks-spiller.vinner { font-weight: 600; }
+  .ks-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .ks-dot.gronn { background: var(--green2); }
+  .ks-dot.gul   { background: var(--yellow); }
+  .ks-dot.graa  { background: var(--muted); }
+  .ks-vs { text-align: center; font-size: 10px; color: var(--muted2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 2px 0; margin: 1px 0; }
+  .ks-spacer { flex: 1; }
+  .ks-resultat { text-align: center; font-size: 15px; font-weight: 700; color: var(--white); padding-top: 2px; }
+  .ks-status { display: flex; align-items: center; gap: 4px; font-size: 10px; padding-top: 2px; white-space: nowrap; }
+  .ks-status.gronn { color: var(--green2); }
+  .ks-status.gul   { color: var(--yellow); }
+  .ks-status.graa  { color: var(--muted2); }
+
+  /* Kollapsbar seksjon */
+  .ks-kollaps-knapp { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--border2); cursor: pointer; background: rgba(255,255,255,.02); user-select: none; transition: background .15s; }
+  .ks-kollaps-knapp:hover { background: rgba(255,255,255,.04); }
+  .ks-kollaps-tittel { font-size: 12px; font-weight: 600; letter-spacing: .5px; color: var(--muted2); }
+  .ks-kollaps-hint   { font-size: 11px; color: var(--muted); flex: 1; }
+  .ks-kollaps-chevron { font-size: 12px; color: var(--muted2); transition: transform .2s; }
+  .ks-kollaps-innhold { display: none; }
+  .ks-kollaps-innhold.synlig { display: block; }
+
+  /* Ferdigspilte runder header */
+  .ks-rf-hdr { display: flex; align-items: center; gap: 8px; padding: 10px 12px 8px; cursor: pointer; }
+  .ks-rf-check { width: 18px; height: 18px; border-radius: 50%; background: rgba(34,197,94,.2); border: 1px solid var(--green2); display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--green2); flex-shrink: 0; }
+  .ks-rf-navn   { font-size: 12px; font-weight: 600; }
+  .ks-rf-status { font-size: 11px; color: var(--green2); }
+  .ks-rf-chevron { margin-left: auto; color: var(--muted2); font-size: 12px; transition: transform .2s; }
+  .ks-rf-baner  { display: flex; gap: 6px; overflow-x: auto; padding: 0 12px 10px 38px; scrollbar-width: none; }
+  .ks-rf-baner::-webkit-scrollbar { display: none; }
+
+  /* Legend */
+  .ks-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; padding: 8px 12px 12px; font-size: 10px; color: var(--muted2); border-top: 1px solid var(--border2); }
+  .ks-leg-item { display: flex; align-items: center; gap: 5px; }
+  .ks-leg-dot  { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  /* MOBIL: horisontal scroll per rad */
+  @media (max-width: 699px) {
+    .ks-runde-blokk { padding: 0; }
+    .ks-runde-rad-mobil { display: flex; border-bottom: 1px solid var(--border2); }
+    .ks-rl-mobil { flex-shrink: 0; width: 64px; padding: 10px 6px; border-right: 1px solid var(--border2); background: var(--navy); display: flex; flex-direction: column; }
+    .ks-scroll-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; flex: 1; }
+    .ks-scroll-wrap::-webkit-scrollbar { display: none; }
+    .ks-scroll-innhold { display: flex; flex-direction: column; width: max-content; }
+    .ks-bane-hdr-rad-mobil { display: flex; gap: 6px; padding: 6px 8px 2px; }
+    .ks-bane-hdr-celle-mobil { width: 138px; flex-shrink: 0; font-family: 'Bebas Neue', cursive; font-size: 12px; letter-spacing: 1px; color: var(--muted2); }
+    .ks-kort-rad-mobil { display: flex; gap: 6px; padding: 6px 8px 10px; }
+    .ks-kort { width: 138px; flex-shrink: 0; }
+    .ks-grid { display: none; }
+    .ks-bane-hdr-rad { display: none; }
+    .ks-runde-rad-desktop { display: none; }
+    .ks-rf-baner .ks-kort { width: 138px; }
+    .ks-sveip-hint { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 4px 0; font-size: 10px; color: var(--muted); }
+  }
+
+  /* DESKTOP: full grid */
+  @media (min-width: 700px) {
+    .ks-runde-rad-mobil { display: none; }
+    .ks-sveip-hint { display: none; }
+    .ks-bane-hdr-rad { display: grid; }
+    .ks-rf-baner .ks-kort { width: auto; }
+    .ks-rf-baner { padding: 0 12px 10px 38px; flex-wrap: wrap; }
+  }
+
+  .pd-neg { color: var(--red2); font-family: monospace; }
+  .pd-nøy { color: var(--muted2); font-family: monospace; }
+
+  /* ── KAMPER ── */
+  .kamp-liste-item {
+    padding: 10px 12px; border-bottom: 1px solid var(--border);
+  }
+  .kamp-liste-item:last-child { border-bottom: none; }
+  .kamp-meta { font-size: 11px; color: var(--muted2); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .5px; }
+  .kamp-lag-rad { display: flex; justify-content: space-between; padding: 2px 0; font-size: 14px; }
+  .kamp-lag-navn { color: var(--muted2); }
+  .kamp-lag-navn.v { color: var(--white); font-weight: 600; }
+  .kamp-lag-score { font-family: monospace; font-size: 14px; color: var(--green2); }
+  .kamp-lag-score.t { color: var(--muted2); }
+
+  /* ── RANGERING ── */
+  .rang-rad {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 14px; border-bottom: 1px solid var(--border);
+  }
+  .rang-rad:last-child { border-bottom: none; }
+  .rang-rad.gull { background: rgba(245,200,66,.05); }
+  .rang-rad.sølv { background: rgba(96,165,250,.04); }
+  .rang-rad.bronse { background: rgba(205,124,63,.04); }
+  .rang-nummer {
+    font-family: 'Bebas Neue', cursive; font-size: 22px;
+    width: 36px; text-align: center; flex-shrink: 0;
+  }
+  .rang-lagnavn { flex: 1; font-size: 17px; font-weight: 500; }
+  .rang-plass { font-family: 'Bebas Neue', cursive; font-size: 18px; color: var(--muted); }
+
+  /* ── GAME-DETALJER (best av 3) ── */
+  .game-detaljer {
+    font-size: 11px;
+    color: var(--muted2);
+    margin-top: 3px;
+    letter-spacing: .3px;
+    padding: 0 10px 6px;
+  }
+  .game-detaljer .g-vinner { color: var(--green2); }
+  .game-detaljer .g-taper  { color: var(--muted2); }
+  .game-detaljer .g-skille { color: var(--muted);  }
+
+  /* ── SPLIT-VISNING ── */
+  .split-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+  .split-seksjon-tittel {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px;
+    color: var(--muted2); font-weight: 600; margin-bottom: 10px;
+  }
+  @media (max-width: 680px) {
+    .split-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ── LOADING / TOM ── */
+  .laster {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 14px; padding: 60px 20px;
+    color: var(--muted2); font-size: 16px;
+  }
+  .snurr {
+    width: 36px; height: 36px; border-radius: 50%;
+    border: 3px solid var(--border2);
+    border-top-color: var(--yellow);
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .tom { text-align: center; padding: 40px 20px; color: var(--muted2); font-size: 16px; }
+  .feil-boks {
+    margin: 20px; padding: 16px; background: rgba(220,38,38,.1);
+    border: 1px solid rgba(220,38,38,.3); border-radius: 12px;
+    color: #fca5a5; font-size: 15px; text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div class="laster" id="global-laster">
+    <div class="snurr"></div>
+    Laster turnering…
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import {
+  getFirestore, doc, onSnapshot,
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+// ── Firebase-konfig (speiler firebase.js) ────────────────
+const BRUK_MILJO = 'test'; // bytt til 'prod' ved produksjon
+const FB_CONFIGS = {
+  prod: {
+    apiKey: 'AIzaSyB_0rxDzHpV2HB6JdHm8SEHoGc8vE2F_rE',
+    authDomain: 'pickle-rank-5fbe5.firebaseapp.com',
+    projectId: 'pickle-rank-5fbe5',
+  },
+  test: {
+    apiKey: 'AIzaSyByUGIQJwohLKWB2x7_qqOMWdi965Ph7ZE',
+    authDomain: 'pickle-rank-test.firebaseapp.com',
+    projectId: 'pickle-rank-test',
+  },
+};
+
+const fbApp = initializeApp(FB_CONFIGS[BRUK_MILJO]);
+const db    = getFirestore(fbApp);
+
+// ── Hent turneringsID fra URL ─────────────────────────────
+const params      = new URLSearchParams(location.search);
+const turneringId = params.get('vis');
+
+if (!turneringId) {
+  document.getElementById('app').innerHTML =
+    '<div class="feil-boks">Ingen turneringsID i URL. Bruk ?vis=TURNERING_ID</div>';
+} else {
+  startLytter(turneringId);
+}
+
+// ── Aktiv fane ────────────────────────────────────────────
+let _aktivFane = 'bracket';
+
+function byttFane(fane) {
+  _aktivFane = fane;
+  document.querySelectorAll('.tab-btn').forEach(b =>
+    b.classList.toggle('aktiv', b.dataset.fane === fane)
+  );
+  document.querySelectorAll('.tab-innhold').forEach(el =>
+    el.classList.toggle('aktiv', el.id === 'fane-' + fane)
+  );
+}
+
+// ── Sanntids-lytter ───────────────────────────────────────
+function startLytter(id) {
+  onSnapshot(doc(db, 'turneringer', id),
+    snap => {
+      if (!snap.exists()) {
+        document.getElementById('app').innerHTML =
+          '<div class="feil-boks">Turnering ikke funnet.</div>';
+        return;
+      }
+      render({ id: snap.id, ...snap.data() });
+    },
+    err => {
+      document.getElementById('app').innerHTML =
+        `<div class="feil-boks">Tilkoblingsfeil: ${err.message}</div>`;
+    }
+  );
+}
+
+// ── Hoved-render ──────────────────────────────────────────
+function render(t) {
+  // Husk hvilke kollapsbare seksjoner som er åpne før re-render
+  const aapneSeksjoner = new Set(
+    [...document.querySelectorAll('.ks-kollaps-innhold.synlig')].map(el => el.id)
+  );
+
+  document.title = (t.navn ?? 'Turnering') + ' — Live';
+  const lagMap   = Object.fromEntries((t.lag ?? []).map(l => [l.id, l]));
+  const erFerdig = t.status === 'finished';
+  const erAktiv  = ['group_play', 'playoffs', 'playoff_seeding'].includes(t.status);
+
+  const pill = erFerdig
+    ? `<span class="ferdig-pill">Ferdig</span>`
+    : erAktiv
+      ? `<span class="live-pill"><span class="live-dot"></span>LIVE</span>`
+      : `<span class="ferdig-pill" style="color:var(--muted2);border-color:var(--muted)">Oppsett</span>`;
+
+  document.getElementById('app').innerHTML = `
+    <div class="viewer-header">
+      <div class="header-top">
+        <div class="turnering-navn">${esc(t.navn ?? 'Turnering')}</div>
+        ${pill}
+      </div>
+      <div class="tab-bar">
+        <button class="tab-btn${_aktivFane==='bracket'?' aktiv':''}" data-fane="bracket" onclick="byttFane('bracket')">Bracket</button>
+        <button class="tab-btn${_aktivFane==='tabeller'?' aktiv':''}" data-fane="tabeller" onclick="byttFane('tabeller')">Tabeller</button>
+        <button class="tab-btn${_aktivFane==='split'?' aktiv':''}" data-fane="split" onclick="byttFane('split')">Oversikt</button>
+        <button class="tab-btn${_aktivFane==='kamper'?' aktiv':''}" data-fane="kamper" onclick="byttFane('kamper')">Kamper</button>
+        <button class="tab-btn${_aktivFane==='kampskjema'?' aktiv':''}" data-fane="kampskjema" onclick="byttFane('kampskjema')">Kampskjema</button>
+        <button class="tab-btn${_aktivFane==='rangering'?' aktiv':''}" data-fane="rangering" onclick="byttFane('rangering')">Rangering</button>
+      </div>
+    </div>
+
+    <div id="fane-bracket" class="tab-innhold${_aktivFane==='bracket'?' aktiv':''}">
+      ${renderBracket(t, lagMap)}
+    </div>
+    <div id="fane-tabeller" class="tab-innhold${_aktivFane==='tabeller'?' aktiv':''}">
+      ${renderTabeller(t, lagMap)}
+    </div>
+    <div id="fane-split" class="tab-innhold${_aktivFane==='split'?' aktiv':''}">
+      ${renderSplit(t, lagMap)}
+    </div>
+    <div id="fane-kamper" class="tab-innhold${_aktivFane==='kamper'?' aktiv':''}">
+      ${renderKamper(t, lagMap)}
+    </div>
+    <div id="fane-kampskjema" class="tab-innhold${_aktivFane==='kampskjema'?' aktiv':''}">
+      ${renderKampskjema(t, lagMap)}
+    </div>
+    <div id="fane-rangering" class="tab-innhold${_aktivFane==='rangering'?' aktiv':''}">
+      ${renderRangering(t, lagMap)}
+    </div>
+  `;
+
+  window.byttFane    = byttFane;
+  window.ksToggle    = _ksToggle;
+  window.ksToggleRf  = _ksToggleRf;
+
+  // Gjenopprett åpne kollapsbare seksjoner fra før re-render
+  aapneSeksjoner.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('synlig');
+  });
+}
+
+// ── SPLIT-VISNING ─────────────────────────────────────────
+function renderSplit(t, lagMap) {
+  const harSluttspill = t.sluttspill?.A?.kamper?.length || t.sluttspill?.B?.kamper?.length || t.sluttspill?.C?.kamper?.length;
+  const harPuljer     = (t.puljer ?? []).length > 0;
+
+  if (!harSluttspill && !harPuljer) {
+    return '<div class="tom">Ingen data å vise ennå.</div>';
+  }
+
+  return `
+    <div class="split-grid">
+      <div>
+        <div class="split-seksjon-tittel">Tabeller</div>
+        ${renderTabeller(t, lagMap)}
+      </div>
+      <div>
+        <div class="split-seksjon-tittel">Bracket</div>
+        ${renderBracket(t, lagMap)}
+      </div>
+    </div>`;
+}
+
+// ── BRACKET ───────────────────────────────────────────────
+function renderBracket(t, lagMap) {
+  const sl = t.sluttspill;
+  if (!sl?.A && !sl?.B && !sl?.C) {
+    if (t.status === 'group_play') return '<div class="tom">Puljespill pågår — bracket genereres etter puljefasen.</div>';
+    return '<div class="tom">Sluttspill ikke startet ennå.</div>';
+  }
+
+  let html = '<div class="bracket-scroll">';
+
+  const renderNivaa = (nivaa, kamper, farge, tittel) => {
+    if (!kamper?.length) return '';
+    const runder = grupperPerRunde(kamper);
+    let h = `<div class="bracket-nivaa"><div class="nivaa-tittel" style="color:${farge}">${tittel}</div><div class="bracket-runder">`;
+    for (const [rundeNavn, kampListe] of runder) {
+      h += `<div class="runde-kol"><div class="runde-navn">${esc(rundeNavn)}</div>`;
+      for (const k of kampListe) {
+        const l1    = lagMap[k.lag1Id]?.navn ?? (k.lag1Id ? '?' : 'TBD');
+        const l2    = lagMap[k.lag2Id]?.navn ?? (k.lag2Id ? '?' : 'TBD');
+        const v1    = k.ferdig && k.lag1Poeng > k.lag2Poeng;
+        const v2    = k.ferdig && k.lag2Poeng > k.lag1Poeng;
+        const tbd1  = !k.lag1Id;
+        const tbd2  = !k.lag2Id;
+        h += `<div class="kamp-kort${!k.ferdig && k.lag1Id && k.lag2Id ? ' live' : ''}">
+          <div class="kamp-rad">
+            <div class="kamp-lagnavn${v1?' vinner':''}${tbd1?' tbd':''}">${esc(l1)}</div>
+            ${k.ferdig ? `<div class="kamp-poeng${v1?'':' tap'}">${k.lag1Poeng}</div>` : `<div class="kamp-poeng venter">—</div>`}
+          </div>
+          <div class="kamp-rad">
+            <div class="kamp-lagnavn${v2?' vinner':''}${tbd2?' tbd':''}">${esc(l2)}</div>
+            ${k.ferdig ? `<div class="kamp-poeng${v2?'':' tap'}">${k.lag2Poeng}</div>` : `<div class="kamp-poeng venter">—</div>`}
+          </div>
+          ${gameDetaljerHTML(k)}
+        </div>`;
+      }
+      h += '</div>';
+    }
+    h += '</div></div>';
+    return h;
+  };
+
+  html += renderNivaa('A', sl.A?.kamper, '#f5c842', 'A-sluttspill');
+  html += renderNivaa('B', sl.B?.kamper, '#60a5fa', 'B-sluttspill');
+  html += renderNivaa('C', sl.C?.kamper, '#7a90a8', 'C-sluttspill');
+  html += '</div>';
+  return html;
+}
+
+function grupperPerRunde(kamper) {
+  const rekkefølge = ['Åttedelsfinale','Kvartfinale','Semifinale','Plass 5–8','5. plass','7. plass','3. plass','1. plass','9. plass','11. plass','13. plass','14. plass','15. plass','16. plass','17. plass','19. plass','21. plass','23. plass'];
+  const map = {};
+  for (const k of kamper) {
+    const r = k.runde ?? 'Ukjent';
+    if (!map[r]) map[r] = [];
+    map[r].push(k);
+  }
+  return Object.entries(map).sort(([a],[b]) => {
+    const ia = rekkefølge.indexOf(a), ib = rekkefølge.indexOf(b);
+    return (ia===-1?99:ia) - (ib===-1?99:ib);
+  });
+}
+
+// ── TABELLER ─────────────────────────────────────────────
+function renderTabeller(t, lagMap) {
+  const puljer = t.puljer ?? [];
+  if (!puljer.length) return '<div class="tom">Ingen puljekamper ennå.</div>';
+
+  return puljer.map(p => {
+    const stats = {};
+    for (const id of p.lagIds ?? []) stats[id] = { lagId:id, seire:0, tap:0, pf:0, pm:0, pd:0 };
+    for (const k of p.kamper ?? []) {
+      if (!k.ferdig) continue;
+      const s1 = stats[k.lag1Id], s2 = stats[k.lag2Id];
+      if (!s1||!s2) continue;
+      s1.pf += k.lag1Poeng; s1.pm += k.lag2Poeng;
+      s2.pf += k.lag2Poeng; s2.pm += k.lag1Poeng;
+      if (k.lag1Poeng > k.lag2Poeng) { s1.seire++; s2.tap++; }
+      else { s2.seire++; s1.tap++; }
+    }
+    for (const s of Object.values(stats)) s.pd = s.pf - s.pm;
+
+    const sorted = _sorterMedTiebreak(Object.values(stats), p.kamper ?? []);
+
+    const harInnbyrdes = sorted.some(r => r.tiebreakType === 'innbyrdes');
+    const harPoengdiff = sorted.some(r => r.tiebreakType === 'poengdiff');
+    let fotnote = '';
+    if (harInnbyrdes || harPoengdiff) {
+      fotnote = '<div class="tb-fotnote">';
+      if (harInnbyrdes) fotnote += '<span><span class="tb-dot" style="background:var(--accent2)"></span>Skilt via innbyrdes oppgjør</span>';
+      if (harPoengdiff) fotnote += '<span><span class="tb-dot" style="background:var(--yellow)"></span>Skilt via poengdiff (sirkeloppgjør)</span>';
+      fotnote += '</div>';
+    }
+
+    return `<div class="seksjon-tittel">${esc(p.navn)}</div>
+    <div class="kort"><table class="pulje-tabell">
+      <thead><tr>
+        <th>#</th><th>Lag</th>
+        <th style="text-align:center">S</th>
+        <th style="text-align:center">T</th>
+        <th style="text-align:right">PD</th>
+        <th style="text-align:right">PF</th>
+      </tr></thead>
+      <tbody>${sorted.map((s,i) => {
+        const pd = s.pd;
+        const rankKl  = i < 2 ? (i===0?'rang-gull':'rang-sølv') : 'rang-grå';
+        const pdKl    = pd > 0 ? 'pd-pos' : pd < 0 ? 'pd-neg' : 'pd-nøy';
+        const kantKl  = s.tiebreakType === 'innbyrdes' ? 'tb-kant-inn'
+                      : s.tiebreakType === 'poengdiff'  ? 'tb-kant-pd'
+                      : 'tb-kant-ingen';
+        return `<tr>
+          <td><span class="${rankKl}"><span class="${kantKl}">${i+1}</span></span></td>
+          <td style="font-weight:${i<2?500:400}">${esc(lagMap[s.lagId]?.navn ?? s.lagId)}</td>
+          <td style="text-align:center;color:var(--green2)">${s.seire}</td>
+          <td style="text-align:center;color:var(--muted2)">${s.tap}</td>
+          <td style="text-align:right" class="${pdKl}">${pd>0?'+':''}${pd}</td>
+          <td style="text-align:right;color:var(--muted2);font-family:monospace">${s.pf}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>${fotnote}</div>`;
+  }).join('');
+}
+
+function _sorterMedTiebreak(lagListe, kamper) {
+  const grov = [...lagListe].sort((a, b) => b.seire - a.seire);
+  const resultat = [];
+  let i = 0;
+  while (i < grov.length) {
+    let j = i + 1;
+    while (j < grov.length && grov[j].seire === grov[i].seire) j++;
+    const gruppe = grov.slice(i, j);
+    if (gruppe.length === 1) {
+      gruppe[0].tiebreakType = null;
+      resultat.push(gruppe[0]);
+    } else {
+      resultat.push(..._sorterGruppeInnbyrdes(gruppe, kamper));
+    }
+    i = j;
+  }
+  return resultat;
+}
+
+function _sirkelPd(lagId, gruppeIds, kamper) {
+  let pd = 0;
+  for (const k of kamper) {
+    if (!k.ferdig || k.lag1Poeng == null || k.lag2Poeng == null) continue;
+    if (k.lag1Id === lagId && gruppeIds.has(k.lag2Id)) pd += k.lag1Poeng - k.lag2Poeng;
+    if (k.lag2Id === lagId && gruppeIds.has(k.lag1Id)) pd += k.lag2Poeng - k.lag1Poeng;
+  }
+  return pd;
+}
+
+function _sorterGruppeInnbyrdes(gruppe, kamper) {
+  const ids  = new Set(gruppe.map(l => l.lagId));
+  const mini = {};
+  gruppe.forEach(l => { mini[l.lagId] = { seire: 0 }; });
+  for (const k of kamper) {
+    if (!k.ferdig || k.lag1Poeng == null || k.lag2Poeng == null) continue;
+    if (!ids.has(k.lag1Id) || !ids.has(k.lag2Id)) continue;
+    if (k.lag1Poeng > k.lag2Poeng) mini[k.lag1Id].seire++;
+    else                            mini[k.lag2Id].seire++;
+  }
+  const totaler  = gruppe.map(l => mini[l.lagId].seire);
+  const erSirkel = totaler.every(s => s === totaler[0]);
+  const tiebreakType = erSirkel ? 'poengdiff' : 'innbyrdes';
+  const sortert = [...gruppe].sort((a, b) => {
+    const innS = mini[b.lagId].seire - mini[a.lagId].seire;
+    if (!erSirkel && innS !== 0) return innS;
+    // Sirkeloppgjør: bruk PD kun i kampene mellom de involverte lagene
+    const sirkelA = _sirkelPd(a.lagId, ids, kamper);
+    const sirkelB = _sirkelPd(b.lagId, ids, kamper);
+    if (sirkelB !== sirkelA) return sirkelB - sirkelA;
+    if (b.pd !== a.pd) return b.pd - a.pd;
+    return b.pf - a.pf;
+  });
+  sortert.forEach(l => { l.tiebreakType = tiebreakType; });
+  return sortert;
+}
+
+// ── KAMPER ────────────────────────────────────────────────
+function renderKamper(t, lagMap) {
+  const puljer = t.puljer ?? [];
+  const sl     = t.sluttspill;
+  let html     = '';
+
+  // Puljekamper
+  for (const p of puljer) {
+    const ferdig = (p.kamper ?? []).filter(k => k.ferdig);
+    if (!ferdig.length) continue;
+
+    const runder = {};
+    for (const k of ferdig) {
+      const r = k.runde ?? 1;
+      if (!runder[r]) runder[r] = [];
+      runder[r].push(k);
+    }
+
+    html += `<div class="seksjon-tittel">${esc(p.navn)}</div><div class="kort">`;
+    for (const rNr of Object.keys(runder).sort((a,b)=>a-b)) {
+      html += `<div class="kamp-liste-item" style="background:rgba(0,0,0,.15)">
+        <div class="kamp-meta">Runde ${rNr}</div>
+      </div>`;
+      for (const k of runder[rNr]) {
+        const l1 = lagMap[k.lag1Id]?.navn ?? '?';
+        const l2 = lagMap[k.lag2Id]?.navn ?? '?';
+        const v1 = k.lag1Poeng > k.lag2Poeng;
+        html += `<div class="kamp-liste-item">
+          <div class="kamp-lag-rad">
+            <span class="kamp-lag-navn${v1?' v':''}">${esc(l1)}</span>
+            <span class="kamp-lag-score${v1?'':' t'}">${k.lag1Poeng}</span>
+          </div>
+          <div class="kamp-lag-rad">
+            <span class="kamp-lag-navn${!v1?' v':''}">${esc(l2)}</span>
+            <span class="kamp-lag-score${!v1?'':' t'}">${k.lag2Poeng}</span>
+          </div>
+          ${gameDetaljerHTML(k)}
+        </div>`;
+      }
+    }
+    html += '</div>';
+  }
+
+  // Sluttspillkamper
+  const renderSlKamper = (kamper, tittel, farge) => {
+    if (!kamper?.length) return '';
+    const ferdig = kamper.filter(k => k.ferdig);
+    if (!ferdig.length) return '';
+    const runder = grupperPerRunde(ferdig);
+    let h = `<div class="seksjon-tittel" style="color:${farge}">${tittel}</div><div class="kort">`;
+    for (const [rundeNavn, kampListe] of runder) {
+      h += `<div class="kamp-liste-item" style="background:rgba(0,0,0,.15)">
+        <div class="kamp-meta">${esc(rundeNavn)}</div></div>`;
+      for (const k of kampListe) {
+        const l1 = lagMap[k.lag1Id]?.navn ?? '?';
+        const l2 = lagMap[k.lag2Id]?.navn ?? '?';
+        const v1 = k.lag1Poeng > k.lag2Poeng;
+        h += `<div class="kamp-liste-item">
+          <div class="kamp-lag-rad">
+            <span class="kamp-lag-navn${v1?' v':''}">${esc(l1)}</span>
+            <span class="kamp-lag-score${v1?'':' t'}">${k.lag1Poeng}</span>
+          </div>
+          <div class="kamp-lag-rad">
+            <span class="kamp-lag-navn${!v1?' v':''}">${esc(l2)}</span>
+            <span class="kamp-lag-score${!v1?'':' t'}">${k.lag2Poeng}</span>
+          </div>
+          ${gameDetaljerHTML(k)}
+        </div>`;
+      }
+    }
+    h += '</div>';
+    return h;
+  };
+
+  html += renderSlKamper(sl?.A?.kamper, 'A-sluttspill', '#f5c842');
+  html += renderSlKamper(sl?.B?.kamper, 'B-sluttspill', '#60a5fa');
+  html += renderSlKamper(sl?.C?.kamper, 'C-sluttspill', '#7a90a8');
+
+  return html || '<div class="tom">Ingen ferdigspilte kamper ennå.</div>';
+}
+
+// ════════════════════════════════════════════════════════
+// KAMPSKJEMA — logikk og rendering
+// ════════════════════════════════════════════════════════
+
+/** Finner gjeldende runde — laveste runde med uferdige kamper. */
+function finnGjeldendeRunde(alleKamper) {
+  const uferdigeRunder = alleKamper
+    .filter(k => !k.ferdig)
+    .map(k => k.runde)
+    .filter(r => r != null);
+  if (!uferdigeRunder.length) return null;
+  return Math.min(...uferdigeRunder);
+}
+
+/**
+ * Finner hvilke kamper i nesteRunde som kan spilles nå
+ * (begge lag er ferdige i gjeldende runde / ikke opptatt),
+ * og hvilken bane de er tildelt.
+ * Returnerer Map<kampId, baneNr>.
+ */
+function finnKlarSet(alleKamper, gjeldendeRunde) {
+  // Lag med uferdig kamp i gjeldende runde er opptatt
+  const opptattIRunde = new Set();
+  for (const k of alleKamper) {
+    if (k.runde !== gjeldendeRunde || k.ferdig) continue;
+    [k.lag1Id, k.lag2Id].filter(Boolean).forEach(id => opptattIRunde.add(id));
+  }
+
+  // Et lag er klart hvis det ikke er opptatt
+  const klarSet = new Set();
+  const nesteRunde = gjeldendeRunde + 1;
+  for (const k of alleKamper) {
+    if (k.runde !== nesteRunde || k.ferdig) continue;
+    if (!k.lag1Id || !k.lag2Id) continue;
+    if (!opptattIRunde.has(k.lag1Id)) klarSet.add(k.lag1Id);
+    if (!opptattIRunde.has(k.lag2Id)) klarSet.add(k.lag2Id);
+  }
+
+  return { klarSet, opptattIRunde };
+}
+
+/**
+ * Rendrer ett kampkort.
+ * @param {object} kamp
+ * @param {object} lagMap
+ * @param {object} opts - { puljNavn, erAktivRad, lag1Klar, lag2Klar }
+ */
+function _ksKort(kamp, lagMap, opts = {}) {
+  const { puljNavn, erAktivRad, lag1Klar, lag2Klar } = opts;
+
+  const lag1 = lagMap[kamp.lag1Id];
+  const lag2 = lagMap[kamp.lag2Id];
+
+  const hentSpillere = (lag) => {
+    if (!lag) return ['?', null];
+    if (lag.spiller1 && lag.spiller2) return [lag.spiller1, lag.spiller2];
+    if (lag.navn?.includes(' / ')) {
+      const deler = lag.navn.split(' / ');
+      return [deler[0].trim(), deler[1].trim()];
+    }
+    return [lag.navn ?? '?', null];
+  };
+
+  const [l1s1, l1s2] = hentSpillere(lag1);
+  const [l2s1, l2s2] = hentSpillere(lag2);
+
+  let kantKl = '';
+  let dot1Kl = 'graa', dot2Kl = 'graa';
+  let statusHTML = '';
+
+  if (kamp.ferdig) {
+    // Ferdigspilt — dimmet med score
+    kantKl = 'ferdig';
+    statusHTML = `<div class="ks-spacer"></div><div class="ks-resultat">${kamp.lag1Poeng} – ${kamp.lag2Poeng}</div>`;
+  } else if (erAktivRad) {
+    // Aktiv runde — grønne dots, ingen statustekst
+    dot1Kl = 'gronn'; dot2Kl = 'gronn';
+    statusHTML = `<div class="ks-spacer"></div>`;
+  } else if (lag1Klar && lag2Klar) {
+    // Neste runde — begge klare, kan spilles
+    kantKl = 'gronn-kant';
+    dot1Kl = 'gronn'; dot2Kl = 'gronn';
+    statusHTML = `<div class="ks-spacer"></div><div class="ks-status gronn">Kan spilles</div>`;
+  } else if (lag1Klar || lag2Klar) {
+    // Neste runde — ett lag klart, venter på motstander
+    kantKl = 'gul-kant';
+    dot1Kl = lag1Klar ? 'gul' : 'graa';
+    dot2Kl = lag2Klar ? 'gul' : 'graa';
+    statusHTML = `<div class="ks-spacer"></div><div class="ks-status gul">Venter på motstander</div>`;
+  } else {
+    // Ingen klare ennå
+    statusHTML = `<div class="ks-spacer"></div><div class="ks-status graa">Venter på begge lag</div>`;
+  }
+
+  const v1 = kamp.ferdig && kamp.lag1Poeng > kamp.lag2Poeng;
+  const v2 = kamp.ferdig && kamp.lag2Poeng > kamp.lag1Poeng;
+  const d1 = kamp.ferdig ? 'graa' : dot1Kl;
+  const d2 = kamp.ferdig ? 'graa' : dot2Kl;
+
+  const lagRader = (s1, s2, dotKl, erVinner) => {
+    const vinnerKl = erVinner ? ' vinner' : '';
+    let html = `<div class="ks-spiller${vinnerKl}"><span class="ks-dot ${dotKl}"></span>${esc(s1)}</div>`;
+    if (s2) html += `<div class="ks-spiller${vinnerKl}"><span class="ks-dot ${dotKl}"></span>${esc(s2)}</div>`;
+    return html;
+  };
+
+  return `<div class="ks-kort ${kantKl}">
+    <div class="ks-pulje-merke">${esc(puljNavn ?? '')}</div>
+    <div class="ks-lag">${lagRader(l1s1, l1s2, d1, v1)}</div>
+    <div class="ks-vs">VS</div>
+    <div class="ks-lag">${lagRader(l2s1, l2s2, d2, v2)}</div>
+    ${statusHTML}
+  </div>`;
+}
+
+/**
+ * Bygger kampkort-radene for én runde (desktop-grid + mobil-scroll).
+ * @param {number}  rundeNr
+ * @param {Array}   kamper        — alle kamper i denne runden
+ * @param {object}  lagMap
+ * @param {object}  opts          — { erAktivRad, klarSet, antallBaner, puljeNavnPerId, visHdr, alleKamper, aktivRunde }
+ */
+function _ksRundeRad(rundeNr, kamper, lagMap, opts = {}) {
+  const { erAktivRad, klarSet, antallBaner, puljeNavnPerId, visHdr, alleKamper = [], aktivRunde = null } = opts;
+  const n         = kamper.length;
+  const kamperVist = kamper; // vis alle kamper, ikke kutt til antallBaner
+  const antallBaneHdr = antallBaner ? Math.min(n, antallBaner) : n;
+  // Sorter kamper etter baneNr for øverste aktive rad (fast bane fra rotasjonsplan)
+  // For andre runder sorteres etter original rekkefølge
+  const kamperSortert = erAktivRad && kamperVist.some(k => k.baneNr != null)
+    ? [...kamperVist].sort((a, b) => (a.baneNr ?? 99) - (b.baneNr ?? 99))
+    : kamperVist;
+
+  const kolBredde = '154px';
+  const gridKols  = `130px repeat(${n}, ${kolBredde})`;
+
+  // Bygg kort-HTML for hvert kampkort
+  const kortHTMLer = kamperSortert.map(k => {
+    const lag1Klar = klarSet?.has(k.lag1Id) ?? false;
+    const lag2Klar = klarSet?.has(k.lag2Id) ?? false;
+    const puljNavn = puljeNavnPerId?.[k.lag1Id] ?? puljeNavnPerId?.[k.lag2Id] ?? '';
+    return _ksKort(k, lagMap, { puljNavn, erAktivRad, lag1Klar, lag2Klar });
+  });
+
+  // Runde-label tekst
+  let statusTekst = '', statusKl = 'graa', overTekst = '';
+  if (erAktivRad) {
+    statusTekst = 'Spilles nå'; statusKl = 'gronn';
+  } else if (klarSet?.size > 0) {
+    statusTekst = 'Kan spilles'; statusKl = 'gronn';
+  } else {
+    statusTekst = 'Venter'; statusKl = 'graa';
+    overTekst = rundeNr > (opts.aktivRunde ?? 0) + 1 ? 'Kommende runde' : '';
+  }
+
+  const labelHTML = `<div class="ks-rl">
+    ${overTekst ? `<div class="ks-rl-over">${overTekst}</div>` : ''}
+    <div class="ks-rl-nr">RUNDE ${rundeNr}</div>
+    <div class="ks-rl-status ${statusKl}">${statusTekst}</div>
+    ${erAktivRad ? `<div class="ks-rl-info">Flyttes ned når alle kampene har fått resultat.</div>` : ''}
+  </div>`;
+
+  // Bane-headers (kun øverste aktive rad, desktop)
+  const baneHdrHTML = visHdr ? `
+    <div class="ks-bane-hdr-rad" style="grid-template-columns:${gridKols}">
+      <div></div>
+      ${(erAktivRad && kamperSortert.some(k => k.baneNr != null) ? kamperSortert.slice(0, antallBaneHdr).map(k => `<div class="ks-bane-hdr-celle">BANE ${k.baneNr}</div>`) : Array.from({length: antallBaneHdr}, (_, i) => `<div class="ks-bane-hdr-celle">BANE ${i + 1}</div>`)).join('')}
+    </div>` : '';
+
+  // DESKTOP: grid
+  const desktopHTML = `
+    <div class="ks-grid" style="grid-template-columns:${gridKols}">
+      ${labelHTML}
+      ${kortHTMLer.join('')}
+    </div>`;
+
+  // MOBIL: låst label + horisontal scroll
+  const mobilBaneHdr = visHdr
+    ? '<div class="ks-bane-hdr-rad-mobil">' + (erAktivRad && kamperSortert.some(k => k.baneNr != null) ? kamperSortert.slice(0, antallBaneHdr).map(k => '<div class="ks-bane-hdr-celle-mobil">BANE ' + k.baneNr + '</div>') : Array.from({length: antallBaneHdr}, (_, i) => '<div class="ks-bane-hdr-celle-mobil">BANE ' + (i + 1) + '</div>')).join('') + '</div>'
+    : '';
+  const mobilLabelHTML = labelHTML.replace('class="ks-rl"', 'class="ks-rl ks-rl-mobil"');
+
+  const mobilHTML = `
+    <div class="ks-runde-rad-mobil">
+      ${mobilLabelHTML}
+      <div class="ks-scroll-wrap">
+        <div class="ks-scroll-innhold">
+          ${mobilBaneHdr}
+          <div class="ks-kort-rad-mobil">${kortHTMLer.join('')}</div>
+        </div>
+      </div>
+    </div>`;
+
+  return `${baneHdrHTML}<div class="ks-runde-blokk">${desktopHTML}${mobilHTML}</div>`;
+}
+
+function renderKampskjema(t, lagMap) {
+  const puljer      = t.puljer ?? [];
+  const antallBaner = t.antallBaner ?? t.konfig?.antallBaner ?? 6;
+
+  if (!puljer.length) return '<div class="tom">Kampskjema vises når puljespill er startet.</div>';
+
+  // Slå sammen alle kamper fra alle puljer, berik med pulje-navn
+  const alleKamper = [];
+  const puljeNavnPerId = {}; // lagId -> pulje-navn
+  for (const p of puljer) {
+    for (const lagId of p.lagIds ?? []) puljeNavnPerId[lagId] = p.navn;
+    for (const k of p.kamper ?? []) alleKamper.push(k);
+  }
+  alleKamper.sort((a, b) => a.runde - b.runde);
+
+  const totalt       = alleKamper.length;
+  const ferdigAntall = alleKamper.filter(k => k.ferdig).length;
+  if (!totalt) return '<div class="tom">Ingen kamper planlagt ennå.</div>';
+
+  const progProsent    = Math.round((ferdigAntall / totalt) * 100);
+  const aktivRunde     = finnGjeldendeRunde(alleKamper);
+
+  // Grupper per runde
+  const perRunde = {};
+  for (const k of alleKamper) {
+    if (!perRunde[k.runde]) perRunde[k.runde] = [];
+    perRunde[k.runde].push(k);
+  }
+  const alleRundeNr    = Object.keys(perRunde).map(Number).sort((a, b) => a - b);
+  const ferdigeRunder  = alleRundeNr.filter(r => perRunde[r].every(k => k.ferdig));
+  const uferdigeRunder = alleRundeNr.filter(r => perRunde[r].some(k => !k.ferdig));
+
+  // Finn hvilke lag er klare for neste runde
+  const { klarSet } = aktivRunde != null
+    ? finnKlarSet(alleKamper, aktivRunde)
+    : { klarSet: new Set() };
+
+  // De tre synlige rundene: aktiv + neste + etter-neste
+  const synligeRunder = uferdigeRunder.slice(0, 3);
+  const skjulteRunder = uferdigeRunder.slice(3);
+
+  let html = `<div class="ks-wrap">
+    <div class="ks-prog-rad">
+      <div class="ks-prog-bar"><div class="ks-prog-fill" style="width:${progProsent}%"></div></div>
+      <div class="ks-prog-tekst">${ferdigAntall} av ${totalt} kamper ferdig</div>
+    </div>`;
+
+  // ── SYNLIGE RUNDER (aktiv + neste 2) ──
+  synligeRunder.forEach((r, idx) => {
+    const erAktivRad = r === aktivRunde;
+    const erNesteRad = r === aktivRunde + 1;
+    const ksForRad   = erNesteRad ? klarSet : new Set();
+    html += _ksRundeRad(r, perRunde[r], lagMap, {
+      erAktivRad,
+      klarSet: ksForRad,
+      antallBaner,
+      puljeNavnPerId,
+      visHdr: idx === 0,
+      aktivRunde,
+      alleKamper,
+    });
+    if (idx === 0) html += `<div class="ks-sveip-hint">← Sveip for å se alle baner →</div>`;
+  });
+
+  // ── KOLLAPSBAR: Skjulte runder ──
+  if (skjulteRunder.length) {
+    const antall = skjulteRunder.length;
+    const label  = skjulteRunder.map(r => `Runde ${r}`).join(', ');
+    html += `<div class="ks-kollaps-knapp" onclick="ksToggle('ks-ekstra-runder', this)">
+      <div class="ks-kollaps-tittel">Vis ${label}</div>
+      <div class="ks-kollaps-hint">${antall} runde${antall > 1 ? 'r' : ''} skjult</div>
+      <div class="ks-kollaps-chevron">▼</div>
+    </div>
+    <div class="ks-kollaps-innhold" id="ks-ekstra-runder">`;
+    for (const r of skjulteRunder) {
+      html += _ksRundeRad(r, perRunde[r], lagMap, {
+        erAktivRad: false,
+        antallBaner,
+        puljeNavnPerId,
+        visHdr: false,
+        aktivRunde,
+      });
+    }
+    html += `</div>`;
+  }
+
+  // ── LEGEND ──
+  html += `<div class="ks-legend">
+    <div class="ks-leg-item"><span class="ks-leg-dot" style="background:var(--green2)"></span>Spiller nå / spiller neste (bane tildelt)</div>
+    <div class="ks-leg-item"><span class="ks-leg-dot" style="background:var(--yellow)"></span>Klar (venter på motstander/bane)</div>
+    <div class="ks-leg-item"><span class="ks-leg-dot" style="background:var(--muted)"></span>Venter (ikke klar)</div>
+
+  </div>`;
+
+  // ── FERDIGSPILTE RUNDER — seksjonstittel + én toggle per runde ──
+  if (ferdigeRunder.length) {
+    html += `<div class="ks-kollaps-knapp" style="cursor:default;pointer-events:none">
+      <div class="ks-kollaps-tittel" style="color:var(--muted2)">Ferdigspilte runder</div>
+    </div>`;
+
+    for (const r of [...ferdigeRunder].reverse()) {
+      const id = `ks-rf-${r}`;
+      html += `
+        <div class="ks-rf-hdr" onclick="ksToggleRf('${id}', this)">
+          <div class="ks-rf-check">✓</div>
+          <div class="ks-rf-navn">RUNDE ${r}</div>
+          <div class="ks-rf-status">– Ferdigspilt</div>
+          <div class="ks-rf-chevron">▼</div>
+        </div>
+        <div class="ks-kollaps-innhold" id="${id}">
+          <div class="ks-rf-baner">
+            ${perRunde[r].map(k => {
+              const puljNavn = puljeNavnPerId?.[k.lag1Id] ?? puljeNavnPerId?.[k.lag2Id] ?? '';
+              return _ksKort(k, lagMap, { puljNavn, erAktivRad: false, lag1Klar: false, lag2Klar: false });
+            }).join('')}
+          </div>
+        </div>`;
+    }
+  }
+
+  html += `</div>`;
+
+  return html;
+}
+
+// Toggle-hjelpere for kampskjema (settes på window i render())
+function _ksToggle(id, btn) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const synlig = el.classList.toggle('synlig');
+  const chevron = btn.querySelector('.ks-kollaps-chevron');
+  if (chevron) chevron.style.transform = synlig ? 'rotate(180deg)' : '';
+  const hint = btn.querySelector('.ks-kollaps-hint');
+  if (hint && id === 'ks-ferdigspilte') hint.textContent = synlig ? 'Klikk for å skjule' : 'Klikk for å vise detaljer';
+  if (hint && id === 'ks-ekstra-runder') hint.textContent = synlig ? 'Klikk for å skjule' : hint.dataset.skjult ?? hint.textContent;
+}
+
+function _ksToggleRf(id, btn) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const synlig = el.classList.toggle('synlig');
+  const chevron = btn.querySelector('.ks-rf-chevron');
+  if (chevron) chevron.style.transform = synlig ? 'rotate(180deg)' : '';
+}
+
+// ── RANGERING ────────────────────────────────────────────
+function renderRangering(t, lagMap) {
+  const rangering = t.rangering ?? [];
+  const erFerdig  = t.status === 'finished';
+
+  if (!rangering.length) {
+    return '<div class="tom">' + (erFerdig ? 'Ingen rangering tilgjengelig.' : 'Rangering vises etter turneringen er avsluttet.') + '</div>';
+  }
+
+  const medal = p => p===1?'🥇':p===2?'🥈':p===3?'🥉':'';
+  const farge = p => p===1?'var(--yellow)':p<=3?'var(--accent2)':'var(--muted2)';
+  const klasse = p => p===1?'gull':p===2?'sølv':p===3?'bronse':'';
+
+  let html = '';
+  if (!erFerdig) html += '<div style="background:rgba(245,200,66,.08);border:1px solid rgba(245,200,66,.2);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:14px;color:var(--yellow)">Foreløpig rangering</div>';
+
+  html += `<div class="kort">
+    ${rangering.map(r => `
+      <div class="rang-rad ${klasse(r.plass)}">
+        <div class="rang-nummer" style="color:${farge(r.plass)}">${medal(r.plass)||r.plass+'.'}</div>
+        <div class="rang-lagnavn">${esc(r.navn ?? lagMap[r.lagId]?.navn ?? '?')}</div>
+        <div class="rang-plass">${r.plass}.</div>
+      </div>`).join('')}
+  </div>`;
+  return html;
+}
+
+// ── HJELPER ───────────────────────────────────────────────
+function esc(str) {
+  return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/** Rendrer game-detaljer for best-av-3 kamper. */
+function gameDetaljerHTML(kamp) {
+  if (!kamp.ferdig || !kamp.games?.length) return '';
+  const deler = kamp.games.map((g, i) => {
+    const g1Vant = g.l1 > g.l2;
+    const skille = i < kamp.games.length - 1 ? '<span class="g-skille"> · </span>' : '';
+    return `<span class="${g1Vant ? 'g-vinner' : 'g-taper'}">${g.l1}</span>`
+         + `<span class="g-skille">–</span>`
+         + `<span class="${!g1Vant ? 'g-vinner' : 'g-taper'}">${g.l2}</span>`
+         + skille;
+  }).join('');
+  return `<div class="game-detaljer">${deler}</div>`;
+}
+</script>
+</body>
+</html>

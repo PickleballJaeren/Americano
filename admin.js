@@ -7,15 +7,27 @@
 // ════════════════════════════════════════════════════════
 // PIN-GETTER — settes av app.js ved oppstart
 // ════════════════════════════════════════════════════════
-let _pinGetter = () => '';
+let _pinGetter    = () => '';
+let _klubbIdGetter = () => '';
 
 /**
  * Registrerer en funksjon som returnerer gjeldende admin-PIN.
- * Kalles av app.js ved oppstart: registrerPinGetter(() => getAdminPin()).
- * Slik slipper admin.js å importere PIN-konstanten direkte.
  */
 export function registrerPinGetter(fn) {
   _pinGetter = fn;
+}
+
+/**
+ * Registrerer en funksjon som returnerer gjeldende klubbId.
+ * Brukes for å lagre admin-status per klubb i localStorage.
+ */
+export function registrerKlubbIdGetter(fn) {
+  _klubbIdGetter = fn;
+}
+
+function _adminNøkkel() {
+  const klubbId = _klubbIdGetter();
+  return klubbId ? `pb_admin_${klubbId}` : 'pb_admin';
 }
 
 // ════════════════════════════════════════════════════════
@@ -23,12 +35,26 @@ export function registrerPinGetter(fn) {
 // ════════════════════════════════════════════════════════
 let pinCallback   = null;
 let pinForsok     = 0;
-let _erAdmin      = false;
+let _erAdmin      = false; // initialiseres av gjenopprettAdminStatus() etter klubbvalg
 
 const PIN_MAKS_FORSOK = 5;
 
 export function getErAdmin() { return _erAdmin; }
-export function setErAdmin(v) { _erAdmin = v; }
+export function setErAdmin(v) {
+  _erAdmin = v;
+  if (v) localStorage.setItem(_adminNøkkel(), '1');
+  else   localStorage.removeItem(_adminNøkkel());
+}
+export function nullstillAdmin() {
+  _erAdmin = false;
+  localStorage.removeItem(_adminNøkkel());
+}
+
+/** Kalles av app.js etter at klubbId er satt — gjenoppretter admin-status fra localStorage. */
+export function gjenopprettAdminStatus() {
+  _erAdmin = localStorage.getItem(_adminNøkkel()) === '1';
+  return _erAdmin;
+}
 
 export function krevAdmin(tittel, tekst, callback, erDemoModus = false) {
   if (_erAdmin || erDemoModus) {
@@ -60,7 +86,7 @@ window.pinInput = pinInput;
 export function bekreftPin() {
   const pin = [0,1,2,3].map(i => document.getElementById('pin'+i).value).join('');
   if (pin === _pinGetter()) {
-    _erAdmin = true;
+    setErAdmin(true);
     const cb = pinCallback;
     lukkPinModal();
     if (typeof cb === 'function') cb();

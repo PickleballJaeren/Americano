@@ -4,15 +4,22 @@
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import {
-  getFirestore, collection, doc, addDoc, updateDoc,
+  getFirestore, collection, doc, addDoc, updateDoc, setDoc,
   getDoc, getDocs, query, where, orderBy, limit,
   onSnapshot, serverTimestamp, writeBatch, runTransaction,
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // ════════════════════════════════════════════════════════
-// FIREBASE-KONFIGURASJON — bytt til dine verdier
+// MILJØ — bytt mellom 'prod' og 'test'
+// ────────────────────────────────────────────────────────
+// Sett BRUK_MILJO = 'test' når du tester refaktoreringen mot
+// test-databasen. Sett tilbake til 'prod' før du deployer
+// til produksjon.
 // ════════════════════════════════════════════════════════
-const FB_CONFIG = {
+const BRUK_MILJO = 'test'; // 'prod' | 'test'
+
+// ── PRODUKSJON ─────────────────────────────────────────
+const FB_CONFIG_PROD = {
   apiKey:            'AIzaSyB_0rxDzHpV2HB6JdHm8SEHoGc8vE2F_rE',
   authDomain:        'pickle-rank-5fbe5.firebaseapp.com',
   projectId:         'pickle-rank-5fbe5',
@@ -21,41 +28,50 @@ const FB_CONFIG = {
   appId:             '1:761601873916:web:f3c13d21e809658fd80479',
 };
 
-// ════════════════════════════════════════════════════════
-// KONSTANTER
-// ════════════════════════════════════════════════════════
-export const SAM = {
-  SPILLERE:   'players',
-  TRENINGER:  'treninger',
-  TS:         'treningSpillere',
-  KAMPER:     'kamper',
-  RESULTATER: 'resultater',
-  HISTORIKK:  'ratingHistorikk',
+// ── TEST ───────────────────────────────────────────────
+const FB_CONFIG_TEST = {
+  apiKey:            'AIzaSyByUGIQJwohLKWB2x7_qqOMWdi965Ph7ZE',
+  authDomain:        'pickle-rank-test.firebaseapp.com',
+  projectId:         'pickle-rank-test',
+  storageBucket:     'pickle-rank-test.firebasestorage.app',
+  messagingSenderId: '491693932367',
+  appId:             '1:491693932367:web:b3c13902ef6adb981dcf3a',
 };
 
-export const STARTRATING = 1000;
+const FB_CONFIG = BRUK_MILJO === 'test' ? FB_CONFIG_TEST : FB_CONFIG_PROD;
 
-export const PARTER = [
-  { nr:1, lag1:[0,1], lag2:[2,3] },
-  { nr:2, lag1:[0,2], lag2:[1,3] },
-  { nr:3, lag1:[0,3], lag2:[1,2] },
-];
+// Logg til konsoll kun i testmiljø
+if (BRUK_MILJO === 'test') {
+  console.log(`[Firebase] Miljø: ${BRUK_MILJO.toUpperCase()} (${FB_CONFIG.projectId})`);
+}
 
-export const PARTER_5 = [
-  { nr:1, lag1:[0,1], lag2:[2,3], hviler:4 },
-  { nr:2, lag1:[0,2], lag2:[1,4], hviler:3 },
-  { nr:3, lag1:[0,3], lag2:[2,4], hviler:1 },
-  { nr:4, lag1:[0,4], lag2:[1,3], hviler:2 },
-  { nr:5, lag1:[1,2], lag2:[3,4], hviler:0 },
-];
+// ════════════════════════════════════════════════════════
+// SAMLINGSREFERANSER
+// ════════════════════════════════════════════════════════
+export const SAM = {
+  SPILLERE:    'players',
+  TRENINGER:   'treninger',
+  TS:          'treningSpillere',
+  KAMPER:      'kamper',
+  RESULTATER:  'resultater',
+  HISTORIKK:   'ratingHistorikk',
+  UTFORDRINGER:    'utfordringer',
+  SINGEL_HISTORIKK:'singelHistorikk',
+  SKJERMSYNC:      'skjermSync',
+};
 
-export const PARTER_6_DOBBEL = [
-  { nr:1, lag1:[0,1], lag2:[2,3], singel:false },
-];
-
-export const PARTER_6_SINGEL = [
-  { nr:1, lag1:[0], lag2:[1], singel:true },
-];
+// ════════════════════════════════════════════════════════
+// DOMENEKONSTANTER — importert fra konstanter.js
+// Re-eksporteres herfra for bakoverkompatibilitet:
+// alle eksisterende import-setninger trenger ingen endring.
+// ════════════════════════════════════════════════════════
+export {
+  STARTRATING,
+  PARTER,
+  PARTER_5,
+  PARTER_6_DOBBEL,
+  PARTER_6_SINGEL,
+} from './konstanter.js';
 
 // ════════════════════════════════════════════════════════
 // FIREBASE INIT
@@ -74,7 +90,7 @@ export { db };
 // Re-eksporter alt fra Firestore SDK slik at andre moduler
 // kun trenger å importere fra denne filen
 export {
-  collection, doc, addDoc, updateDoc,
+  collection, doc, addDoc, updateDoc, setDoc,
   getDoc, getDocs, query, where, orderBy, limit,
   onSnapshot, serverTimestamp, writeBatch, runTransaction,
 };

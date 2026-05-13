@@ -5,19 +5,40 @@
 // direkte til nett — aldri fra cache.
 // ════════════════════════════════════════════════════════
 
-const CACHE_NAVN = 'pb-jaeren-v2';
+const CACHE_NAVN = 'pb-jaeren-v7';
 
 const SHELL = [
   './',
   './index.html',
   './style.css',
+  './turnering.css',
   './app.js',
   './state.js',
   './firebase.js',
+  './konstanter.js',
+  './render-helpers.js',
+  './batch-helpers.js',
   './rotasjon.js',
   './rating.js',
   './ui.js',
   './admin.js',
+  './lyttere.js',
+  './spillere.js',
+  './baner.js',
+  './poeng.js',
+  './resultat.js',
+  './trening.js',
+  './profil.js',
+  './global-profil.js',
+  './ledertavle.js',
+  './arkiv.js',
+  './utfordrer.js',
+  './turnering.js',
+  './turnering-logikk.js',
+  './turnering-ui.js',
+  './turnering-spill-ui.js',
+  './turnering-skjermer.html',
+  './viewer.html',
   './logo.svg',
   './icon-192.png',
   './icon-512.png',

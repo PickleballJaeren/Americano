@@ -12,14 +12,14 @@
 // ════════════════════════════════════════════════════════
 let toastTimer = null;
 
-export function visMelding(tekst, type = 'ok') {
+export function visMelding(tekst, type = 'ok', varighet = 2800) {
   const t = document.getElementById('toast');
   if (!t) return;
   t.textContent = tekst;
   t.className   = 'toast' + (type === 'feil' ? ' feil' : type === 'advarsel' ? ' advarsel' : '');
   t.classList.add('vis');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('vis'), 2800);
+  toastTimer = setTimeout(() => t.classList.remove('vis'), varighet);
 }
 
 export function visFBFeil(tekst) {
@@ -42,13 +42,31 @@ export function escHtml(str) {
 }
 
 // ════════════════════════════════════════════════════════
-// NAVIGASJON
+// PROFIL-CALLBACKS — registreres av profil.js ved oppstart
+// Unngår globals og typeof-sjekker i naviger()
 // ════════════════════════════════════════════════════════
-const SVEIP_FANER = ['hjem', 'baner', 'slutt', 'spillere', 'arkiv'];
+let _nullstillUtfordringBadge = null;
+let _visUtfordrerSkjerm       = null;
+
+export function registrerProfilCallbacks({ nullstillUtfordringBadge, visUtfordrerSkjerm }) {
+  _nullstillUtfordringBadge = nullstillUtfordringBadge ?? null;
+  _visUtfordrerSkjerm       = visUtfordrerSkjerm       ?? null;
+}
+
+// Brukes av naviger() for å avgjøre om en tilskuer skal omrutes til tilskuerskjermen.
+// Registreres av app.js ved oppstart via registrerHarAktivOkt().
+let _harAktivOkt = () => false;
+export function registrerHarAktivOkt(fn) {
+  _harAktivOkt = fn;
+}
+
+
+const SVEIP_FANER = ['hjem', 'baner', 'slutt', 'spillere', 'utfordrer', 'arkiv'];
 let _aktivFane = 'hjem';
 
 function settAktivFane(skjerm) {
   if (SVEIP_FANER.includes(skjerm)) _aktivFane = skjerm;
+  else if (TURNERING_SKJERMER.has(skjerm)) _aktivFane = skjerm;
 }
 
 // app.js registrerer sin navigasjonshandler her ved oppstart.
@@ -59,6 +77,11 @@ export function registrerNavigertHandler(fn) {
 }
 
 export function naviger(skjerm, retning = null) {
+  // Tilskuere som ber om baner-skjermen sendes til tilskuerskjermen.
+  // getErAdmin og harAktivOkt er registrert av app.js via hjelpere.
+  if (skjerm === 'baner' && window.getErAdmin && !window.getErAdmin() && _harAktivOkt()) {
+    skjerm = 'tilskuer';
+  }
   settAktivFane(skjerm);
   document.querySelectorAll('.screen').forEach(s => {
     s.classList.remove('active', 'sveip-venstre', 'sveip-hoyre');
@@ -69,19 +92,30 @@ export function naviger(skjerm, retning = null) {
     hjem: 'nav-hjem',
     baner: 'nav-baner', slutt: 'nav-slutt',
     spillere: 'nav-spillere', 'global-profil': 'nav-spillere',
+    utfordrer: 'nav-utfordrer',
     arkiv: 'nav-arkiv', treningsdetalj: 'nav-arkiv',
+    'turnering-arkiv-detalj': 'nav-arkiv',
+    tilskuer: 'nav-baner',  // tilskuer-skjerm markerer baner-fanen som aktiv
   };
   const nb = document.getElementById(navMap[skjerm]);
   if (nb) nb.classList.add('aktiv');
 
-  const ingenNav = ['hjem', 'poeng', 'resultat', 'profil', 'global-profil', 'treningsdetalj'];
+  const ingenNav = ['hjem', 'poeng', 'resultat', 'profil', 'global-profil', 'treningsdetalj',
+                    'turnering', 'turnering-oppsett', 'turnering-pulje', 'turnering-bracket',
+                    'turnering-resultat', 'turnering-arkiv-detalj'];
   document.getElementById('bunn-nav').style.display =
     ingenNav.includes(skjerm) ? 'none' : 'flex';
 
   const tilbakeBoks = document.getElementById('oppsett-tilbake-boks');
   if (tilbakeBoks) tilbakeBoks.style.display = skjerm === 'oppsett' ? 'flex' : 'none';
 
-  const skjermMap = { 'oppsett-nav': 'oppsett' };
+  const skjermMap = {
+    'oppsett-nav':        'oppsett',
+    'turnering-oppsett':  'turnering-oppsett',
+    'turnering-pulje':    'turnering-pulje',
+    'turnering-bracket':  'turnering-bracket',
+    'turnering-resultat': 'turnering-resultat',
+  };
   const sid = 'skjerm-' + (skjermMap[skjerm] ?? skjerm);
   const el  = document.getElementById(sid);
   if (el) {
@@ -91,6 +125,15 @@ export function naviger(skjerm, retning = null) {
   }
 
   if (_navigertHandler) _navigertHandler(skjerm);
+
+  // Nullstill utfordrer-badge når spillerskjermen åpnes
+  if (skjerm === 'spillere' && _nullstillUtfordringBadge) {
+    _nullstillUtfordringBadge();
+  }
+  // Last utfordrer-skjerm
+  if (skjerm === 'utfordrer' && _visUtfordrerSkjerm) {
+    _visUtfordrerSkjerm();
+  }
 }
 window.naviger = naviger;
 
@@ -105,6 +148,11 @@ document.addEventListener('touchstart', e => {
   _sveipStartY = e.touches[0].clientY;
 }, { passive: true });
 
+const TURNERING_SKJERMER = new Set([
+  'turnering', 'turnering-oppsett', 'turnering-pulje',
+  'turnering-bracket', 'turnering-resultat', 'turnering-arkiv-detalj',
+]);
+
 document.addEventListener('touchend', e => {
   if (_sveipStartX === null) return;
   const dx = e.changedTouches[0].clientX - _sveipStartX;
@@ -114,6 +162,7 @@ document.addEventListener('touchend', e => {
 
   if (Math.abs(dy) > Math.abs(dx)) return;
   if (Math.abs(dx) < 60) return;
+  if (TURNERING_SKJERMER.has(_aktivFane)) return;
   if (!SVEIP_FANER.includes(_aktivFane)) return;
 
   const mål = e.target;

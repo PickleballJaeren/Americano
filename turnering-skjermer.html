@@ -1,0 +1,305 @@
+<!-- ═══════════════════════════════════════════════════════
+     TURNERINGSSKJERMER — legg til i index.html
+     Plasseres etter SKJERM 10 (treningsdetalj), før <nav>
+     ═══════════════════════════════════════════════════════ -->
+
+<!-- SKJERM T1 — TURNERINGOVERSIKT -->
+<div id="skjerm-turnering" class="screen">
+  <div class="app-header">
+    <button class="app-logo" style="background:var(--yellow);color:#000;border:none;cursor:pointer" onclick="naviger('oppsett')" title="Hjem">PB</button>
+    <div>
+      <div class="app-name" id="turnering-klubbnavn">Turneringer</div>
+      <div class="app-sub">Oversikt</div>
+    </div>
+    <div class="header-right">
+      <button class="knapp knapp-primaer knapp-liten" onclick="visNyTurneringModal()">+ Ny</button>
+    </div>
+  </div>
+  <div class="scroll-omrade">
+    <div id="turnering-laster" class="laster" style="display:none">
+      <div class="laster-snurr"></div>Laster turneringer…
+    </div>
+    <div id="turnering-liste"></div>
+  </div>
+</div>
+
+<!-- SKJERM T2 — OPPSETT (lag + puljer) -->
+<div id="skjerm-turnering-oppsett" class="screen">
+  <div class="app-header">
+    <button class="tilbake-btn" onclick="naviger('turnering')">←</button>
+    <button class="app-logo" style="background:var(--yellow);color:#000;border:none;cursor:pointer" onclick="naviger('oppsett')" title="Hjem">PB</button>
+    <div style="flex:1">
+      <div class="app-name" id="oppsett-turnering-navn" style="font-size:20px">Oppsett</div>
+      <div class="app-sub">Lag og puljer</div>
+    </div>
+  </div>
+  <div class="scroll-omrade">
+
+    <!-- Legg til lag -->
+    <div class="seksjon-etikett">
+      Lag
+      <span id="turnering-lag-teller" style="font-family:'DM Mono',monospace;font-size:14px;color:var(--muted2);text-transform:none;letter-spacing:0;margin-left:4px"></span>
+    </div>
+    <div class="kort"><div class="kort-innhold">
+      <div class="legg-til-rad" style="flex-direction:column;gap:8px">
+        <div style="display:flex;gap:8px">
+          <input id="nytt-lag-spiller1" placeholder="Spiller 1…"
+            onkeydown="if(event.key==='Enter')document.getElementById('nytt-lag-spiller2').focus()"
+            style="font-size:17px;flex:1"/>
+          <input id="nytt-lag-spiller2" placeholder="Spiller 2…"
+            onkeydown="if(event.key==='Enter')leggTilLagUI()"
+            style="font-size:17px;flex:1"/>
+          <button class="knapp knapp-primaer knapp-liten" onclick="leggTilLagUI()">Legg til</button>
+        </div>
+      </div>
+      <div id="turnering-lag-liste" style="display:flex;flex-direction:column;gap:6px"></div>
+    </div></div>
+
+    <!-- Pulje-preview -->
+    <div class="seksjon-etikett">Puljeoppsett (forhåndsvisning)</div>
+    <div class="kort"><div class="kort-innhold">
+      <div id="pulje-preview"></div>
+    </div></div>
+
+    <button class="knapp knapp-gronn" id="start-puljespill-knapp"
+      onclick="startPuljespillUI()" disabled>
+      START PULJESPILL →
+    </button>
+  </div>
+</div>
+
+<!-- SKJERM T3 — PULJESPILL -->
+<div id="skjerm-turnering-pulje" class="screen">
+  <div class="app-header">
+    <button class="tilbake-btn" onclick="naviger('turnering')">←</button>
+    <button class="app-logo" style="background:var(--yellow);color:#000;border:none;cursor:pointer" onclick="naviger('oppsett')" title="Hjem">PB</button>
+    <div style="flex:1">
+      <div class="app-name" id="pulje-turnering-navn" style="font-size:20px">Puljespill</div>
+      <div class="app-sub">Tabeller og kamper</div>
+    </div>
+  </div>
+  <div class="scroll-omrade">
+    <div id="pulje-fremgang" style="margin-bottom:14px"></div>
+    <div id="pulje-innhold"></div>
+    <div id="kvalifisering-boks" style="display:none"></div>
+    <button class="knapp knapp-gronn" id="til-sluttspill-knapp"
+      onclick="tilSluttspillUI()" style="display:none;margin-top:8px">
+      GENERER SLUTTSPILL →
+    </button>
+  </div>
+</div>
+
+<!-- SKJERM T4 — BRACKET (sluttspill) -->
+<div id="skjerm-turnering-bracket" class="screen">
+  <div class="app-header">
+    <button class="tilbake-btn" onclick="naviger('turnering')">←</button>
+    <button class="app-logo" style="background:var(--yellow);color:#000;border:none;cursor:pointer" onclick="naviger('oppsett')" title="Hjem">PB</button>
+    <div style="flex:1">
+      <div class="app-name" id="bracket-turnering-navn" style="font-size:20px">Sluttspill</div>
+      <div class="app-sub">A · B · C</div>
+    </div>
+  </div>
+  <div class="scroll-omrade">
+    <div id="bracket-innhold"></div>
+    <button class="knapp knapp-fare" id="nullstill-sluttspill-knapp"
+      onclick="nullstillSluttspillUI()" style="margin-top:8px;width:100%">
+      ↺ Nullstill sluttspill
+    </button>
+    <button class="knapp knapp-gronn" id="avslutt-turnering-knapp"
+      onclick="avsluttTurneringUI()" style="display:none;margin-top:8px">
+      AVSLUTT TURNERING →
+    </button>
+  </div>
+</div>
+
+<!-- SKJERM T5 — SLUTTRESULTAT -->
+<div id="skjerm-turnering-resultat" class="screen">
+  <div class="app-header">
+    <button class="tilbake-btn" onclick="naviger('turnering')">←</button>
+    <button class="app-logo" style="background:var(--yellow);color:#000;border:none;cursor:pointer" onclick="naviger('oppsett')" title="Hjem">PB</button>
+    <div style="flex:1">
+      <div class="app-name" id="resultat-turnering-navn" style="font-size:20px">Resultat</div>
+      <div class="app-sub">Endelig rangering</div>
+    </div>
+  </div>
+  <div class="scroll-omrade">
+    <div id="resultat-innhold"></div>
+    <div style="margin-top:20px;text-align:center">
+      <button class="knapp knapp-omriss" onclick="naviger('turnering')"
+        style="font-family:'DM Sans',sans-serif;font-size:17px;padding:12px;width:auto;min-width:180px">
+        ← Tilbake til turneringer
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     MODALER — turneringer
+     ═══════════════════════════════════════════════════════ -->
+
+<!-- Modal: Ny turnering -->
+<div class="modal-bakgrunn" id="modal-ny-turnering" style="display:none"
+  onclick="if(event.target===this)lukkNyTurneringModal()">
+  <div class="modal" style="border-radius:22px 22px 0 0;max-height:90vh;overflow-y:auto;padding-bottom:calc(24px + var(--safe-bottom))">
+    <div class="modal-tittel">Ny turnering</div>
+
+    <div style="margin-bottom:16px">
+      <div class="config-etikett" style="margin-bottom:8px">Turneringsnavn</div>
+      <input id="ny-turnering-navn" placeholder="F.eks. Jæren Open 2025"
+        style="width:100%;background:var(--navy3);border:1px solid var(--border2);border-radius:12px;padding:13px 14px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:18px;outline:none"
+        onkeydown="if(event.key==='Enter')bekreftNyTurnering()"/>
+    </div>
+
+    <div style="margin-bottom:16px">
+      <div class="config-etikett" style="margin-bottom:8px">Antall puljer</div>
+      <div class="t-velger-gruppe t-puljer-velger">
+        <button class="t-velger-knapp aktiv" data-verdi="2" onclick="velgAlternativ('t-puljer-velger','2')">2 puljer</button>
+        <button class="t-velger-knapp" data-verdi="3" onclick="velgAlternativ('t-puljer-velger','3')">3 puljer</button>
+        <button class="t-velger-knapp" data-verdi="4" onclick="velgAlternativ('t-puljer-velger','4')">4 puljer</button>
+      </div>
+    </div>
+
+    <div style="margin-bottom:16px">
+      <div class="config-etikett" style="margin-bottom:8px">Seeding-modus</div>
+      <div class="t-velger-gruppe t-seeding-velger">
+        <button class="t-velger-knapp aktiv" data-verdi="standard" onclick="velgAlternativ('t-seeding-velger','standard')">🏆 Standard</button>
+        <button class="t-velger-knapp" data-verdi="trekning" onclick="velgAlternativ('t-seeding-velger','trekning')">🎲 Trekning</button>
+      </div>
+    </div>
+
+    <div style="margin-bottom:16px">
+      <div class="config-etikett" style="margin-bottom:10px">Plasseringskamper</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--navy3);border:1px solid var(--border);border-radius:10px;margin-bottom:8px">
+        <div>
+          <div style="font-size:16px;font-weight:500">A-sluttspill (3. og 5.–8. plass)</div>
+          <div style="font-size:14px;color:var(--muted2)">Alle kamper for plass 1–8 spilles</div>
+        </div>
+        <label class="t-toggle">
+          <input type="checkbox" id="toggle-plasseringskamper-a" checked>
+          <span class="t-toggle-spor"></span>
+        </label>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--navy3);border:1px solid var(--border);border-radius:10px">
+        <div>
+          <div style="font-size:16px;font-weight:500">B og C-sluttspill</div>
+          <div style="font-size:14px;color:var(--muted2)">Ekstra plasseringskamper i B/C</div>
+        </div>
+        <label class="t-toggle">
+          <input type="checkbox" id="toggle-plasseringskamper-bc">
+          <span class="t-toggle-spor"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Antall baner -->
+    <div style="margin-bottom:16px">
+      <div class="config-etikett" style="margin-bottom:8px">Antall baner</div>
+      <div class="t-velger-gruppe t-baner-velger">
+        <button class="t-velger-knapp" data-verdi="3" onclick="velgAlternativ('t-baner-velger','3')">3</button>
+        <button class="t-velger-knapp" data-verdi="4" onclick="velgAlternativ('t-baner-velger','4')">4</button>
+        <button class="t-velger-knapp" data-verdi="5" onclick="velgAlternativ('t-baner-velger','5')">5</button>
+        <button class="t-velger-knapp aktiv" data-verdi="6" onclick="velgAlternativ('t-baner-velger','6')">6</button>
+        <button class="t-velger-knapp" data-verdi="8" onclick="velgAlternativ('t-baner-velger','8')">8</button>
+      </div>
+    </div>
+
+    <!-- Kampformat puljespill -->
+    <div style="margin-bottom:16px">
+      <div class="config-etikett" style="margin-bottom:8px">Kampformat — puljespill</div>
+      <div style="display:flex;flex-direction:column;gap:8px;padding:12px 14px;background:var(--navy3);border:1px solid var(--border);border-radius:10px">
+        <div class="t-velger-gruppe t-pulje-type-velger">
+          <button class="t-velger-knapp aktiv" data-verdi="single" onclick="velgAlternativ('t-pulje-type-velger','single')">1 game</button>
+          <button class="t-velger-knapp" data-verdi="best_of_3" onclick="velgAlternativ('t-pulje-type-velger','best_of_3')">Best av 3</button>
+        </div>
+        <div class="t-velger-gruppe t-pulje-poeng-velger">
+          <button class="t-velger-knapp aktiv" data-verdi="11" onclick="velgAlternativ('t-pulje-poeng-velger','11')">11 pts</button>
+          <button class="t-velger-knapp" data-verdi="15" onclick="velgAlternativ('t-pulje-poeng-velger','15')">15 pts</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Kampformat kvartfinale -->
+    <div style="margin-bottom:16px">
+      <div class="config-etikett" style="margin-bottom:8px">Kampformat — kvartfinale</div>
+      <div style="display:flex;flex-direction:column;gap:8px;padding:12px 14px;background:var(--navy3);border:1px solid var(--border);border-radius:10px">
+        <div class="t-velger-gruppe t-kvart-type-velger">
+          <button class="t-velger-knapp aktiv" data-verdi="single" onclick="velgAlternativ('t-kvart-type-velger','single')">1 game</button>
+          <button class="t-velger-knapp" data-verdi="best_of_3" onclick="velgAlternativ('t-kvart-type-velger','best_of_3')">Best av 3</button>
+        </div>
+        <div class="t-velger-gruppe t-kvart-poeng-velger">
+          <button class="t-velger-knapp aktiv" data-verdi="11" onclick="velgAlternativ('t-kvart-poeng-velger','11')">11 pts</button>
+          <button class="t-velger-knapp" data-verdi="15" onclick="velgAlternativ('t-kvart-poeng-velger','15')">15 pts</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Kampformat semifinale -->
+    <div style="margin-bottom:16px">
+      <div class="config-etikett" style="margin-bottom:8px">Kampformat — semifinale</div>
+      <div style="display:flex;flex-direction:column;gap:8px;padding:12px 14px;background:var(--navy3);border:1px solid var(--border);border-radius:10px">
+        <div class="t-velger-gruppe t-semi-type-velger">
+          <button class="t-velger-knapp aktiv" data-verdi="single" onclick="velgAlternativ('t-semi-type-velger','single')">1 game</button>
+          <button class="t-velger-knapp" data-verdi="best_of_3" onclick="velgAlternativ('t-semi-type-velger','best_of_3')">Best av 3</button>
+        </div>
+        <div class="t-velger-gruppe t-semi-poeng-velger">
+          <button class="t-velger-knapp aktiv" data-verdi="11" onclick="velgAlternativ('t-semi-poeng-velger','11')">11 pts</button>
+          <button class="t-velger-knapp" data-verdi="15" onclick="velgAlternativ('t-semi-poeng-velger','15')">15 pts</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Kampformat finale -->
+    <div style="margin-bottom:16px">
+      <div class="config-etikett" style="margin-bottom:8px">Kampformat — finale og plasseringskamper</div>
+      <div style="display:flex;flex-direction:column;gap:8px;padding:12px 14px;background:var(--navy3);border:1px solid var(--border);border-radius:10px">
+        <div class="t-velger-gruppe t-finale-type-velger">
+          <button class="t-velger-knapp aktiv" data-verdi="single" onclick="velgAlternativ('t-finale-type-velger','single')">1 game</button>
+          <button class="t-velger-knapp" data-verdi="best_of_3" onclick="velgAlternativ('t-finale-type-velger','best_of_3')">Best av 3</button>
+        </div>
+        <div class="t-velger-gruppe t-finale-poeng-velger">
+          <button class="t-velger-knapp" data-verdi="11" onclick="velgAlternativ('t-finale-poeng-velger','11')">11 pts</button>
+          <button class="t-velger-knapp aktiv" data-verdi="15" onclick="velgAlternativ('t-finale-poeng-velger','15')">15 pts</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-knapper">
+      <button class="knapp knapp-omriss" style="flex:1" onclick="lukkNyTurneringModal()">Avbryt</button>
+      <button class="knapp knapp-gronn" style="flex:1;font-family:'Bebas Neue',cursive;font-size:22px;letter-spacing:1px"
+        onclick="bekreftNyTurnering()">OPPRETT →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Registrer kampresultat -->
+<div class="modal-bakgrunn" id="modal-resultat" style="display:none"
+  onclick="if(event.target===this)lukkResultatModal()">
+  <div class="modal" style="border-radius:22px 22px 0 0">
+    <div class="modal-tittel">Kampresultat</div>
+    <div id="modal-resultat-format" style="font-size:14px;color:var(--muted2);margin-bottom:16px"></div>
+
+    <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;margin-bottom:16px">
+      <div style="text-align:center">
+        <div id="modal-resultat-lag1" style="font-size:15px;color:var(--muted2);margin-bottom:8px;min-height:36px;display:flex;align-items:center;justify-content:center;font-weight:500"></div>
+        <input type="number" id="modal-resultat-p1" min="0" max="99" inputmode="numeric"
+          class="poeng-inndata" style="font-size:52px"
+          oninput="this.value=this.value.replace(/[^0-9]/g,'')"/>
+      </div>
+      <div class="vs-deler" style="font-size:24px">—</div>
+      <div style="text-align:center">
+        <div id="modal-resultat-lag2" style="font-size:15px;color:var(--muted2);margin-bottom:8px;min-height:36px;display:flex;align-items:center;justify-content:center;font-weight:500"></div>
+        <input type="number" id="modal-resultat-p2" min="0" max="99" inputmode="numeric"
+          class="poeng-inndata" style="font-size:52px"
+          oninput="this.value=this.value.replace(/[^0-9]/g,'')"/>
+      </div>
+    </div>
+
+    <div id="modal-resultat-feil" style="color:var(--red2);font-size:15px;min-height:20px;margin-bottom:12px;text-align:center"></div>
+
+    <div class="modal-knapper">
+      <button class="knapp knapp-omriss" style="flex:1" onclick="lukkResultatModal()">Avbryt</button>
+      <button class="knapp knapp-gronn" style="flex:2;font-family:'Bebas Neue',cursive;font-size:22px;letter-spacing:1px"
+        onclick="bekreftResultat()">LAGRE</button>
+    </div>
+  </div>
+</div>
