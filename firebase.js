@@ -16,7 +16,7 @@ import {
 // test-databasen. Sett tilbake til 'prod' før du deployer
 // til produksjon.
 // ════════════════════════════════════════════════════════
-const BRUK_MILJO = 'test'; // 'prod' | 'test'
+const BRUK_MILJO = 'prod'; // 'prod' | 'test'
 
 // ── PRODUKSJON ─────────────────────────────────────────
 const FB_CONFIG_PROD = {
