@@ -104,6 +104,11 @@ function _byggTurneringKortArkiv(item) {
 
 export async function lastArkiv() {
   if (!db) { visMelding('Firebase ikke tilkoblet.', 'feil'); return; }
+
+  // Vis/skjul "Slett alle økter"-knappen basert på admin-status
+  const adminKnapperArkiv = document.getElementById('admin-knapper-arkiv');
+  if (adminKnapperArkiv) adminKnapperArkiv.style.display = window.getErAdmin?.() ? 'block' : 'none';
+
   const laster = document.getElementById('arkiv-laster');
   const liste  = document.getElementById('arkiv-liste');
   if (laster) laster.style.display = 'flex';
@@ -364,6 +369,10 @@ window.apneTreningsdetaljFraDom = apneTreningsdetaljFraDom;
 
 export async function apneTreningsdetalj(treningId) {
   if (!db || !treningId) return;
+
+  // Vis/skjul "Slett"-knappen i headeren basert på admin-status
+  const slettKnapp = document.getElementById('admin-knapp-slett-okt');
+  if (slettKnapp) slettKnapp.style.display = window.getErAdmin?.() ? '' : 'none';
 
   // Naviger og vis lastingsindikator
   document.getElementById('detalj-rangering').innerHTML =

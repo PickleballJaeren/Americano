@@ -477,7 +477,7 @@
     </div>
   </div>
   <div class="scroll-omrade">
-    <div style="display:flex;gap:8px;margin-bottom:14px">
+    <div id="admin-knapper-spillere" style="display:none;gap:8px;margin-bottom:14px">
       <button class="knapp knapp-fare knapp-liten" style="flex:1" onclick="visNullstillModal()">Nullstill rating</button>
       <button class="knapp knapp-fare knapp-liten" style="flex:1" onclick="visSlettAlleSpillereModal()">Slett alle spillere</button>
     </div>
@@ -759,7 +759,7 @@
     </div>
   </div>
   <div class="scroll-omrade">
-    <div style="margin-bottom:14px">
+    <div id="admin-knapper-arkiv" style="display:none;margin-bottom:14px">
       <button class="knapp knapp-fare knapp-liten" style="width:100%" onclick="visSlettAlleOkterModal()">Slett alle økter</button>
     </div>
     <div id="arkiv-laster" class="laster" style="display:none">
@@ -782,7 +782,7 @@
       <div class="app-sub" id="detalj-dato"></div>
     </div>
     <div class="header-right">
-      <button class="knapp knapp-fare knapp-liten" onclick="visSlettOktModal()">Slett</button>
+      <button id="admin-knapp-slett-okt" class="knapp knapp-fare knapp-liten" style="display:none" onclick="visSlettOktModal()">Slett</button>
     </div>
   </div>
   <div class="scroll-omrade">

@@ -30,6 +30,11 @@ export function oppdaterGlobalLedertavle() {
   const liste  = document.getElementById('global-ledertavle');
   if (laster) laster.style.display = 'none';
   if (liste)  liste.innerHTML = '';
+
+  // Vis/skjul admin-knapper på spillere-skjermen
+  const adminKnapper = document.getElementById('admin-knapper-spillere');
+  if (adminKnapper) adminKnapper.style.display = window.getErAdmin?.() ? 'flex' : 'none';
+
   try {
     const spillere = [...(app.spillere ?? [])].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
     if (!spillere.length) {
@@ -37,6 +42,7 @@ export function oppdaterGlobalLedertavle() {
       return;
     }
     if (liste) {
+      const erAdmin = window.getErAdmin?.() ?? false;
       liste.innerHTML = spillere.map((s, i) => {
         const plass = i + 1;
         const ini   = lagInitialer(s.navn);
@@ -47,9 +53,11 @@ export function oppdaterGlobalLedertavle() {
           <div class="lb-navn" onclick="apneGlobalProfil('${s.id}')">${s.navn ?? 'Ukjent'}</div>
           <div style="text-align:right;flex-shrink:0;display:flex;align-items:center;gap:8px">
             ${getNivaaRatingHTML(s.rating ?? STARTRATING)}
-            <button class="knapp-rediger-rating" onclick="startRedigerRating('${s.id}', ${s.rating ?? STARTRATING}, this)" title="Rediger rating" style="background:none;border:1px solid var(--border);border-radius:6px;padding:3px 8px;color:var(--muted2);font-size:13px;cursor:pointer">✏️</button>
+            ${erAdmin ? `<button class="knapp-rediger-rating" onclick="startRedigerRating('${s.id}', ${s.rating ?? STARTRATING}, this)" title="Rediger rating" style="background:none;border:1px solid var(--border);border-radius:6px;padding:3px 8px;color:var(--muted2);font-size:13px;cursor:pointer">✏️</button>` : ''}
           </div>
         </div>`;
+      }).join('');
+    }
       }).join('');
     }
 
