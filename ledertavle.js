@@ -58,8 +58,6 @@ export function oppdaterGlobalLedertavle() {
         </div>`;
       }).join('');
     }
-      }).join('');
-    }
 
     // Fyll sammenlign-dropdowns
     const optioner = spillere.map(s =>
