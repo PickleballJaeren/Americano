@@ -129,7 +129,7 @@ async function _kanUtfordre(utfordrerSpiller, motstanderSpiller, klubbId) {
   return { ok: true, grunn: null };
 }
 
-async function _sendUtfordring(utfordrerSpiller, motstanderSpiller, klubbId) {
+async function _sendUtfordring(utfordrerSpiller, motstanderSpiller, klubbId, format = 11) {
   await addDoc(collection(db, SAM.UTFORDRINGER), {
     klubbId,
     utfordrerIds:      utfordrerSpiller.id,
@@ -138,6 +138,7 @@ async function _sendUtfordring(utfordrerSpiller, motstanderSpiller, klubbId) {
     motstanderId:      motstanderSpiller.id,
     motstanderNavn:    motstanderSpiller.navn ?? 'Ukjent',
     motstanderRating:  _hentUtfordrerRating(motstanderSpiller),
+    format:            format,   // 6 eller 11 — låst for hele serien
     status:            UTF_STATUS.VENTER,
     opprettet:         serverTimestamp(),
     avsluttet:         null,
@@ -304,8 +305,9 @@ function _oppdaterMotstanderVelger(spillere, lagretId) {
 }
 
 window.sendUtfordringFraSkjerm = async function() {
-  const megId = document.getElementById('utf-meg-velger')?.value;
-  const motId = document.getElementById('utf-mot-velger')?.value;
+  const megId  = document.getElementById('utf-meg-velger')?.value;
+  const motId  = document.getElementById('utf-mot-velger')?.value;
+  const format = parseInt(document.getElementById('utf-format-velger')?.value ?? '11');
   if (!megId) { visMelding('Velg deg selv først.', 'advarsel'); return; }
   if (!motId) { visMelding('Velg en motstander.', 'advarsel'); return; }
 
@@ -325,7 +327,7 @@ window.sendUtfordringFraSkjerm = async function() {
     const { ok, grunn } = await _kanUtfordre(utfSpiller, motSpiller, klubbId);
     if (!ok) { visMelding(grunn, 'advarsel'); return; }
 
-    await _sendUtfordring(utfSpiller, motSpiller, klubbId);
+    await _sendUtfordring(utfSpiller, motSpiller, klubbId, format);
     visMelding(`Utfordring sendt til ${escHtml(motSpiller.navn ?? 'motstanderen')}!`);
     await visUtfordrerSkjerm();
   } catch (e) {
@@ -386,11 +388,11 @@ async function _lastAktiveUtfordringer(klubbId, spillere) {
         const demSeire = gamesSpilt.filter(g => (erUtfordrer ? g.motPoeng : g.utfPoeng) > (erUtfordrer ? g.utfPoeng : g.motPoeng)).length;
         stillingHTML = `Pågår · <span style="color:var(--green2);font-weight:600">${megSeire}</span>–<span style="color:var(--red2);font-weight:600">${demSeire}</span>${gamesHTML}`;
       } else if (erPagar) {
-        stillingHTML = 'Akseptert — avtal tidspunkt med motstanderen';
+        stillingHTML = `Akseptert — avtal tidspunkt med motstanderen · til ${u.format ?? 11} poeng`;
       } else if (erMotstander) {
-        stillingHTML = `⚡ ${escHtml(u.utfordrerNavn)} har utfordret deg!`;
+        stillingHTML = `⚡ ${escHtml(u.utfordrerNavn)} har utfordret deg! · til ${u.format ?? 11} poeng`;
       } else if (erUtfordrer) {
-        stillingHTML = `Venter på svar · utløper om ${dagerIgjen} dag${dagerIgjen === 1 ? '' : 'er'}`;
+        stillingHTML = `Venter på svar · til ${u.format ?? 11} poeng · utløper om ${dagerIgjen} dag${dagerIgjen === 1 ? '' : 'er'}`;
       } else {
         const gamesAndreHTML = gamesSpilt.length
           ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">` +
@@ -399,7 +401,7 @@ async function _lastAktiveUtfordringer(klubbId, spillere) {
               return `<span style="font-size:12px;background:rgba(255,255,255,.06);border-radius:6px;padding:2px 8px;font-family:'DM Mono',monospace;color:${farge}">G${i+1}: ${g.utfPoeng}–${g.motPoeng}</span>`;
             }).join('') + `</div>`
           : '';
-        stillingHTML = `${escHtml(u.utfordrerNavn)} utfordret ${escHtml(u.motstanderNavn)} · ${dagerIgjen}d igjen${gamesAndreHTML}`;
+        stillingHTML = `${escHtml(u.utfordrerNavn)} utfordret ${escHtml(u.motstanderNavn)} · til ${u.format ?? 11} poeng · ${dagerIgjen}d igjen${gamesAndreHTML}`;
       }
 
       let knapperHTML = '';
@@ -620,9 +622,10 @@ export async function visUtfordrerSeksjon(motstanderSpiller) {
 
   if (aktiv) {
     const erUtfordrer = aktiv.utfordrerIds === aktivSpillerId;
+    const format      = aktiv.format ?? 11;
     const statusTekst = aktiv.status === UTF_STATUS.VENTER
-      ? (erUtfordrer ? '⏳ Venter på svar…' : '⚡ Du er utfordret!')
-      : '🎾 Pågår — Best av 3';
+      ? (erUtfordrer ? `⏳ Venter på svar… · til ${format} poeng` : `⚡ Du er utfordret! · til ${format} poeng`)
+      : `🎾 Pågår — Best av 3 · til ${format} poeng`;
 
     const gamesHTML = (aktiv.games ?? []).map((g, i) =>
       `<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">
@@ -664,7 +667,17 @@ export async function visUtfordrerSeksjon(motstanderSpiller) {
   } else if (kanSende) {
     html += `<div class="kort"><div class="kort-innhold">
       <div style="font-size:15px;color:var(--muted2);margin-bottom:12px">
-        Best av 3 games til 11 poeng · K-faktor ${UTF_K_FAKTOR}
+        Best av 3 games · K-faktor ${UTF_K_FAKTOR}
+      </div>
+      <div style="margin-bottom:14px">
+        <div class="config-etikett" style="margin-bottom:8px">Velg format</div>
+        <div style="display:flex;gap:8px">
+          <button id="utf-gp-fmt-11" class="t-velger-knapp aktiv"
+            onclick="utfVelgFormat(11,'gp')" style="flex:1">🎾 Til 11 poeng</button>
+          <button id="utf-gp-fmt-6" class="t-velger-knapp"
+            onclick="utfVelgFormat(6,'gp')" style="flex:1">⚡ Til 6 poeng</button>
+        </div>
+        <input type="hidden" id="utf-gp-format-velger" value="11">
       </div>
       <button class="knapp knapp-primaer" style="font-family:'DM Sans',sans-serif;font-size:17px;letter-spacing:0"
         onclick="sendUtfordring('${motstanderSpiller.id}')">
@@ -702,12 +715,30 @@ export async function visUtfordrerSeksjon(motstanderSpiller) {
 }
 
 // ════════════════════════════════════════════════════════
+// FORMAT-VELGER — delt mellom utfordrer-skjerm og global-profil
+// kontekst: 'skjerm' = utfordrer-skjermen, 'gp' = global-profil
+// ════════════════════════════════════════════════════════
+window.utfVelgFormat = function(format, kontekst) {
+  if (kontekst === 'gp') {
+    document.getElementById('utf-gp-format-velger').value = String(format);
+    document.getElementById('utf-gp-fmt-11')?.classList.toggle('aktiv', format === 11);
+    document.getElementById('utf-gp-fmt-6')?.classList.toggle('aktiv',  format === 6);
+  } else {
+    document.getElementById('utf-format-velger').value = String(format);
+    document.getElementById('utf-fmt-11')?.classList.toggle('aktiv', format === 11);
+    document.getElementById('utf-fmt-6')?.classList.toggle('aktiv',  format === 6);
+  }
+};
+
+// ════════════════════════════════════════════════════════
 // WINDOW-FUNKSJONER
 // ════════════════════════════════════════════════════════
 window.sendUtfordring = async function(motstanderId) {
   const klubbId        = _getAktivKlubbId();
   const aktivSpillerId = _getAktivSpillerId();
   if (!klubbId || !aktivSpillerId || !db) return;
+
+  const format = parseInt(document.getElementById('utf-gp-format-velger')?.value ?? '11');
 
   try {
     const [utfSnap, motSnap] = await Promise.all([
@@ -721,7 +752,7 @@ window.sendUtfordring = async function(motstanderId) {
     const { ok, grunn } = await _kanUtfordre(utfSpiller, motSpiller, klubbId);
     if (!ok) { visMelding(grunn, 'advarsel'); return; }
 
-    await _sendUtfordring(utfSpiller, motSpiller, klubbId);
+    await _sendUtfordring(utfSpiller, motSpiller, klubbId, format);
     visMelding(`Utfordring sendt til ${motSpiller.navn}!`);
     await visUtfordrerSeksjon(motSpiller);
   } catch (e) {
@@ -806,8 +837,11 @@ function _utfBuildPickerGrid(felt) {
   const picker = document.getElementById(`utf-pp-${felt}`);
   if (!picker) return;
   const gjeldende = parseInt(picker.dataset.valgt ?? '-1');
+  const format    = parseInt(document.getElementById('modal-utf-game')?.dataset?.format ?? '11');
+  // Maks antall poeng i picker: format + 4 for å dekke deuce-situasjoner (6→10, 11→15)
+  const maks = format === 6 ? 10 : 15;
   picker.innerHTML = '';
-  for (let n = 0; n <= 15; n++) {
+  for (let n = 0; n <= maks; n++) {
     const el = document.createElement('div');
     el.className = 'poeng-picker-tall' + (n === gjeldende ? ' valgt' : '');
     el.textContent = n;
@@ -896,6 +930,8 @@ window.registrerUtfordringGame = async function(utfordringId, erUtfordrer) {
     const snap = await getDoc(doc(db, SAM.UTFORDRINGER, utfordringId));
     if (snap.exists()) {
       const u        = snap.data();
+      const format   = u.format ?? 11;
+      modal.dataset.format = String(format);
       const gNr      = (u.games ?? []).length + 1;
       const utfSeire = (u.games ?? []).filter(g => g.utfPoeng > g.motPoeng).length;
       const motSeire = (u.games ?? []).filter(g => g.motPoeng > g.utfPoeng).length;
@@ -906,9 +942,10 @@ window.registrerUtfordringGame = async function(utfordringId, erUtfordrer) {
       const nav2 = document.getElementById('utf-game-navn2');
       if (nav1) nav1.textContent = erUtf ? (u.utfordrerNavn ?? 'Deg') : (u.motstanderNavn ?? 'Deg');
       if (nav2) nav2.textContent = erUtf ? (u.motstanderNavn ?? 'Motstander') : (u.utfordrerNavn ?? 'Motstander');
-      _utfResetModal(gNr, gNr > 1 ? `Stilling: ${megSeire}–${demSeire}` : 'Best av 3 · til 11 poeng');
+      _utfResetModal(gNr, gNr > 1 ? `Stilling: ${megSeire}–${demSeire}` : `Best av 3 · til ${format} poeng`);
     }
   } catch (_) {
+    modal.dataset.format = '11';
     _utfResetModal(1, 'Best av 3 · til 11 poeng');
   }
 
@@ -934,6 +971,7 @@ window.bekreftUtfordringGame = async function() {
 
   const p1 = _utfHentVerdi('p1');
   const p2 = _utfHentVerdi('p2');
+  const format = parseInt(modal?.dataset?.format ?? '11');
 
   if (isNaN(p1) || isNaN(p2) || p1 < 0 || p2 < 0) {
     feilEl.textContent = 'Fyll inn poeng for begge spillere.'; return;
@@ -943,9 +981,11 @@ window.bekreftUtfordringGame = async function() {
   }
   const vinnende = Math.max(p1, p2);
   const tapende  = Math.min(p1, p2);
-  if (vinnende < 11) { feilEl.textContent = 'Vinnerpoeng må være minst 11.'; return; }
-  if (tapende === 14 && vinnende === 15) {
-    // Gyldig golden point
+  if (vinnende < format) { feilEl.textContent = `Vinnerpoeng må være minst ${format}.`; return; }
+  // Golden point for 6-poengskamp: 5-5 → 6-5 (én poeng foran, ingen deuce)
+  // Golden point for 11-poengskamp: 14-15 er eneste lovlige deuce-avslutning
+  if (format === 11 && tapende === 14 && vinnende === 15) {
+    // Gyldig golden point ved 11-poengskamp
   } else if (vinnende - tapende < 2) {
     feilEl.textContent = 'Vinneren må lede med minst 2 poeng.'; return;
   }

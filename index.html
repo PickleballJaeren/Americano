@@ -582,7 +582,7 @@
     <!-- Intro -->
     <div class="kort"><div class="kort-innhold">
       <div style="font-size:15px;color:var(--muted2);line-height:1.5;margin-bottom:10px">
-        Utfordre enkeltspillere til singelduel — best av 3 games til 11 poeng. Resultater gir deg en egen singel-rating, separat fra Americano-rankingen.
+        Utfordre enkeltspillere til singelduel — best av 3 games. Resultater gir deg en egen singel-rating, separat fra Americano-rankingen.
       </div>
       <div class="utf-info-chips">
         <span class="utf-chip">±100 rating</span>
@@ -608,6 +608,16 @@
           style="width:100%;background:var(--navy3);border:1px solid var(--border2);border-radius:8px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:16px;outline:none">
           <option value="">— Velg motstander —</option>
         </select>
+      </div>
+      <div style="margin-bottom:14px">
+        <div class="config-etikett" style="margin-bottom:8px">Format</div>
+        <div style="display:flex;gap:8px">
+          <button id="utf-fmt-11" class="t-velger-knapp aktiv"
+            onclick="utfVelgFormat(11,'skjerm')" style="flex:1">🎾 Til 11 poeng</button>
+          <button id="utf-fmt-6" class="t-velger-knapp"
+            onclick="utfVelgFormat(6,'skjerm')" style="flex:1">⚡ Til 6 poeng</button>
+        </div>
+        <input type="hidden" id="utf-format-velger" value="11">
       </div>
       <button class="knapp knapp-primaer" onclick="sendUtfordringFraSkjerm()"
         style="font-family:'Bebas Neue',cursive;font-size:22px;letter-spacing:1px">
