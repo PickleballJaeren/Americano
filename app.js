@@ -478,7 +478,10 @@ async function init() {
   profilInit({ naviger });
 
   // Koble ledertavle.js
-  ledertavleInit({ krevAdmin: krevAdminMedDemo });
+  ledertavleInit({
+    krevAdmin:       krevAdminMedDemo,
+    getAktivKlubbId: () => aktivKlubbId,
+  });
 
   // Koble global-profil.js
   globalProfilInit({ naviger });

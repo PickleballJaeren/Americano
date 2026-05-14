@@ -16,10 +16,12 @@ import { visMelding, visFBFeil, escHtml } from './ui.js';
 import { lagInitialer } from './render-helpers.js';
 
 // ── Avhengigheter injisert fra app.js ────────────────────
-let _krevAdmin = () => {};
+let _krevAdmin        = () => {};
+let _getAktivKlubbId  = () => null;
 
 export function ledertavleInit(deps) {
-  _krevAdmin = deps.krevAdmin;
+  _krevAdmin       = deps.krevAdmin;
+  _getAktivKlubbId = deps.getAktivKlubbId ?? (() => null);
 }
 
 // ════════════════════════════════════════════════════════
@@ -58,8 +60,6 @@ export function oppdaterGlobalLedertavle() {
         </div>`;
       }).join('');
     }
-      }).join('');
-    }
 
     // Fyll sammenlign-dropdowns
     const optioner = spillere.map(s =>
@@ -91,10 +91,16 @@ let _sesongCache = null;
 const SESONG_TTL_MS = 2 * 60 * 1000;
 
 async function beregnSesongsKaaring(spillereListe) {
-  const sesongLaster = document.getElementById('sesong-laster');
-  const sesongBoks   = document.getElementById('sesong-kaaring');
+  const sesongLaster  = document.getElementById('sesong-laster');
+  const sesongBoks    = document.getElementById('sesong-kaaring');
+  const aktivKlubbId  = _getAktivKlubbId();
 
-  if (_sesongCache && (Date.now() - _sesongCache.hentetMs) < SESONG_TTL_MS) {
+  // Cache er per klubb — ugyldig hvis annen klubb enn da cachen ble bygget
+  if (
+    _sesongCache &&
+    _sesongCache.klubbId === aktivKlubbId &&
+    (Date.now() - _sesongCache.hentetMs) < SESONG_TTL_MS
+  ) {
     if (sesongBoks) { sesongBoks.innerHTML = _sesongCache.html; sesongBoks.style.display = 'block'; }
     if (sesongLaster) sesongLaster.style.display = 'none';
     return;
@@ -108,6 +114,17 @@ async function beregnSesongsKaaring(spillereListe) {
     spillereListe.forEach(s => { ratingMap[s.id] = s.rating ?? STARTRATING; });
     const klubbSpillerIds = new Set(Object.keys(ratingMap));
 
+    // Hent trenings-IDer for aktiv klubb — kamp-dokumenter har ikke klubbId,
+    // men har treningId. Filtrer kamper via treningId for å sikre riktig klubb.
+    let gyldigeTreningIds = null;
+    if (aktivKlubbId) {
+      const treningSnap = await getDocs(query(
+        collection(db, SAM.TRENINGER),
+        where('klubbId', '==', aktivKlubbId)
+      ));
+      gyldigeTreningIds = new Set(treningSnap.docs.map(d => d.id));
+    }
+
     const snap = await getDocs(query(
       collection(db, SAM.KAMPER),
       where('ferdig', '==', true)
@@ -116,8 +133,9 @@ async function beregnSesongsKaaring(spillereListe) {
       .map(d => ({ id: d.id, ...d.data() }))
       .filter(k =>
         k.lag1Poeng != null && k.lag2Poeng != null &&
-        // Alle spillere i kampen må tilhøre aktiv klubb
-        // lag1_s2 og lag2_s2 kan være null (singelkamper)
+        // Filtrer på treningId for å sikre riktig klubb
+        (gyldigeTreningIds == null || gyldigeTreningIds.has(k.treningId)) &&
+        // Alle spillere må tilhøre aktiv klubb (dobbeltsjekk)
         klubbSpillerIds.has(k.lag1_s1) &&
         klubbSpillerIds.has(k.lag2_s1) &&
         (k.lag1_s2 == null || klubbSpillerIds.has(k.lag1_s2)) &&
@@ -258,7 +276,7 @@ async function beregnSesongsKaaring(spillereListe) {
 
     if (sesongBoks) {
       sesongBoks.style.display = 'block';
-      _sesongCache = { html: sesongBoks.innerHTML, hentetMs: Date.now() };
+      _sesongCache = { html: sesongBoks.innerHTML, hentetMs: Date.now(), klubbId: aktivKlubbId };
     }
 
   } catch (e) {
@@ -456,6 +474,8 @@ export async function utforNullstill() {
   if (!db) { visMelding('Firebase ikke tilkoblet.', 'feil'); return; }
 
   const nullstillSingel = document.getElementById('nullstill-inkluder-singel')?.checked ?? false;
+  const aktivKlubbId    = _getAktivKlubbId();
+  if (!aktivKlubbId) { visMelding('Kunne ikke fastslå aktiv klubb.', 'feil'); return; }
 
   document.getElementById('modal-nullstill').style.display = 'none';
   visMelding('Nullstiller… vennligst vent.', 'advarsel');
@@ -465,8 +485,12 @@ export async function utforNullstill() {
     let batch = writeBatch(db);
     let teller = 0;
 
-    // Nullstill dobbel-rating — alltid. Nullstill singelRating om valgt.
-    const spillerSnap = await getDocs(collection(db, SAM.SPILLERE));
+    // Nullstill dobbel-rating — kun spillere i aktiv klubb
+    const spillerSnap = await getDocs(
+      query(collection(db, SAM.SPILLERE), where('klubbId', '==', aktivKlubbId))
+    );
+    const klubbSpillerIds = new Set(spillerSnap.docs.map(d => d.id));
+
     for (const d of spillerSnap.docs) {
       const oppdatering = { rating: STARTRATING };
       if (nullstillSingel) oppdatering.singelRating = null;
@@ -476,29 +500,41 @@ export async function utforNullstill() {
     }
     if (teller > 0) await batch.commit();
 
-    // Slett dobbel-historikk — alltid
-    const histSnap = await getDocs(collection(db, SAM.HISTORIKK));
+    // Slett dobbel-historikk — historikk har spillerId men ikke klubbId.
+    // Filtrer via spillerIds for aktiv klubb.
     batch = writeBatch(db); teller = 0;
-    for (const d of histSnap.docs) {
-      batch.delete(d.ref);
-      teller++;
-      if (teller >= BATCH_MAKS) { await batch.commit(); batch = writeBatch(db); teller = 0; }
+    for (const spillerId of klubbSpillerIds) {
+      const histSnap = await getDocs(
+        query(collection(db, SAM.HISTORIKK), where('spillerId', '==', spillerId))
+      );
+      for (const d of histSnap.docs) {
+        batch.delete(d.ref);
+        teller++;
+        if (teller >= BATCH_MAKS) { await batch.commit(); batch = writeBatch(db); teller = 0; }
+      }
     }
     if (teller > 0) await batch.commit();
 
-    // Slett resultater — alltid
-    const resSnap = await getDocs(collection(db, SAM.RESULTATER));
+    // Slett resultater — resultater har spillerId men ikke klubbId.
+    // Filtrer via spillerIds for aktiv klubb.
     batch = writeBatch(db); teller = 0;
-    for (const d of resSnap.docs) {
-      batch.delete(d.ref);
-      teller++;
-      if (teller >= BATCH_MAKS) { await batch.commit(); batch = writeBatch(db); teller = 0; }
+    for (const spillerId of klubbSpillerIds) {
+      const resSnap = await getDocs(
+        query(collection(db, SAM.RESULTATER), where('spillerId', '==', spillerId))
+      );
+      for (const d of resSnap.docs) {
+        batch.delete(d.ref);
+        teller++;
+        if (teller >= BATCH_MAKS) { await batch.commit(); batch = writeBatch(db); teller = 0; }
+      }
     }
     if (teller > 0) await batch.commit();
 
-    // Slett singel-historikk om valgt
+    // Slett singel-historikk om valgt — har klubbId, filtrer direkte
     if (nullstillSingel) {
-      const singelSnap = await getDocs(collection(db, SAM.SINGEL_HISTORIKK));
+      const singelSnap = await getDocs(
+        query(collection(db, SAM.SINGEL_HISTORIKK), where('klubbId', '==', aktivKlubbId))
+      );
       batch = writeBatch(db); teller = 0;
       for (const d of singelSnap.docs) {
         batch.delete(d.ref);
