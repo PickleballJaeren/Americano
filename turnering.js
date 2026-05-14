@@ -351,21 +351,23 @@ export async function startPuljespill(turneringId) {
   if (!t.lag?.length) throw new Error('Ingen lag registrert.');
 
   const puljeMedKamper = (() => {
-    const antallPuljer = t.puljer.length;
-    const antallBaner  = t.antallBaner ?? t.konfig?.antallBaner ?? 6;
-    // Bruk global rotasjon for 4 puljer / 6 baner
-    if (antallPuljer === 4 && antallBaner === 6) {
+    const antallPuljer  = t.puljer.length;
+    const antallBaner   = t.antallBaner ?? t.konfig?.antallBaner ?? 6;
+    const minLagPerPulje = Math.min(...t.puljer.map(p => p.lagIds?.length ?? 0));
+
+    // Bruk global rotasjon for 4 puljer / 6 baner — krever minst 4 lag per pulje
+    if (antallPuljer === 4 && antallBaner === 6 && minLagPerPulje >= 4) {
       return genererKamperMed4Puljer6Baner(t.puljer);
     }
-    // Bruk global rotasjon for 3 puljer / 6 baner
-    if (antallPuljer === 3 && antallBaner === 6) {
+    // Bruk global rotasjon for 3 puljer / 6 baner — krever minst 5 lag per pulje
+    if (antallPuljer === 3 && antallBaner === 6 && minLagPerPulje >= 5) {
       return genererKamperMed3Puljer6Baner(t.puljer);
     }
-    // Bruk global rotasjon for 2 puljer / 6 baner
-    if (antallPuljer === 2 && antallBaner === 6) {
+    // Bruk global rotasjon for 2 puljer / 6 baner — krever minst 6 lag per pulje
+    if (antallPuljer === 2 && antallBaner === 6 && minLagPerPulje >= 6) {
       return genererKamperMed2Puljer6Baner(t.puljer);
     }
-    // Standard round-robin ellers
+    // Standard round-robin for alle andre kombinasjoner
     return t.puljer.map(p => ({
       ...p,
       kamper: genererRoundRobin(p.lagIds),
