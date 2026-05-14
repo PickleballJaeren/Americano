@@ -635,9 +635,12 @@ export async function visSlettAlleOkterModal() {
     'Slett alle økter',
     'Kun administrator kan slette alle lagrede økter.',
     async () => {
-      // Tell opp antall økter før vi viser modalen
       try {
-        const snap = await getDocs(collection(db, SAM.TRENINGER));
+        const klubbId = _getAktivKlubbId();
+        if (!klubbId) { visMelding('Kunne ikke fastslå aktiv klubb.', 'feil'); return; }
+        const snap = await getDocs(
+          query(collection(db, SAM.TRENINGER), where('klubbId', '==', klubbId))
+        );
         const antall = snap.size;
         document.getElementById('slett-alle-teller').textContent =
           antall === 0
@@ -658,25 +661,29 @@ export async function utforSlettAlleOkter() {
   visMelding('Sletter alle økter… vennligst vent.', 'advarsel');
 
   try {
+    const klubbId = _getAktivKlubbId();
+    if (!klubbId) { visMelding('Kunne ikke fastslå aktiv klubb.', 'feil'); return; }
+
     const bh = lagBatchHjelper(db);
 
-    // Hent alle trenings-IDer først
-    const treningSnap = await getDocs(collection(db, SAM.TRENINGER));
-    const treningIds  = treningSnap.docs.map(d => d.id);
+    // Hent kun treninger som tilhører aktiv klubb
+    const treningSnap = await getDocs(
+      query(collection(db, SAM.TRENINGER), where('klubbId', '==', klubbId))
+    );
+    const treningIds = treningSnap.docs.map(d => d.id);
 
     if (treningIds.length === 0) {
       visMelding('Ingen økter å slette.', 'advarsel');
       return;
     }
 
-    // Slett alle treningsdokumenter
+    // Slett treningsdokumentene
     for (const d of treningSnap.docs) await bh.slett(d.ref);
 
-    // Slett alle undersamlinger (Firestore tillater maks 10 IDer i where-in)
+    // Slett undersamlinger — filtrert via treningId (Firestore maks 10 per where-in)
     const samlingerMedTreningId = [SAM.KAMPER, SAM.TS, SAM.RESULTATER, SAM.HISTORIKK];
 
     for (const sam of samlingerMedTreningId) {
-      // Del opp i grupper på 10 (Firestore 'in'-grense)
       for (let i = 0; i < treningIds.length; i += 10) {
         const gruppe = treningIds.slice(i, i + 10);
         const snap = await getDocs(
