@@ -801,3 +801,37 @@ html,body{height:100%;background:var(--navy);color:var(--white);font-family:'DM 
 .fremgang-bar-spor      { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
 .fremgang-bar-fyll      { height: 100%; background: var(--green); border-radius: 3px; transition: width .4s; }
 .fremgang-bar-tekst     { font-size: 14px; color: var(--muted2); flex-shrink: 0; }
+
+/* ════════════════════════════════════════════════════════
+   UTFORDRERMODUSEN — kort og resultater
+   ════════════════════════════════════════════════════════ */
+
+/* ── Aktive utfordringer ── */
+.utf-aktiv-kort,
+.utf-venter-kort {
+  background: var(--navy3);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+}
+.utf-aktiv-kort   { border-color: var(--accent2); }
+.utf-kort-tittel  { font-size: 15px; font-weight: 600; color: var(--white); }
+.utf-kort-sub     { font-size: 13px; color: var(--muted2); margin-top: 2px; }
+.utf-status-pagar { font-size: 12px; font-weight: 600; color: var(--green2); flex-shrink: 0; }
+.utf-status-venter{ font-size: 12px; color: var(--muted2); flex-shrink: 0; }
+
+/* ── Siste resultater ── */
+.utf-res-rad {
+  display: flex;
+  align-items: flex-start;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.utf-res-rad:last-child { border-bottom: none; }
+.utf-res-delta-nil {
+  font-size: 18px;
+  color: var(--muted2);
+  flex-shrink: 0;
+  padding-left: 12px;
+}
