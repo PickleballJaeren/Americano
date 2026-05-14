@@ -58,6 +58,8 @@ export function oppdaterGlobalLedertavle() {
         </div>`;
       }).join('');
     }
+      }).join('');
+    }
 
     // Fyll sammenlign-dropdowns
     const optioner = spillere.map(s =>
@@ -114,8 +116,12 @@ async function beregnSesongsKaaring(spillereListe) {
       .map(d => ({ id: d.id, ...d.data() }))
       .filter(k =>
         k.lag1Poeng != null && k.lag2Poeng != null &&
-        (klubbSpillerIds.has(k.lag1_s1) || klubbSpillerIds.has(k.lag1_s2) ||
-         klubbSpillerIds.has(k.lag2_s1) || klubbSpillerIds.has(k.lag2_s2))
+        // Alle spillere i kampen må tilhøre aktiv klubb
+        // lag1_s2 og lag2_s2 kan være null (singelkamper)
+        klubbSpillerIds.has(k.lag1_s1) &&
+        klubbSpillerIds.has(k.lag2_s1) &&
+        (k.lag1_s2 == null || klubbSpillerIds.has(k.lag1_s2)) &&
+        (k.lag2_s2 == null || klubbSpillerIds.has(k.lag2_s2))
       );
 
     if (alleKamper.length === 0) {
