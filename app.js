@@ -641,7 +641,7 @@ async function init() {
 
   // Koble ui.js til app-spesifikk logikk
   registrerNavigertHandler(skjerm => {
-    if (skjerm === 'baner')    { app._oektAktiv = true; visBaner(); oppdaterTilskuerInnhold(); }
+    if (skjerm === 'baner')    { app._oektAktiv = true; visBaner(); oppdaterTilskuerInnhold(); oppdaterMixLiveKnapp(); }
     if (skjerm === 'slutt')    visSluttresultat();
     if (skjerm === 'spillere') oppdaterGlobalLedertavle();
     if (skjerm === 'arkiv')    lastArkiv();
