@@ -326,6 +326,7 @@
       <div class="app-sub" id="tilskuer-hdr-sub">Baneoversikt</div>
     </div>
     <div class="header-right">
+      <button class="knapp knapp-omriss knapp-liten" onclick="apneMixLiveModal()" title="Del live-skjerm til spillere" id="mix-live-knapp" style="display:none">📲 Live</button>
       <button class="knapp knapp-omriss knapp-liten" onclick="delLenke()" title="Del lenke til denne økten">🔗 Del</button>
     </div>
   </div>
@@ -1610,6 +1611,26 @@
       <button class="knapp knapp-gronn" style="flex:2;font-family:'Bebas Neue',cursive;font-size:22px;letter-spacing:1px"
         onclick="bekreftUtfordringGame()">LAGRE</button>
     </div>
+  </div>
+</div>
+
+<!-- Modal: Mix & Match Live-skjerm -->
+<div class="modal-bakgrunn" id="modal-mix-live" style="display:none"
+  onclick="if(event.target===this)lukkMixLiveModal()">
+  <div class="modal" style="border-radius:22px 22px 0 0;padding-bottom:calc(28px + var(--safe-bottom))">
+    <div class="modal-tittel">📲 Live-skjerm</div>
+    <div class="modal-tekst" style="margin-bottom:16px">
+      Scan QR-koden eller del lenken — spillerne kan følge sammenlagtabellen live på mobilen.
+    </div>
+    <div id="mix-qr-wrap" style="display:flex;justify-content:center;align-items:center;background:#fff;border-radius:14px;padding:16px;margin-bottom:16px;min-height:212px">
+      <div id="mix-qr-kode"></div>
+    </div>
+    <div style="background:var(--navy3);border:1px solid var(--border2);border-radius:10px;padding:11px 14px;margin-bottom:14px;font-family:'DM Mono',monospace;font-size:13px;color:var(--muted2);word-break:break-all;display:flex;align-items:center;gap:10px">
+      <span id="mix-live-url" style="flex:1"></span>
+      <button onclick="kopierMixLiveUrl()" style="flex-shrink:0;background:var(--accent);border:none;color:#fff;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer">Kopier</button>
+    </div>
+    <button class="knapp knapp-gronn" onclick="delMixLiveUrl()" style="margin-bottom:10px">🔗 Del lenke</button>
+    <button class="knapp knapp-omriss" onclick="lukkMixLiveModal()">Lukk</button>
   </div>
 </div>
 

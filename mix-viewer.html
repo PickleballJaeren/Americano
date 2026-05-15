@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#050f1f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+<title>Mix & Match — Live</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,400;0,500;0,600;1,400&family=DM+Mono:wght@400;500&display=swap');
+
+  :root {
+    --navy:    #050f1f;
+    --navy2:   #0a1628;
+    --navy3:   #0d1e35;
+    --border:  rgba(30,45,69,.8);
+    --border2: rgba(30,45,69,1);
+    --white:   #e8f0f8;
+    --muted:   #4a6080;
+    --muted2:  #7a90a8;
+    --green:   #16a34a;
+    --green2:  #22c55e;
+    --yellow:  #f5c842;
+    --accent:  #3b82f6;
+    --accent2: #60a5fa;
+    --red2:    #ef4444;
+    --orange:  #f97316;
+    --safe-top:    env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    background: var(--navy);
+    color: var(--white);
+    font-family: 'DM Sans', system-ui, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    position: sticky; top: 0; z-index: 50;
+    background: var(--navy2);
+    border-bottom: 1px solid var(--border2);
+    padding: calc(var(--safe-top) + 12px) 16px 0;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+  .header-top {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 10px;
+  }
+  .logo {
+    width: 38px; height: 38px; flex-shrink: 0;
+    background: var(--accent); border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Bebas Neue', cursive; font-size: 20px; color: #fff;
+    box-shadow: 0 4px 14px rgba(37,99,235,.4);
+  }
+  .header-tekst { flex: 1; min-width: 0; }
+  .klubbnavn {
+    font-family: 'Bebas Neue', cursive;
+    font-size: 22px; letter-spacing: 1.5px;
+    color: var(--white); line-height: 1;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .header-sub {
+    font-size: 12px; color: var(--muted2);
+    text-transform: uppercase; letter-spacing: 1px;
+    margin-top: 1px;
+  }
+  .live-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: rgba(34,197,94,.12);
+    border: 1px solid rgba(34,197,94,.3);
+    color: var(--green2); font-size: 12px; font-weight: 600;
+    padding: 4px 10px; border-radius: 20px;
+    letter-spacing: .5px; flex-shrink: 0;
+  }
+  .live-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--green2);
+    animation: puls 1.5s ease-in-out infinite;
+  }
+  .ferdig-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: rgba(245,200,66,.12);
+    border: 1px solid rgba(245,200,66,.3);
+    color: var(--yellow); font-size: 12px; font-weight: 600;
+    padding: 4px 10px; border-radius: 20px; flex-shrink: 0;
+  }
+  @keyframes puls { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+  /* ── FANER ── */
+  .tab-bar {
+    display: flex; border-bottom: none;
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .tab-bar::-webkit-scrollbar { display: none; }
+  .tab-knapp {
+    flex: 1; padding: 10px 16px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px; font-weight: 600;
+    color: var(--muted); background: none; border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer; transition: color .15s, border-color .15s;
+    white-space: nowrap;
+  }
+  .tab-knapp.aktiv { color: var(--yellow); border-bottom-color: var(--yellow); }
+
+  /* ── INNHOLD ── */
+  .innhold {
+    padding: 16px 16px calc(32px + var(--safe-bottom));
+    max-width: 480px; margin: 0 auto; width: 100%;
+  }
+  .tab-panel { display: none; }
+  .tab-panel.aktiv { display: block; }
+
+  /* ── ENGASJEMENTSBANNER ── */
+  .banner {
+    border-radius: 12px; padding: 12px 14px;
+    margin-bottom: 14px; font-size: 15px; font-weight: 500;
+    line-height: 1.4; border: 1px solid;
+  }
+  .banner-live   { background: rgba(37,99,235,.1);  border-color: rgba(37,99,235,.25);  color: var(--accent2); }
+  .banner-tett   { background: rgba(245,200,66,.08); border-color: rgba(245,200,66,.2);  color: var(--yellow); }
+    .banner-leder  { background: rgba(34,197,94,.08);  border-color: rgba(34,197,94,.2);   color: var(--green2); }
+  .banner-venter { background: rgba(74,96,128,.12);  border-color: rgba(74,96,128,.25);  color: var(--muted2); font-style: italic; }
+  .banner-ferdig { background: rgba(245,200,66,.1);  border-color: rgba(245,200,66,.3);  color: var(--yellow); }
+
+  /* ── SAMMENLAGT-TABELL ── */
+  .tabell-wrap {
+    background: var(--navy2); border: 1px solid var(--border);
+    border-radius: 14px; overflow: hidden; margin-bottom: 14px;
+  }
+  .tabell-hode {
+    display: grid; grid-template-columns: 36px 1fr 52px 44px 44px;
+    gap: 0; padding: 8px 12px;
+    border-bottom: 1px solid var(--border2);
+    font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--muted); font-weight: 600;
+  }
+  .tabell-hode span:nth-child(n+3) { text-align: right; }
+
+  .tabell-rad {
+    display: grid; grid-template-columns: 36px 1fr 52px 44px 44px;
+    gap: 0; padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    align-items: center; transition: background .15s;
+    position: relative;
+  }
+  .tabell-rad:last-child { border-bottom: none; }
+  .tabell-rad.leder {
+    background: linear-gradient(90deg, rgba(245,200,66,.08) 0%, transparent 70%);
+  }
+  .tabell-rad.podium-2 {
+    background: linear-gradient(90deg, rgba(96,165,250,.05) 0%, transparent 70%);
+  }
+  .tabell-rad.podium-3 {
+    background: linear-gradient(90deg, rgba(205,124,63,.04) 0%, transparent 70%);
+  }
+
+  .rad-plass {
+    font-family: 'Bebas Neue', cursive;
+    font-size: 20px; line-height: 1;
+    color: var(--muted);
+  }
+  .rad-plass.p1 { color: var(--yellow); }
+  .rad-plass.p2 { color: var(--accent2); }
+  .rad-plass.p3 { color: #cd7c3f; }
+
+  .rad-navn-wrap { min-width: 0; }
+  .rad-navn {
+    font-size: 16px; font-weight: 500;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .rad-merker { display: flex; gap: 4px; margin-top: 3px; flex-wrap: wrap; }
+  .merke {
+    font-size: 10px; font-weight: 700; letter-spacing: .4px;
+    padding: 1px 6px; border-radius: 4px;
+    display: inline-flex; align-items: center; gap: 3px;
+  }
+  .merke-opp    { background: rgba(34,197,94,.15);   color: var(--green2); }
+  .merke-ned    { background: rgba(239,68,68,.12);    color: var(--red2); }
+  .merke-stabil { background: rgba(74,96,128,.15);    color: var(--muted2); }
+  .merke-topp   { background: rgba(245,200,66,.15);   color: var(--yellow); }
+  .merke-hviler { background: rgba(234,88,12,.12);    color: var(--orange); }
+
+  .rad-poeng {
+    text-align: right;
+    font-family: 'DM Mono', monospace;
+    font-size: 18px; font-weight: 500;
+    color: var(--white);
+  }
+  .rad-poeng.leder-tall { color: var(--yellow); }
+
+  .rad-kamper {
+    text-align: right;
+    font-family: 'DM Mono', monospace;
+    font-size: 14px; color: var(--muted2);
+  }
+  .rad-seire {
+    text-align: right;
+    font-family: 'DM Mono', monospace;
+    font-size: 14px; color: var(--green2);
+  }
+
+  /* Pil */
+  .pil {
+    position: absolute; right: 130px; top: 50%;
+    transform: translateY(-50%);
+    font-size: 13px; font-weight: 700;
+  }
+  .pil-opp  { color: var(--green2); }
+  .pil-ned  { color: var(--red2); }
+
+  /* ── KAMPOPPSETT-SEKSJON ── */
+  .seksjon-tittel {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px;
+    color: var(--muted2); font-weight: 600;
+    margin: 18px 0 8px; display: flex; align-items: center; gap: 8px;
+  }
+  .seksjon-tittel::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .bane-kompakt {
+    background: var(--navy2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 10px 14px;
+    margin-bottom: 8px; display: flex; align-items: center; gap: 12px;
+  }
+  .bane-nr {
+    font-family: 'Bebas Neue', cursive; font-size: 28px;
+    color: var(--accent); line-height: 1; flex-shrink: 0; width: 28px;
+  }
+  .bane-lag-wrap { flex: 1; min-width: 0; }
+  .bane-lag {
+    font-size: 14px; color: var(--white); font-weight: 500;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .bane-vs {
+    font-size: 11px; color: var(--muted); margin: 2px 0;
+    text-transform: uppercase; letter-spacing: .5px;
+  }
+  .bane-status {
+    flex-shrink: 0; font-size: 12px; font-weight: 600;
+    padding: 3px 8px; border-radius: 6px;
+  }
+  .bane-status.pagar   { background: rgba(34,197,94,.15); color: var(--green2); }
+  .bane-status.ferdig  { background: rgba(74,96,128,.15); color: var(--muted2); }
+  .bane-poeng-res {
+    font-family: 'Bebas Neue', cursive; font-size: 18px;
+    color: var(--green2); flex-shrink: 0; letter-spacing: 1px;
+  }
+
+  .hviler-rad {
+    background: rgba(234,88,12,.08); border: 1px solid rgba(234,88,12,.2);
+    border-radius: 10px; padding: 9px 14px;
+    font-size: 14px; color: var(--orange);
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  /* ── HISTORIKK ── */
+  .historikk-runde {
+    background: var(--navy2); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden; margin-bottom: 10px;
+  }
+  .historikk-runde-hdr {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; cursor: pointer;
+    background: rgba(255,255,255,.02);
+    border-bottom: 1px solid transparent;
+    transition: background .15s;
+    user-select: none;
+  }
+  .historikk-runde-hdr:hover { background: rgba(255,255,255,.04); }
+  .historikk-runde-hdr.aapen { border-bottom-color: var(--border); }
+  .historikk-runde-nr {
+    font-family: 'Bebas Neue', cursive; font-size: 18px;
+    color: var(--accent2); flex-shrink: 0;
+  }
+  .historikk-runde-meta { flex: 1; font-size: 13px; color: var(--muted2); }
+  .historikk-chevron {
+    color: var(--muted2); font-size: 12px;
+    transition: transform .2s; flex-shrink: 0;
+  }
+  .historikk-innhold { display: none; }
+  .historikk-innhold.synlig { display: block; }
+
+  .historikk-kamp {
+    padding: 8px 14px; border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .historikk-kamp:last-child { border-bottom: none; }
+  .historikk-kamp-bane { font-size: 11px; color: var(--muted); margin-bottom: 3px; text-transform: uppercase; letter-spacing: .5px; }
+  .historikk-lag { display: flex; justify-content: space-between; padding: 1px 0; }
+  .historikk-lagnavn { color: var(--muted2); }
+  .historikk-lagnavn.vinner { color: var(--white); font-weight: 600; }
+  .historikk-score { font-family: 'DM Mono', monospace; color: var(--green2); }
+  .historikk-score.tap { color: var(--muted2); }
+
+  /* ── LASTER / FEIL / TOM ── */
+  .laster {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 16px;
+    padding: 80px 20px; color: var(--muted2); font-size: 16px;
+    min-height: 60vh;
+  }
+  .snurr {
+    width: 40px; height: 40px; border-radius: 50%;
+    border: 3px solid var(--border2);
+    border-top-color: var(--yellow);
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .feil-boks {
+    margin: 24px; padding: 18px;
+    background: rgba(220,38,38,.1); border: 1px solid rgba(220,38,38,.3);
+    border-radius: 12px; color: #fca5a5;
+    font-size: 15px; text-align: center; line-height: 1.5;
+  }
+  .tom { text-align: center; padding: 40px 20px; color: var(--muted2); font-size: 15px; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div class="laster" id="global-laster">
+    <div class="snurr"></div>
+    Kobler til økt…
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import {
+  getFirestore, doc, collection,
+  query, where, onSnapshot,
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+// ── Firebase-konfig ──────────────────────────────────────
+const BRUK_MILJO = 'prod'; // bytt til 'test' ved testing
+const FB_CONFIGS = {
+  prod: {
+    apiKey:    'AIzaSyB_0rxDzHpV2HB6JdHm8SEHoGc8vE2F_rE',
+    authDomain:'pickle-rank-5fbe5.firebaseapp.com',
+    projectId: 'pickle-rank-5fbe5',
+  },
+  test: {
+    apiKey:    'AIzaSyByUGIQJwohLKWB2x7_qqOMWdi965Ph7ZE',
+    authDomain:'pickle-rank-test.firebaseapp.com',
+    projectId: 'pickle-rank-test',
+  },
+};
+const fbApp = initializeApp(FB_CONFIGS[BRUK_MILJO]);
+const db    = getFirestore(fbApp);
+
+// ── Hent økt-ID fra URL ─────────────────────────────────
+const params   = new URLSearchParams(location.search);
+const oktId    = params.get('okt');
+
+if (!oktId) {
+  document.getElementById('app').innerHTML =
+    '<div class="feil-boks">Ingen økt-ID i URL.<br>Bruk <code>?okt=ØKT_ID</code></div>';
+} else {
+  startLyttere(oktId);
+}
+
+// ── Tilstand ─────────────────────────────────────────────
+let _aktivFane    = 'sammenlagt';
+let _treningData  = null;
+let _alleKamper   = [];
+let _forrigeRang  = {}; // spillerId -> forrige plass (for pil-beregning)
+let _kamperLytter = null;
+
+// ── Sanntids-lyttere ────────────────────────────────────
+function startLyttere(id) {
+  // Lytter 1: treningsdokumentet
+  onSnapshot(
+    doc(db, 'treninger', id),
+    snap => {
+      if (!snap.exists()) {
+        document.getElementById('app').innerHTML =
+          '<div class="feil-boks">Økt ikke funnet.</div>';
+        return;
+      }
+      _treningData = { id: snap.id, ...snap.data() };
+      render();
+    },
+    err => {
+      document.getElementById('app').innerHTML =
+        `<div class="feil-boks">Tilkoblingsfeil: ${esc(err.message)}</div>`;
+    }
+  );
+
+  // Lytter 2: alle kamper for denne økten (alle runder)
+  if (_kamperLytter) { try { _kamperLytter(); } catch(_) {} }
+  _kamperLytter = onSnapshot(
+    query(collection(db, 'kamper'), where('treningId', '==', id)),
+    snap => {
+      _alleKamper = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      render();
+    },
+    err => console.warn('[kamper-lytter]', err.message)
+  );
+}
+
+// ── Fane-bytte ──────────────────────────────────────────
+function byttFane(fane) {
+  _aktivFane = fane;
+  document.querySelectorAll('.tab-knapp').forEach(b =>
+    b.classList.toggle('aktiv', b.dataset.fane === fane)
+  );
+  document.querySelectorAll('.tab-panel').forEach(el =>
+    el.classList.toggle('aktiv', el.id === 'panel-' + fane)
+  );
+}
+window.byttFane = byttFane;
+
+// ── Toggle historikk-runde ──────────────────────────────
+function toggleHistorikk(id, hdr) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const synlig = el.classList.toggle('synlig');
+  hdr.classList.toggle('aapen', synlig);
+  const chev = hdr.querySelector('.historikk-chevron');
+  if (chev) chev.style.transform = synlig ? 'rotate(180deg)' : '';
+}
+window.toggleHistorikk = toggleHistorikk;
+
+// ── Hoved-render ────────────────────────────────────────
+function render() {
+  if (!_treningData) return;
+  const t = _treningData;
+
+  document.title = 'Mix & Match — Live';
+
+  const erFerdig = t.status === 'avsluttet';
+  const runde    = t.gjeldendRunde ?? 1;
+  const klubb    = t.klubbNavn ?? 'Mix & Match';
+
+  const pill = erFerdig
+    ? `<span class="ferdig-pill">🎉 Ferdig</span>`
+    : `<span class="live-pill"><span class="live-dot"></span>LIVE</span>`;
+
+  // Beregn sammenlagtabell
+  const sammenlagt = beregnSammenlagt(_alleKamper);
+
+  // Pil-beregning: sammenlign med forrige kjente rangering
+  const pilar = beregnPilar(sammenlagt, _forrigeRang);
+  // Oppdater forrige rangering
+  sammenlagt.forEach((s, i) => { _forrigeRang[s.spillerId] = i + 1; });
+
+  // Engasjementstekst
+  const banner = lagBanner(sammenlagt, runde, erFerdig, _alleKamper);
+
+  // Bygg HTML
+  document.getElementById('app').innerHTML = `
+    <div class="header">
+      <div class="header-top">
+        <div class="logo">PB</div>
+        <div class="header-tekst">
+          <div class="klubbnavn">${esc(klubb)}</div>
+          <div class="header-sub">${erFerdig ? 'Avsluttet' : `Kamp ${runde} pågår`}</div>
+        </div>
+        ${pill}
+      </div>
+      <div class="tab-bar">
+        <button class="tab-knapp${_aktivFane==='sammenlagt'?' aktiv':''}"
+          data-fane="sammenlagt" onclick="byttFane('sammenlagt')">Sammenlagt</button>
+        <button class="tab-knapp${_aktivFane==='historikk'?' aktiv':''}"
+          data-fane="historikk" onclick="byttFane('historikk')">Historikk</button>
+      </div>
+    </div>
+
+    <div class="innhold">
+      <div id="panel-sammenlagt" class="tab-panel${_aktivFane==='sammenlagt'?' aktiv':''}">
+        ${renderSammenlagt(sammenlagt, pilar, t, runde, erFerdig, banner)}
+      </div>
+      <div id="panel-historikk" class="tab-panel${_aktivFane==='historikk'?' aktiv':''}">
+        ${renderHistorikk(_alleKamper, runde)}
+      </div>
+    </div>
+  `;
+
+  // Gjenopprett toggle-tilstand for historikk-runder
+  document.querySelectorAll('.historikk-innhold').forEach(el => {
+    if (_aapneRunder.has(el.id)) {
+      el.classList.add('synlig');
+      const hdr = el.previousElementSibling;
+      if (hdr) {
+        hdr.classList.add('aapen');
+        const chev = hdr.querySelector('.historikk-chevron');
+        if (chev) chev.style.transform = 'rotate(180deg)';
+      }
+    }
+  });
+}
+
+// Husk hvilke historikk-runder som er åpne
+const _aapneRunder = new Set();
+window._historikkToggle = function(id, hdr) {
+  if (_aapneRunder.has(id)) _aapneRunder.delete(id);
+  else _aapneRunder.add(id);
+  toggleHistorikk(id, hdr);
+};
+
+// ── BEREGN SAMMENLAGT ───────────────────────────────────
+function beregnSammenlagt(kamper) {
+  const totaler = {};
+
+  kamper
+    .filter(k => k.ferdig && k.lag1Poeng != null && k.lag2Poeng != null)
+    .forEach(k => {
+      const lag1Vant = k.lag1Poeng > k.lag2Poeng;
+      const lag2Vant = k.lag2Poeng > k.lag1Poeng;
+
+      const leggTil = (id, navn, mine, deres, vant) => {
+        if (!id) return;
+        if (!totaler[id]) totaler[id] = {
+          spillerId: id, navn: navn ?? 'Ukjent',
+          poeng: 0, seire: 0, kamper: 0,
+        };
+        totaler[id].poeng  += mine;
+        totaler[id].kamper += 1;
+        if (vant) totaler[id].seire += 1;
+      };
+
+      leggTil(k.lag1_s1, k.lag1_s1_navn, k.lag1Poeng, k.lag2Poeng, lag1Vant);
+      leggTil(k.lag1_s2, k.lag1_s2_navn, k.lag1Poeng, k.lag2Poeng, lag1Vant);
+      leggTil(k.lag2_s1, k.lag2_s1_navn, k.lag2Poeng, k.lag1Poeng, lag2Vant);
+      leggTil(k.lag2_s2, k.lag2_s2_navn, k.lag2Poeng, k.lag1Poeng, lag2Vant);
+
+      // Hvilende spiller: snittpoeng, ingen seier
+      if (k.hviler_id) {
+        const hvil = k.hvilerPoeng ?? Math.ceil((k.lag1Poeng + k.lag2Poeng) / 2);
+        const id   = k.hviler_id;
+        if (!totaler[id]) totaler[id] = {
+          spillerId: id, navn: k.hviler_navn ?? 'Ukjent',
+          poeng: 0, seire: 0, kamper: 0,
+        };
+        totaler[id].poeng += hvil;
+      }
+    });
+
+  return Object.values(totaler)
+    .sort((a, b) => b.poeng - a.poeng || b.seire - a.seire);
+}
+
+// ── PILER (opp/ned siden forrige oppdatering) ───────────
+function beregnPilar(sammenlagt, forrige) {
+  const pilar = {};
+  if (!Object.keys(forrige).length) return pilar;
+  sammenlagt.forEach((s, i) => {
+    const nyPlass     = i + 1;
+    const gammelPlass = forrige[s.spillerId];
+    if (gammelPlass == null) { pilar[s.spillerId] = null; return; }
+    if (nyPlass < gammelPlass)  pilar[s.spillerId] = 'opp';
+    else if (nyPlass > gammelPlass) pilar[s.spillerId] = 'ned';
+    else pilar[s.spillerId] = null;
+  });
+  return pilar;
+}
+
+// ── ENGASJEMENTSBANNER ──────────────────────────────────
+function lagBanner(sammenlagt, runde, erFerdig, alleKamper) {
+  if (erFerdig) {
+    if (!sammenlagt.length) return { kl: 'banner-ferdig', tekst: '🎉 Mix & Match er ferdig!' };
+    return {
+      kl: 'banner-ferdig',
+      tekst: `🎉 Ferdig! ${esc(sammenlagt[0].navn)} vant med ${sammenlagt[0].poeng} poeng!`,
+    };
+  }
+
+  const ferdigeKamper = alleKamper.filter(k => k.ferdig && k.rundeNr === runde);
+  const alleKamperDenneRunden = alleKamper.filter(k => k.rundeNr === runde);
+
+  if (!sammenlagt.length || ferdigeKamper.length === 0) {
+    return { kl: 'banner-venter', tekst: `⏸ Venter på resultater fra kamp ${runde}…` };
+  }
+
+  // Sjekk om det er tett i toppen
+  if (sammenlagt.length >= 2) {
+    const diff = sammenlagt[0].poeng - sammenlagt[1].poeng;
+    if (diff <= 3 && sammenlagt.length >= 3) {
+      const diff3 = sammenlagt[0].poeng - sammenlagt[2].poeng;
+      if (diff3 <= 6) {
+        return {
+          kl: 'banner-tett',
+          tekst: `🔥 Tett i toppen — bare ${diff3} poeng skiller de tre øverste!`,
+        };
+      }
+    }
+    if (diff <= 5) {
+      return {
+        kl: 'banner-tett',
+        tekst: `🔥 Tett kamp om toppen — ${diff} poeng skiller de to øverste!`,
+      };
+    }
+    if (diff >= 15) {
+      return {
+        kl: 'banner-leder',
+        tekst: `👑 ${esc(sammenlagt[0].navn)} leder suverent — ${diff} poeng foran nummer 2!`,
+      };
+    }
+  }
+
+  return {
+    kl: 'banner-live',
+    tekst: `🎲 Kamp ${runde} pågår — ${esc(sammenlagt[0].navn)} leder med ${sammenlagt[0].poeng} poeng`,
+  };
+}
+
+// ── RENDER SAMMENLAGT ───────────────────────────────────
+function renderSammenlagt(sammenlagt, pilar, t, runde, erFerdig, banner) {
+  const baneOversikt = t.baneOversikt ?? [];
+  const venteliste   = t.venteliste   ?? [];
+
+  // Hvilere denne runden
+  const hvilerIds = new Set(venteliste.map(s => s.id));
+
+  // Finn på-vei-opp spiller (mest klatret)
+  let paVeiOppId = null;
+  let mestKlatret = 0;
+  Object.entries(pilar).forEach(([id, retning]) => {
+    if (retning !== 'opp') return;
+    const forrige = _forrigeRang[id] ?? 99;
+    const ny      = sammenlagt.findIndex(s => s.spillerId === id) + 1;
+    const klatret = forrige - ny;
+    if (klatret > mestKlatret) { mestKlatret = klatret; paVeiOppId = id; }
+  });
+
+  let html = '';
+
+  // Banner
+  html += `<div class="banner ${banner.kl}">${banner.tekst}</div>`;
+
+  // Tabell
+  if (!sammenlagt.length) {
+    html += `<div class="tom">Ingen resultater ennå — første kamp er ikke ferdig.</div>`;
+  } else {
+    html += `
+      <div class="tabell-wrap">
+        <div class="tabell-hode">
+          <span>#</span>
+          <span>Navn</span>
+          <span style="text-align:right">Poeng</span>
+          <span style="text-align:right">Seire</span>
+          <span style="text-align:right">Kamp</span>
+        </div>
+        ${sammenlagt.map((s, i) => {
+          const plass  = i + 1;
+          const pil    = pilar[s.spillerId];
+          const hviler = hvilerIds.has(s.spillerId);
+
+          const radKl = plass === 1 ? 'tabell-rad leder'
+            : plass === 2 ? 'tabell-rad podium-2'
+            : plass === 3 ? 'tabell-rad podium-3'
+            : 'tabell-rad';
+
+          const plassKl = plass === 1 ? 'rad-plass p1'
+            : plass === 2 ? 'rad-plass p2'
+            : plass === 3 ? 'rad-plass p3'
+            : 'rad-plass';
+
+          const plassSymbol = plass === 1 ? '🥇'
+            : plass === 2 ? '🥈'
+            : plass === 3 ? '🥉'
+            : plass + '.';
+
+          // Merker under navn
+          const merker = [];
+          if (hviler && !erFerdig)
+            merker.push(`<span class="merke merke-hviler">😴 Hviler</span>`);
+          if (s.spillerId === paVeiOppId && mestKlatret >= 1)
+            merker.push(`<span class="merke merke-topp">⚡ På vei opp</span>`);
+
+          const pilHTML = pil === 'opp'
+            ? `<span class="pil pil-opp">▲</span>`
+            : pil === 'ned'
+              ? `<span class="pil pil-ned">▼</span>`
+              : '';
+
+          return `
+            <div class="${radKl}">
+              ${pilHTML}
+              <div class="${plassKl}">${plassSymbol}</div>
+              <div class="rad-navn-wrap">
+                <div class="rad-navn">${esc(s.navn)}</div>
+                ${merker.length ? `<div class="rad-merker">${merker.join('')}</div>` : ''}
+              </div>
+              <div class="rad-poeng${plass===1?' leder-tall':''}">${s.poeng}</div>
+              <div class="rad-seire">${s.seire}</div>
+              <div class="rad-kamper">${s.kamper}</div>
+            </div>`;
+        }).join('')}
+      </div>`;
+  }
+
+  // ── Kampoppsett denne runden ──
+  if (!erFerdig && baneOversikt.length) {
+    html += `<div class="seksjon-tittel">Kamp ${runde} — Baner</div>`;
+
+    // Hent kamper for gjeldende runde
+    const kamperDenneRunden = _alleKamper.filter(k => k.rundeNr === runde);
+
+    baneOversikt.forEach(bane => {
+      const baneNr   = bane.baneNr;
+      const spillere = bane.spillere ?? [];
+      const kamp     = kamperDenneRunden.find(k => k.baneNr === `bane${baneNr}`);
+
+      let lag1Navn, lag2Navn, statusHTML, poengHTML = '';
+
+      if (spillere.length === 2) {
+        // Singel
+        lag1Navn = esc(spillere[0]?.navn ?? '?');
+        lag2Navn = esc(spillere[1]?.navn ?? '?');
+      } else if (spillere.length >= 4) {
+        lag1Navn = `${esc(spillere[0]?.navn ?? '?')} + ${esc(spillere[1]?.navn ?? '?')}`;
+        lag2Navn = `${esc(spillere[2]?.navn ?? '?')} + ${esc(spillere[3]?.navn ?? '?')}`;
+      } else {
+        lag1Navn = '?'; lag2Navn = '?';
+      }
+
+      if (kamp?.ferdig) {
+        statusHTML = `<span class="bane-status ferdig">Ferdig</span>`;
+        poengHTML  = `<div class="bane-poeng-res">${kamp.lag1Poeng}–${kamp.lag2Poeng}</div>`;
+      } else {
+        statusHTML = `<span class="bane-status pagar">Pågår</span>`;
+      }
+
+      html += `
+        <div class="bane-kompakt">
+          <div class="bane-nr">${baneNr}</div>
+          <div class="bane-lag-wrap">
+            <div class="bane-lag">${lag1Navn}</div>
+            <div class="bane-vs">vs</div>
+            <div class="bane-lag">${lag2Navn}</div>
+          </div>
+          ${statusHTML}
+          ${poengHTML}
+        </div>`;
+    });
+
+    // Hviler
+    if (venteliste.length) {
+      venteliste.forEach(s => {
+        html += `<div class="hviler-rad">😴 ${esc(s.navn ?? 'Ukjent')} hviler denne kampen</div>`;
+      });
+    }
+  }
+
+  return html;
+}
+
+// ── RENDER HISTORIKK ────────────────────────────────────
+function renderHistorikk(alleKamper, gjeldendeRunde) {
+  // Grupper ferdigspilte kamper per runde (unntatt gjeldende runde hvis ingen er ferdige)
+  const perRunde = {};
+  alleKamper
+    .filter(k => k.ferdig && k.lag1Poeng != null && k.lag2Poeng != null)
+    .forEach(k => {
+      const r = k.rundeNr ?? 1;
+      if (!perRunde[r]) perRunde[r] = [];
+      perRunde[r].push(k);
+    });
+
+  const runder = Object.keys(perRunde).map(Number).sort((a, b) => b - a); // nyeste først
+
+  if (!runder.length) {
+    return `<div class="tom">Ingen ferdigspilte kamper ennå.</div>`;
+  }
+
+  return runder.map(r => {
+    const kamper   = perRunde[r];
+    const id       = `hist-runde-${r}`;
+    const antall   = kamper.length;
+    const totPoeng = kamper.reduce((s, k) => s + k.lag1Poeng + k.lag2Poeng, 0);
+
+    const kamperHTML = kamper
+      .sort((a, b) => (a.baneNr ?? '').localeCompare(b.baneNr ?? ''))
+      .map(k => {
+        const baneNr = k.baneNr?.replace('bane', '') ?? '?';
+        const l1     = lagNavn(k, 1);
+        const l2     = lagNavn(k, 2);
+        const v1     = k.lag1Poeng > k.lag2Poeng;
+        return `
+          <div class="historikk-kamp">
+            <div class="historikk-kamp-bane">Bane ${baneNr}</div>
+            <div class="historikk-lag">
+              <span class="historikk-lagnavn${v1 ? ' vinner' : ''}">${l1}</span>
+              <span class="historikk-score${v1 ? '' : ' tap'}">${k.lag1Poeng}</span>
+            </div>
+            <div class="historikk-lag">
+              <span class="historikk-lagnavn${!v1 ? ' vinner' : ''}">${l2}</span>
+              <span class="historikk-score${!v1 ? '' : ' tap'}">${k.lag2Poeng}</span>
+            </div>
+          </div>`;
+      }).join('');
+
+    return `
+      <div class="historikk-runde">
+        <div class="historikk-runde-hdr" onclick="_historikkToggle('${id}', this)">
+          <div class="historikk-runde-nr">Kamp ${r}</div>
+          <div class="historikk-runde-meta">${antall} kamp${antall > 1 ? 'er' : ''} · ${totPoeng} poeng spilt</div>
+          <div class="historikk-chevron">▼</div>
+        </div>
+        <div class="historikk-innhold" id="${id}">
+          ${kamperHTML}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ── HJELPERE ─────────────────────────────────────────────
+function lagNavn(kamp, lag) {
+  if (lag === 1) {
+    const s1 = esc(kamp.lag1_s1_navn ?? '?');
+    const s2 = kamp.lag1_s2_navn ? ` + ${esc(kamp.lag1_s2_navn)}` : '';
+    return s1 + s2;
+  }
+  const s1 = esc(kamp.lag2_s1_navn ?? '?');
+  const s2 = kamp.lag2_s2_navn ? ` + ${esc(kamp.lag2_s2_navn)}` : '';
+  return s1 + s2;
+}
+
+function esc(str) {
+  return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>

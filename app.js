@@ -199,8 +199,9 @@ function oppdaterTilskuerInnhold() {
   const subEl     = document.getElementById('tilskuer-hdr-sub');
   const indEl     = document.getElementById('tilskuer-indikator-tekst');
   if (rundeEl) rundeEl.textContent = app.runde ?? 1;
-  if (subEl)   subEl.textContent   = 'Baneoversikt';
-  if (indEl)   indEl.textContent   = `Runde ${app.runde ?? 1} pågår`;
+  if (subEl)   subEl.textContent   = erMix() ? 'Mix & Match' : 'Baneoversikt';
+  if (indEl)   indEl.textContent   = erMix() ? `Kamp ${app.runde ?? 1} pågår` : `Runde ${app.runde ?? 1} pågår`;
+  oppdaterMixLiveKnapp();
 
   // Gjenbruk bane-liste fra skjerm-baner
   const baneListeEl = document.getElementById('bane-liste');
@@ -289,6 +290,89 @@ function settScoringFormat(format) {
   if (infoB3) infoB3.style.display = format === 'best_of_3' ? 'block' : 'none';
 }
 window.settScoringFormat = settScoringFormat;
+
+// ════════════════════════════════════════════════════════
+// MIX LIVE-SKJERM — QR-kode og del-knapp
+// Åpnes fra tilskuerskjermen når spillmodus er Mix & Match.
+// Genererer en lenke til mix-viewer.html?okt=TRENING_ID
+// og viser QR-kode via qrcode.js fra CDN.
+// ════════════════════════════════════════════════════════
+
+function lagMixLiveUrl() {
+  if (!app.treningId) return null;
+  const base = location.origin + location.pathname.replace(/\/[^/]*$/, '/');
+  return `${base}mix-viewer.html?okt=${app.treningId}`;
+}
+
+function oppdaterMixLiveKnapp() {
+  const knapp = document.getElementById('mix-live-knapp');
+  if (!knapp) return;
+  knapp.style.display = (erMix() && app.treningId) ? 'inline-flex' : 'none';
+}
+
+function apneMixLiveModal() {
+  if (!app.treningId) { visMelding('Ingen aktiv økt.', 'feil'); return; }
+  const url    = lagMixLiveUrl();
+  const urlEl  = document.getElementById('mix-live-url');
+  const qrWrap = document.getElementById('mix-qr-kode');
+  const modal  = document.getElementById('modal-mix-live');
+  if (urlEl)  urlEl.textContent = url;
+  if (modal)  modal.style.display = 'flex';
+  if (qrWrap) qrWrap.innerHTML = '';
+  if (!window.QRCode) {
+    const script   = document.createElement('script');
+    script.src     = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+    script.onload  = () => _genererMixQR(qrWrap, url);
+    script.onerror = () => {
+      if (qrWrap) qrWrap.innerHTML =
+        '<div style="color:#888;font-size:13px;text-align:center;padding:8px">Kunne ikke laste QR-generator.<br>Kopier lenken manuelt.</div>';
+    };
+    document.head.appendChild(script);
+  } else {
+    _genererMixQR(qrWrap, url);
+  }
+}
+window.apneMixLiveModal = apneMixLiveModal;
+
+function _genererMixQR(container, url) {
+  if (!container || !url || !window.QRCode) return;
+  container.innerHTML = '';
+  new QRCode(container, {
+    text:         url,
+    width:        180,
+    height:       180,
+    colorDark:    '#050f1f',
+    colorLight:   '#ffffff',
+    correctLevel: QRCode.CorrectLevel.M,
+  });
+}
+
+function lukkMixLiveModal() {
+  const modal = document.getElementById('modal-mix-live');
+  if (modal) modal.style.display = 'none';
+}
+window.lukkMixLiveModal = lukkMixLiveModal;
+
+function kopierMixLiveUrl() {
+  const url = lagMixLiveUrl();
+  if (!url) return;
+  navigator.clipboard.writeText(url)
+    .then(()  => visMelding('Lenke kopiert! 📋'))
+    .catch(()  => visMelding('Kunne ikke kopiere — kopier manuelt.', 'advarsel'));
+}
+window.kopierMixLiveUrl = kopierMixLiveUrl;
+
+function delMixLiveUrl() {
+  const url = lagMixLiveUrl();
+  if (!url) return;
+  if (navigator.share) {
+    navigator.share({ title: 'Mix & Match — Live', text: 'Følg sammenlagtabellen live! 🎲', url })
+      .catch(() => {});
+  } else {
+    kopierMixLiveUrl();
+  }
+}
+window.delMixLiveUrl = delMixLiveUrl;
 
 // ════════════════════════════════════════════════════════
 // HJEMSKJERM
