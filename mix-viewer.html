@@ -347,29 +347,35 @@ import {
 const BRUK_MILJO = 'prod'; // bytt til 'test' ved testing
 const FB_CONFIGS = {
   prod: {
-    apiKey:    'AIzaSyB_0rxDzHpV2HB6JdHm8SEHoGc8vE2F_rE',
-    authDomain:'pickle-rank-5fbe5.firebaseapp.com',
-    projectId: 'pickle-rank-5fbe5',
+    apiKey:            'AIzaSyB_0rxDzHpV2HB6JdHm8SEHoGc8vE2F_rE',
+    authDomain:        'pickle-rank-5fbe5.firebaseapp.com',
+    projectId:         'pickle-rank-5fbe5',
+    storageBucket:     'pickle-rank-5fbe5.firebasestorage.app',
+    messagingSenderId: '761601873916',
+    appId:             '1:761601873916:web:f3c13d21e809658fd80479',
   },
   test: {
-    apiKey:    'AIzaSyByUGIQJwohLKWB2x7_qqOMWdi965Ph7ZE',
-    authDomain:'pickle-rank-test.firebaseapp.com',
-    projectId: 'pickle-rank-test',
+    apiKey:            'AIzaSyByUGIQJwohLKWB2x7_qqOMWdi965Ph7ZE',
+    authDomain:        'pickle-rank-test.firebaseapp.com',
+    projectId:         'pickle-rank-test',
+    storageBucket:     'pickle-rank-test.firebasestorage.app',
+    messagingSenderId: '491693932367',
+    appId:             '1:491693932367:web:b3c13902ef6adb981dcf3a',
   },
 };
-const fbApp = initializeApp(FB_CONFIGS[BRUK_MILJO]);
-const db    = getFirestore(fbApp);
+
+let db;
+try {
+  const fbApp = initializeApp(FB_CONFIGS[BRUK_MILJO], 'mix-viewer');
+  db = getFirestore(fbApp);
+} catch (e) {
+  document.getElementById('app').innerHTML =
+    `<div class="feil-boks">Firebase-feil: ${e?.message ?? e}</div>`;
+}
 
 // ── Hent økt-ID fra URL ─────────────────────────────────
 const params   = new URLSearchParams(location.search);
 const oktId    = params.get('okt');
-
-if (!oktId) {
-  document.getElementById('app').innerHTML =
-    '<div class="feil-boks">Ingen økt-ID i URL.<br>Bruk <code>?okt=ØKT_ID</code></div>';
-} else {
-  startLyttere(oktId);
-}
 
 // ── Tilstand ─────────────────────────────────────────────
 let _aktivFane    = 'sammenlagt';
@@ -377,6 +383,15 @@ let _treningData  = null;
 let _alleKamper   = [];
 let _forrigeRang  = {}; // spillerId -> forrige plass (for pil-beregning)
 let _kamperLytter = null;
+
+if (!db) {
+  // feil vist i catch-blokken over
+} else if (!oktId) {
+  document.getElementById('app').innerHTML =
+    '<div class="feil-boks">Ingen økt-ID i URL.<br>Bruk <code>?okt=ØKT_ID</code></div>';
+} else {
+  startLyttere(oktId);
+}
 
 // ── Sanntids-lyttere ────────────────────────────────────
 function startLyttere(id) {
@@ -435,7 +450,7 @@ window.toggleHistorikk = toggleHistorikk;
 
 // ── Hoved-render ────────────────────────────────────────
 function render() {
-  if (!_treningData) return;
+  if (!_treningData) return; // vent til begge lytterne har svart
   const t = _treningData;
 
   document.title = 'Mix & Match — Live';
