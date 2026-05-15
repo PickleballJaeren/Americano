@@ -541,6 +541,24 @@ html,body{height:100%;background:var(--navy);color:var(--white);font-family:'DM 
   letter-spacing:1px;color:var(--muted2);margin-top:3px;
 }
 
+/* ── MIX — Plassering på sluttresultat-kort ── */
+.mix-plass-rad{
+  display:flex;align-items:center;
+  padding:6px 16px 0;
+}
+.mix-plass-symbol{
+  font-size:18px;font-weight:700;
+  font-family:'Bebas Neue',cursive;
+  letter-spacing:.5px;color:var(--muted2);
+  line-height:1;
+}
+.mix-spiller-kort-topp .mix-plass-symbol{ color:var(--yellow); }
+
+/* ── MIX — Runderesultat-tabell (leder-fremheving) ── */
+.mix-rang-leder{
+  background:linear-gradient(90deg, rgba(245,200,66,.08) 0%, transparent 70%);
+}
+
 /* ── BANE-NAVIGASJON (Forrige / Neste) i poengregistrering ── */
 .poeng-nav{
   display:grid;grid-template-columns:1fr 1fr;gap:10px;
