@@ -54,7 +54,6 @@ function _byggOktKort(item) {
     : '';
   const erAktiv = t.status === 'aktiv';
   const runder  = t.gjeldendRunde ?? 1;
-  const maks    = t.maksRunder    ?? '?';
   const baner   = t.antallBaner   ?? '?';
 
   return `<div class="kort bane-kort-klikk" style="margin-bottom:10px" data-treningid="${item.id}" onclick="apneTreningsdetaljFraDom(this)">
@@ -65,7 +64,7 @@ function _byggOktKort(item) {
       </div>
       <div class="arkiv-kort-høyre">
         <div class="${erAktiv ? 'arkiv-kort-status-aktiv' : 'arkiv-kort-status-avsl'}">${erAktiv ? '● Aktiv' : 'Avsluttet'}</div>
-        <div class="arkiv-kort-meta">${baner} baner • ${runder}/${maks} runder</div>
+        <div class="arkiv-kort-meta">${baner} baner • ${runder} runder</div>
       </div>
       ${_byggChevron()}
     </div>
@@ -400,13 +399,12 @@ export async function apneTreningsdetalj(treningId) {
     // Meta-chips
     const antallBaner    = t.antallBaner   ?? '?';
     const gjeldendRunde  = t.gjeldendRunde ?? 1;
-    const maksRunder     = t.maksRunder    ?? '?';
     const poengPerKamp   = t.poengPerKamp  ?? '?';
     const antallSpillere = (t.baneOversikt ?? []).reduce((sum, b) => sum + (b.spillere?.length ?? 0), 0)
                          + (t.venteliste ?? []).length;
     document.getElementById('detalj-meta').innerHTML = renderMetaChips([
       { ikon: '⛳', tekst: antallBaner + ' baner' },
-      { ikon: '🔄', tekst: gjeldendRunde + '/' + maksRunder + ' runder' },
+      { ikon: '🔄', tekst: gjeldendRunde + ' runder' },
       { ikon: '👥', tekst: antallSpillere + ' deltakere' },
       { ikon: '🎯', tekst: poengPerKamp + ' poeng/kamp' },
     ]);
@@ -458,9 +456,8 @@ export async function apneTreningsdetalj(treningId) {
       const baner = t.baneOversikt ?? [];
       const vl    = t.venteliste   ?? [];
       const runde = t.gjeldendRunde ?? 1;
-      const maks  = t.maksRunder   ?? '?';
       let html = `<div style="padding:8px 0 12px;font-size:16px;color:var(--accent2);font-weight:600;display:flex;align-items:center;gap:8px">
-        <div class="runde-prikk-live"></div>Runde ${runde} av ${maks} pågår
+        <div class="runde-prikk-live"></div>Runde ${runde} pågår
       </div>`;
       baner.forEach(bane => {
         html += `<div style="margin-bottom:14px">
