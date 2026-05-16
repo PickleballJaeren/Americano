@@ -59,7 +59,7 @@ import {
   setKampStatusCache, getKampStatusCache,
   oppdaterRundeUI, visBanerDebounced, oppdaterKampStatus, visBaner,
   apnePoenginput, navigerBane, oppdaterPoengNav,
-  visDeltakerModal,
+  visDeltakerModal, oppdaterMixRedigerKnapp,
 } from './baner.js';
 import {
   poengInit,
@@ -202,6 +202,7 @@ function oppdaterTilskuerInnhold() {
   if (subEl)   subEl.textContent   = erMix() ? 'Mix & Match' : 'Baneoversikt';
   if (indEl)   indEl.textContent   = erMix() ? `Kamp ${app.runde ?? 1} pågår` : `Runde ${app.runde ?? 1} pågår`;
   oppdaterMixLiveKnapp();
+  oppdaterMixRedigerKnapp();
 
   // Gjenbruk bane-liste fra skjerm-baner
   const baneListeEl = document.getElementById('bane-liste');
@@ -641,7 +642,7 @@ async function init() {
 
   // Koble ui.js til app-spesifikk logikk
   registrerNavigertHandler(skjerm => {
-    if (skjerm === 'baner')    { app._oektAktiv = true; visBaner(); oppdaterTilskuerInnhold(); oppdaterMixLiveKnapp(); }
+    if (skjerm === 'baner')    { app._oektAktiv = true; visBaner(); oppdaterTilskuerInnhold(); oppdaterMixLiveKnapp(); oppdaterMixRedigerKnapp(); }
     if (skjerm === 'slutt')    visSluttresultat();
     if (skjerm === 'spillere') oppdaterGlobalLedertavle();
     if (skjerm === 'arkiv')    lastArkiv();

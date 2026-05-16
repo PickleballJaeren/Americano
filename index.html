@@ -308,6 +308,7 @@
     </div>
     <div style="display:flex;gap:8px;margin-bottom:12px">
       <button class="knapp knapp-omriss" id="rediger-baner-knapp" onclick="visRedigerBanerModal()" style="display:none;flex:1;font-family:'DM Sans',sans-serif;font-size:17px;letter-spacing:0;padding:11px 16px">✏️ Rediger baner</button>
+      <button class="knapp knapp-omriss" id="mix-rediger-knapp" onclick="apneMixRedigerModal()" style="display:none;flex:1;font-family:'DM Sans',sans-serif;font-size:17px;letter-spacing:0;padding:11px 16px">✏️ Rediger kamper<span class="admin-merke">Admin</span></button>
       <button class="knapp knapp-omriss" id="deltaker-admin-knapp" onclick="visDeltakerModal()" style="flex:1;font-family:'DM Sans',sans-serif;font-size:17px;letter-spacing:0;padding:11px 16px">👥 Deltakere<span class="admin-merke">Admin</span></button>
     </div>
     <div id="fremgang-beholder" class="fremgang-beholder"></div>
@@ -1614,7 +1615,45 @@
   </div>
 </div>
 
-<!-- Modal: Mix & Match Live-skjerm -->
+<!-- Modal: Rediger Mix-kamper -->
+<div class="modal-bakgrunn" id="modal-mix-rediger" style="display:none"
+  onclick="if(event.target===this)lukkMixRedigerModal()">
+  <div class="modal" style="border-radius:22px 22px 0 0;padding-bottom:calc(28px + var(--safe-bottom));max-height:85vh;display:flex;flex-direction:column">
+    <div class="modal-tittel">✏️ Rediger kamper</div>
+    <div class="modal-tekst" style="margin-bottom:14px">Velg en kamp for å korrigere poengscoren.</div>
+    <div id="mix-rediger-innhold" style="overflow-y:auto;flex:1"></div>
+    <button class="knapp knapp-omriss" style="margin-top:14px;flex-shrink:0" onclick="lukkMixRedigerModal()">Lukk</button>
+  </div>
+</div>
+
+<!-- Modal: Rediger én Mix-kamp -->
+<div class="modal-bakgrunn" id="modal-mix-rediger-kamp" style="display:none"
+  onclick="if(event.target===this)lukkMixRedigerKampModal()">
+  <div class="modal" style="border-radius:22px 22px 0 0;padding-bottom:calc(28px + var(--safe-bottom))">
+    <div class="modal-tittel" id="mix-rk-tittel">Rediger kamp</div>
+    <div id="mix-rk-laginfo" style="margin-bottom:18px;font-size:15px;color:var(--muted2);line-height:1.5"></div>
+    <div style="display:flex;gap:12px;margin-bottom:18px;align-items:center">
+      <div style="flex:1;text-align:center">
+        <div id="mix-rk-lag1-navn" style="font-size:14px;color:var(--muted2);margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+        <input id="mix-rk-l1" type="number" inputmode="numeric" min="0" max="99"
+          style="width:100%;font-size:32px;font-family:'Bebas Neue',cursive;text-align:center;background:var(--navy3);border:2px solid var(--border2);border-radius:12px;color:var(--white);padding:10px 4px"
+          oninput="mixRkValider()">
+      </div>
+      <div style="font-family:'Bebas Neue',cursive;font-size:28px;color:var(--muted);flex-shrink:0">—</div>
+      <div style="flex:1;text-align:center">
+        <div id="mix-rk-lag2-navn" style="font-size:14px;color:var(--muted2);margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+        <input id="mix-rk-l2" type="number" inputmode="numeric" min="0" max="99"
+          style="width:100%;font-size:32px;font-family:'Bebas Neue',cursive;text-align:center;background:var(--navy3);border:2px solid var(--border2);border-radius:12px;color:var(--white);padding:10px 4px"
+          oninput="mixRkValider()">
+      </div>
+    </div>
+    <div id="mix-rk-feil" style="font-size:13px;color:var(--red2);text-align:center;min-height:18px;margin-bottom:10px"></div>
+    <button class="knapp knapp-gronn" id="mix-rk-lagre" onclick="lagreMixRedigerKamp()" disabled>Lagre</button>
+    <button class="knapp knapp-omriss" style="margin-top:10px" onclick="lukkMixRedigerKampModal()">Avbryt</button>
+  </div>
+</div>
+
+</body>
 <div class="modal-bakgrunn" id="modal-mix-live" style="display:none"
   onclick="if(event.target===this)lukkMixLiveModal()">
   <div class="modal" style="border-radius:22px 22px 0 0;padding-bottom:calc(28px + var(--safe-bottom))">

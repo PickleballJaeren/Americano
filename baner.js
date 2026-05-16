@@ -1885,3 +1885,222 @@ window._leggTilNySpillerIOkt = async function() {
     visMelding('Feil ved opprettelse: ' + (e?.message ?? e), 'feil');
   }
 };
+
+// ════════════════════════════════════════════════════════
+// 9. REDIGER MIX-KAMPER (admin) — alle runder
+// ════════════════════════════════════════════════════════
+
+let _mixRkAktivKampId  = null; // Firestore-ID for kampen som redigeres
+let _mixRkMaksPoeng    = 15;   // maksPoeng for gjeldende kamp
+
+/** Viser/skjuler «Rediger kamper»-knappen basert på modus og admin-status. */
+export function oppdaterMixRedigerKnapp() {
+  const knapp = document.getElementById('mix-rediger-knapp');
+  if (!knapp) return;
+  knapp.style.display = (erMix() && app.treningId && window.getErAdmin?.()) ? 'flex' : 'none';
+}
+window.oppdaterMixRedigerKnapp = oppdaterMixRedigerKnapp;
+
+/** Åpner modal med alle runder og kamper. */
+export async function apneMixRedigerModal() {
+  if (!db || !app.treningId) return;
+  const modal = document.getElementById('modal-mix-rediger');
+  const innhold = document.getElementById('mix-rediger-innhold');
+  if (!modal || !innhold) return;
+
+  innhold.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted2)">Laster kamper…</div>';
+  modal.style.display = 'flex';
+
+  try {
+    const snap = await getDocs(
+      query(collection(db, SAM.KAMPER), where('treningId', '==', app.treningId))
+    );
+    const alleKamper = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    // Grupper per runde
+    const perRunde = {};
+    alleKamper.forEach(k => {
+      const r = k.rundeNr ?? 1;
+      if (!perRunde[r]) perRunde[r] = [];
+      perRunde[r].push(k);
+    });
+
+    const runder = Object.keys(perRunde).map(Number).sort((a, b) => b - a); // nyeste først
+
+    if (!runder.length) {
+      innhold.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted2)">Ingen kamper funnet.</div>';
+      return;
+    }
+
+    innhold.innerHTML = runder.map(r => {
+      const kamper = perRunde[r].sort((a, b) =>
+        (a.baneNr ?? '').localeCompare(b.baneNr ?? '')
+      );
+      const erGjeldende = r === app.runde;
+      const id = `mrunde-${r}`;
+
+      const kamperHTML = kamper.map(k => {
+        const baneNr  = k.baneNr?.replace('bane', '') ?? '?';
+        const l1Navn  = lagNavnFraKamp(k, 1);
+        const l2Navn  = lagNavnFraKamp(k, 2);
+        const ferdig  = k.ferdig && k.lag1Poeng != null;
+        const poengTekst = ferdig ? `${k.lag1Poeng} – ${k.lag2Poeng}` : 'Ikke registrert';
+        const poengFarge = ferdig ? 'var(--green2)' : 'var(--muted)';
+
+        return `<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px">
+          <div style="font-family:'Bebas Neue',cursive;font-size:22px;color:var(--accent);flex-shrink:0;width:22px">${baneNr}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(l1Navn)}</div>
+            <div style="font-size:11px;color:var(--muted);margin:1px 0">vs</div>
+            <div style="font-size:14px;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(l2Navn)}</div>
+          </div>
+          <div style="font-family:'DM Mono',monospace;font-size:16px;font-weight:600;color:${poengFarge};flex-shrink:0">${poengTekst}</div>
+          <button onclick="apneMixRedigerKamp('${k.id}')"
+            style="flex-shrink:0;background:var(--navy3);border:1px solid var(--border2);border-radius:8px;color:var(--muted2);padding:6px 10px;font-size:13px;cursor:pointer">
+            ✏️
+          </button>
+        </div>`;
+      }).join('');
+
+      return `<div style="background:var(--navy2);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:10px">
+        <div onclick="_mixRedigertoggle('${id}',this)"
+          style="display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;user-select:none;background:rgba(255,255,255,.02)">
+          <div style="font-family:'Bebas Neue',cursive;font-size:18px;color:var(--accent2)">
+            Kamp ${r}${erGjeldende ? ' <span style="font-size:12px;color:var(--green2)">● Pågår</span>' : ''}
+          </div>
+          <div style="flex:1;font-size:13px;color:var(--muted2)">${kamper.length} kamp${kamper.length > 1 ? 'er' : ''}</div>
+          <div id="${id}-chev" style="color:var(--muted2);font-size:12px;transition:transform .2s">▼</div>
+        </div>
+        <div id="${id}" style="display:none">${kamperHTML}</div>
+      </div>`;
+    }).join('');
+
+  } catch (e) {
+    innhold.innerHTML = `<div style="text-align:center;padding:24px;color:var(--red2)">Feil: ${escHtml(e?.message ?? String(e))}</div>`;
+  }
+}
+window.apneMixRedigerModal = apneMixRedigerModal;
+
+window._mixRedigertoggle = function(id, hdr) {
+  const el   = document.getElementById(id);
+  const chev = document.getElementById(id + '-chev');
+  if (!el) return;
+  const synlig = el.style.display === 'block';
+  el.style.display = synlig ? 'none' : 'block';
+  if (chev) chev.style.transform = synlig ? '' : 'rotate(180deg)';
+};
+
+export function lukkMixRedigerModal() {
+  const modal = document.getElementById('modal-mix-rediger');
+  if (modal) modal.style.display = 'none';
+}
+window.lukkMixRedigerModal = lukkMixRedigerModal;
+
+/** Åpner rediger-kamp-modal for én spesifikk kamp. */
+export async function apneMixRedigerKamp(kampId) {
+  if (!db || !kampId) return;
+
+  try {
+    const snap = await getDocs(
+      query(collection(db, SAM.KAMPER), where('treningId', '==', app.treningId))
+    );
+    const kamp = snap.docs.map(d => ({ id: d.id, ...d.data() })).find(k => k.id === kampId);
+    if (!kamp) { visMelding('Fant ikke kampen.', 'feil'); return; }
+
+    _mixRkAktivKampId = kampId;
+    _mixRkMaksPoeng   = kamp.maksPoeng ?? app.poengPerKamp ?? 15;
+
+    const baneNr = kamp.baneNr?.replace('bane', '') ?? '?';
+    const l1Navn = lagNavnFraKamp(kamp, 1);
+    const l2Navn = lagNavnFraKamp(kamp, 2);
+
+    document.getElementById('mix-rk-tittel').textContent    = `Rediger kamp — Bane ${baneNr}`;
+    document.getElementById('mix-rk-lag1-navn').textContent = l1Navn;
+    document.getElementById('mix-rk-lag2-navn').textContent = l2Navn;
+    document.getElementById('mix-rk-l1').value = kamp.ferdig ? kamp.lag1Poeng : '';
+    document.getElementById('mix-rk-l2').value = kamp.ferdig ? kamp.lag2Poeng : '';
+    document.getElementById('mix-rk-feil').textContent      = '';
+    document.getElementById('mix-rk-lagre').disabled        = false;
+
+    mixRkValider();
+    document.getElementById('modal-mix-rediger-kamp').style.display = 'flex';
+  } catch (e) {
+    visMelding('Feil ved lasting av kamp: ' + (e?.message ?? e), 'feil');
+  }
+}
+window.apneMixRedigerKamp = apneMixRedigerKamp;
+
+/** Validerer poeng-input i rediger-kamp-modal. */
+export function mixRkValider() {
+  const l1  = parseInt(document.getElementById('mix-rk-l1').value, 10);
+  const l2  = parseInt(document.getElementById('mix-rk-l2').value, 10);
+  const btn = document.getElementById('mix-rk-lagre');
+  const feil = document.getElementById('mix-rk-feil');
+  const maks = _mixRkMaksPoeng;
+
+  if (isNaN(l1) || isNaN(l2)) {
+    feil.textContent = '';
+    btn.disabled = true;
+    return;
+  }
+  if (l1 + l2 !== maks) {
+    feil.textContent = `${l1} + ${l2} = ${l1 + l2} — skal være ${maks}`;
+    btn.disabled = true;
+    return;
+  }
+  feil.textContent = '';
+  btn.disabled = false;
+}
+window.mixRkValider = mixRkValider;
+
+/** Lagrer korrigert score til Firestore. */
+export async function lagreMixRedigerKamp() {
+  if (!db || !_mixRkAktivKampId) return;
+  const l1  = parseInt(document.getElementById('mix-rk-l1').value, 10);
+  const l2  = parseInt(document.getElementById('mix-rk-l2').value, 10);
+  const maks = _mixRkMaksPoeng;
+  if (isNaN(l1) || isNaN(l2) || l1 + l2 !== maks) return;
+
+  const btn = document.getElementById('mix-rk-lagre');
+  btn.disabled = true;
+  btn.textContent = 'Lagrer…';
+
+  try {
+    const batch = writeBatch(db);
+    batch.update(doc(db, SAM.KAMPER, _mixRkAktivKampId), {
+      lag1Poeng: l1, lag2Poeng: l2, ferdig: true,
+    });
+    await batch.commit();
+
+    visMelding('Kamp oppdatert ✓');
+    lukkMixRedigerKampModal();
+    // Oppdater listen i rediger-modal automatisk
+    await apneMixRedigerModal();
+  } catch (e) {
+    visMelding('Lagring feilet: ' + (e?.message ?? e), 'feil');
+    btn.disabled = false;
+    btn.textContent = 'Lagre';
+  }
+}
+window.lagreMixRedigerKamp = lagreMixRedigerKamp;
+
+export function lukkMixRedigerKampModal() {
+  const modal = document.getElementById('modal-mix-rediger-kamp');
+  if (modal) modal.style.display = 'none';
+  _mixRkAktivKampId = null;
+  const btn = document.getElementById('mix-rk-lagre');
+  if (btn) { btn.disabled = false; btn.textContent = 'Lagre'; }
+}
+window.lukkMixRedigerKampModal = lukkMixRedigerKampModal;
+
+/** Lager lesbar lagnavn-streng fra et kamp-dokument. */
+function lagNavnFraKamp(kamp, lag) {
+  if (lag === 1) {
+    const s1 = kamp.lag1_s1_navn ?? '?';
+    const s2 = kamp.lag1_s2_navn ? ` + ${kamp.lag1_s2_navn}` : '';
+    return s1 + s2;
+  }
+  const s1 = kamp.lag2_s1_navn ?? '?';
+  const s2 = kamp.lag2_s2_navn ? ` + ${kamp.lag2_s2_navn}` : '';
+  return s1 + s2;
+}
