@@ -379,8 +379,8 @@ export function visBaner() {
   _oppdaterAvbrytKnapp();
 
   // Vis redigeringsknappen (allerede i HTML, bare skjult som standard)
-  const redigerKnapp = document.getElementById('rediger-baner-knapp');
-  if (redigerKnapp) redigerKnapp.style.display = 'block';
+  // oppdaterMixRedigerKnapp() koordinerer hvilken rediger-knapp som vises
+  oppdaterMixRedigerKnapp();
 
   // Oppdater tilskuerskjermen med nytt bane-innhold
   if (typeof window.oppdaterTilskuerInnhold === 'function') {
@@ -1895,9 +1895,13 @@ let _mixRkMaksPoeng    = 15;   // maksPoeng for gjeldende kamp
 
 /** Viser/skjuler «Rediger kamper»-knappen basert på modus og admin-status. */
 export function oppdaterMixRedigerKnapp() {
-  const knapp = document.getElementById('mix-rediger-knapp');
-  if (!knapp) return;
-  knapp.style.display = (erMix() && app.treningId && window.getErAdmin?.()) ? 'flex' : 'none';
+  const mixKnapp   = document.getElementById('mix-rediger-knapp');
+  const banerKnapp = document.getElementById('rediger-baner-knapp');
+  const erMixAdmin = erMix() && app.treningId && window.getErAdmin?.();
+  // I Mix: vis «Rediger kamper», skjul «Rediger baner»
+  // I konkurranse: vis «Rediger baner», skjul «Rediger kamper»
+  if (mixKnapp)   mixKnapp.style.display   = erMixAdmin  ? '' : 'none';
+  if (banerKnapp) banerKnapp.style.display = !erMixAdmin ? '' : 'none';
 }
 window.oppdaterMixRedigerKnapp = oppdaterMixRedigerKnapp;
 
