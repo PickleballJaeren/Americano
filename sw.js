@@ -5,7 +5,7 @@
 // direkte til nett — aldri fra cache.
 // ════════════════════════════════════════════════════════
 
-const CACHE_NAVN = 'pb-jaeren-v8';
+const CACHE_NAVN = 'pb-jaeren-v4';
 
 const SHELL = [
   './',
@@ -93,8 +93,10 @@ self.addEventListener('fetch', e => {
   }
 
   // Cache-first for lokale filer
+  // Bruk pathname uten query-parametere for cache-oppslag
+  // slik at ?okt=... ikke hindrer treff på index.html eller mix-viewer.html
   e.respondWith(
-    caches.match(e.request).then(cached => {
+    caches.match(e.request, { ignoreSearch: true }).then(cached => {
       if (cached) return cached;
       return fetch(e.request).then(response => {
         // Cache kun gyldige GET-svar
@@ -108,6 +110,10 @@ self.addEventListener('fetch', e => {
           );
         }
         return response;
+      }).catch(() => {
+        // Nettverksfeil — prøv å returnere index.html som fallback
+        // slik at appen kan laste selv offline
+        return caches.match('./index.html');
       });
     })
   );
