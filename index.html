@@ -298,30 +298,13 @@
     <div class="header-right" style="gap:8px">
       <button class="knapp knapp-omriss knapp-liten" id="mix-live-knapp" onclick="apneMixLiveModal()" title="Del live-skjerm til spillere" style="display:none">📲 Live</button>
       <button class="knapp knapp-omriss knapp-liten" onclick="delLenke()" id="del-lenke-knapp" title="Del lenke til denne økten">🔗 Del</button>
+      <button class="knapp knapp-omriss knapp-liten" onclick="apneAdminMeny()" id="admin-meny-knapp" title="Admin-handlinger">⚙️</button>
     </div>
   </div>
   <div class="scroll-omrade">
     <div class="runde-indikator">
       <div class="runde-prikk-live"></div>
       <span id="runde-indikator-tekst">Runde 1 pågår</span>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
-      <button class="knapp knapp-omriss" id="rediger-baner-knapp" onclick="visRedigerBanerModal()"
-        style="display:none;font-family:'DM Sans',sans-serif;font-size:15px;letter-spacing:0;padding:10px 12px">
-        ✏️ Rediger baner
-      </button>
-      <button class="knapp knapp-omriss" id="mix-rediger-knapp" onclick="apneMixRedigerModal()"
-        style="display:none;font-family:'DM Sans',sans-serif;font-size:15px;letter-spacing:0;padding:10px 12px">
-        ✏️ Rediger kamper<span class="admin-merke">Admin</span>
-      </button>
-      <button class="knapp knapp-omriss" id="deltaker-admin-knapp" onclick="visDeltakerModal()"
-        style="font-family:'DM Sans',sans-serif;font-size:15px;letter-spacing:0;padding:10px 12px">
-        👥 Deltakere<span class="admin-merke">Admin</span>
-      </button>
-      <button class="knapp knapp-omriss" id="avslutt-knapp" onclick="visAvsluttEllerAvbryt()"
-        style="font-family:'DM Sans',sans-serif;font-size:15px;letter-spacing:0;padding:10px 12px;color:var(--red2);border-color:rgba(220,38,38,.3)">
-        ⏹ Avslutt<span class="admin-merke">Admin</span>
-      </button>
     </div>
     <div id="fremgang-beholder" class="fremgang-beholder"></div>
     <div id="venteliste-visning"></div>
@@ -1673,7 +1656,49 @@
   </div>
 </div>
 
-</body>
+<!-- Admin-bunnmeny -->
+<div class="modal-bakgrunn" id="modal-admin-meny" style="display:none"
+  onclick="if(event.target===this)lukkAdminMeny()">
+  <div class="modal" style="border-radius:22px 22px 0 0;padding-bottom:calc(28px + var(--safe-bottom))">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <div class="modal-tittel" style="margin:0">⚙️ Admin</div>
+      <button onclick="lukkAdminMeny()" style="background:none;border:none;color:var(--muted2);font-size:22px;cursor:pointer;padding:0 4px">✕</button>
+    </div>
+    <button id="admin-meny-rediger-baner" onclick="lukkAdminMeny();visRedigerBanerModal()"
+      style="display:none;width:100%;text-align:left;background:var(--navy3);border:1px solid var(--border2);border-radius:12px;padding:14px 16px;margin-bottom:10px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:16px;color:var(--white);align-items:center;gap:12px">
+      <span style="font-size:20px">✏️</span>
+      <div>
+        <div style="font-weight:600">Rediger baner</div>
+        <div style="font-size:13px;color:var(--muted2);margin-top:1px">Endre baneoppsett for gjeldende runde</div>
+      </div>
+    </button>
+    <button id="admin-meny-rediger-kamper" onclick="lukkAdminMeny();apneMixRedigerModal()"
+      style="display:none;width:100%;text-align:left;background:var(--navy3);border:1px solid var(--border2);border-radius:12px;padding:14px 16px;margin-bottom:10px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:16px;color:var(--white);align-items:center;gap:12px">
+      <span style="font-size:20px">✏️</span>
+      <div>
+        <div style="font-weight:600">Rediger kamper</div>
+        <div style="font-size:13px;color:var(--muted2);margin-top:1px">Korriger poengscorer fra tidligere kamper</div>
+      </div>
+    </button>
+    <button onclick="lukkAdminMeny();visDeltakerModal()"
+      style="width:100%;text-align:left;background:var(--navy3);border:1px solid var(--border2);border-radius:12px;padding:14px 16px;margin-bottom:10px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:16px;color:var(--white);display:flex;align-items:center;gap:12px">
+      <span style="font-size:20px">👥</span>
+      <div>
+        <div style="font-weight:600">Deltakere</div>
+        <div style="font-size:13px;color:var(--muted2);margin-top:1px">Legg til eller ta ut spillere</div>
+      </div>
+    </button>
+    <button onclick="lukkAdminMeny();visAvsluttEllerAvbryt()"
+      style="width:100%;text-align:left;background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.25);border-radius:12px;padding:14px 16px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:16px;color:var(--red2);display:flex;align-items:center;gap:12px">
+      <span style="font-size:20px">⏹</span>
+      <div>
+        <div style="font-weight:600">Avslutt økt</div>
+        <div style="font-size:13px;color:rgba(239,68,68,.7);margin-top:1px">Avslutter hele økten for alle</div>
+      </div>
+    </button>
+  </div>
+</div>
+
 <div class="modal-bakgrunn" id="modal-mix-live" style="display:none"
   onclick="if(event.target===this)lukkMixLiveModal()">
   <div class="modal" style="border-radius:22px 22px 0 0;padding-bottom:calc(28px + var(--safe-bottom))">

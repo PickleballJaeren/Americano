@@ -1895,13 +1895,8 @@ let _mixRkMaksPoeng    = 15;   // maksPoeng for gjeldende kamp
 
 /** Viser/skjuler «Rediger kamper»-knappen basert på modus og admin-status. */
 export function oppdaterMixRedigerKnapp() {
-  const mixKnapp   = document.getElementById('mix-rediger-knapp');
-  const banerKnapp = document.getElementById('rediger-baner-knapp');
-  const erMixAdmin = erMix() && app.treningId && window.getErAdmin?.();
-  // I Mix: vis «Rediger kamper», skjul «Rediger baner»
-  // I konkurranse: vis «Rediger baner», skjul «Rediger kamper»
-  if (mixKnapp)   mixKnapp.style.display   = erMixAdmin  ? '' : 'none';
-  if (banerKnapp) banerKnapp.style.display = !erMixAdmin ? '' : 'none';
+  // Grid-knappene er fjernet — admin-meny håndterer visning ved åpning.
+  // Denne funksjonen beholdes for bakoverkompatibilitet med app.js-kallene.
 }
 window.oppdaterMixRedigerKnapp = oppdaterMixRedigerKnapp;
 

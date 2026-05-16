@@ -376,6 +376,27 @@ function delMixLiveUrl() {
 window.delMixLiveUrl = delMixLiveUrl;
 
 // ════════════════════════════════════════════════════════
+// ADMIN-BUNNMENY
+// ════════════════════════════════════════════════════════
+function apneAdminMeny() {
+  // Oppdater hvilke knapper som vises basert på modus
+  const redigerBaner   = document.getElementById('admin-meny-rediger-baner');
+  const redigerKamper  = document.getElementById('admin-meny-rediger-kamper');
+  const erMixAdmin     = erMix() && app.treningId && getErAdmin();
+  if (redigerBaner)  redigerBaner.style.display  = !erMixAdmin ? 'flex' : 'none';
+  if (redigerKamper) redigerKamper.style.display =  erMixAdmin ? 'flex' : 'none';
+  const modal = document.getElementById('modal-admin-meny');
+  if (modal) modal.style.display = 'flex';
+}
+window.apneAdminMeny = apneAdminMeny;
+
+function lukkAdminMeny() {
+  const modal = document.getElementById('modal-admin-meny');
+  if (modal) modal.style.display = 'none';
+}
+window.lukkAdminMeny = lukkAdminMeny;
+
+// ════════════════════════════════════════════════════════
 // HJEMSKJERM
 // ════════════════════════════════════════════════════════
 
