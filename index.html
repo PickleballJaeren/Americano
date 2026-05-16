@@ -298,7 +298,6 @@
     <div class="header-right" style="gap:8px">
       <button class="knapp knapp-omriss knapp-liten" id="mix-live-knapp" onclick="apneMixLiveModal()" title="Del live-skjerm til spillere" style="display:none">📲 Live</button>
       <button class="knapp knapp-omriss knapp-liten" onclick="delLenke()" id="del-lenke-knapp" title="Del lenke til denne økten">🔗 Del</button>
-      <button class="knapp knapp-omriss knapp-liten" onclick="visAvsluttEllerAvbryt()">Avslutt<span class="admin-merke">Admin</span></button>
     </div>
   </div>
   <div class="scroll-omrade">
@@ -306,10 +305,23 @@
       <div class="runde-prikk-live"></div>
       <span id="runde-indikator-tekst">Runde 1 pågår</span>
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:12px">
-      <button class="knapp knapp-omriss" id="rediger-baner-knapp" onclick="visRedigerBanerModal()" style="display:none;flex:1;font-family:'DM Sans',sans-serif;font-size:17px;letter-spacing:0;padding:11px 16px">✏️ Rediger baner</button>
-      <button class="knapp knapp-omriss" id="mix-rediger-knapp" onclick="apneMixRedigerModal()" style="display:none;flex:1;font-family:'DM Sans',sans-serif;font-size:17px;letter-spacing:0;padding:11px 16px">✏️ Rediger kamper<span class="admin-merke">Admin</span></button>
-      <button class="knapp knapp-omriss" id="deltaker-admin-knapp" onclick="visDeltakerModal()" style="flex:1;font-family:'DM Sans',sans-serif;font-size:17px;letter-spacing:0;padding:11px 16px">👥 Deltakere<span class="admin-merke">Admin</span></button>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+      <button class="knapp knapp-omriss" id="rediger-baner-knapp" onclick="visRedigerBanerModal()"
+        style="display:none;font-family:'DM Sans',sans-serif;font-size:15px;letter-spacing:0;padding:10px 12px">
+        ✏️ Rediger baner
+      </button>
+      <button class="knapp knapp-omriss" id="mix-rediger-knapp" onclick="apneMixRedigerModal()"
+        style="display:none;font-family:'DM Sans',sans-serif;font-size:15px;letter-spacing:0;padding:10px 12px">
+        ✏️ Rediger kamper<span class="admin-merke">Admin</span>
+      </button>
+      <button class="knapp knapp-omriss" id="deltaker-admin-knapp" onclick="visDeltakerModal()"
+        style="font-family:'DM Sans',sans-serif;font-size:15px;letter-spacing:0;padding:10px 12px">
+        👥 Deltakere<span class="admin-merke">Admin</span>
+      </button>
+      <button class="knapp knapp-omriss" id="avslutt-knapp" onclick="visAvsluttEllerAvbryt()"
+        style="font-family:'DM Sans',sans-serif;font-size:15px;letter-spacing:0;padding:10px 12px;color:var(--red2);border-color:rgba(220,38,38,.3)">
+        ⏹ Avslutt<span class="admin-merke">Admin</span>
+      </button>
     </div>
     <div id="fremgang-beholder" class="fremgang-beholder"></div>
     <div id="venteliste-visning"></div>
