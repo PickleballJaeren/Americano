@@ -160,9 +160,9 @@ export async function visRundeResultat() {
         const lag2Vant = k.lag2Poeng > k.lag1Poeng;
         const leggTil = (id, navn, mine, deres, vant) => {
           if (!id) return;
-          if (!totaler[id]) totaler[id] = { spillerId: id, navn: navn ?? 'Ukjent', seire: 0, poeng: 0, kamper: 0 };
-          totaler[id].poeng  += mine;
-          totaler[id].kamper += 1;
+          if (!totaler[id]) totaler[id] = { spillerId: id, navn: navn ?? 'Ukjent', seire: 0, for: 0, imot: 0 };
+          totaler[id].for   += mine;
+          totaler[id].imot  += deres;
           if (vant) totaler[id].seire += 1;
         };
         leggTil(k.lag1_s1, k.lag1_s1_navn, k.lag1Poeng, k.lag2Poeng, lag1Vant);
@@ -172,30 +172,25 @@ export async function visRundeResultat() {
         // Hvilende spiller (5-spillerbane) får snittpoeng, ingen seir
         if (k.hviler_id) {
           const hvilPoeng = k.hvilerPoeng ?? Math.ceil((k.lag1Poeng + k.lag2Poeng) / 2);
-          if (!totaler[k.hviler_id]) totaler[k.hviler_id] = { spillerId: k.hviler_id, navn: k.hviler_navn ?? 'Ukjent', seire: 0, poeng: 0, kamper: 0 };
-          totaler[k.hviler_id].poeng += hvilPoeng;
+          if (!totaler[k.hviler_id]) totaler[k.hviler_id] = { spillerId: k.hviler_id, navn: k.hviler_navn ?? 'Ukjent', seire: 0, for: 0, imot: 0 };
+          totaler[k.hviler_id].for += hvilPoeng;
         }
       });
 
     const alleSpillere = Object.values(totaler)
-      .sort((a, b) => b.poeng - a.poeng || b.seire - a.seire);
+      .sort((a, b) => b.for - a.for || b.seire - a.seire || (b.for - b.imot) - (a.for - a.imot));
 
     const kampLabel = erSiste ? `Alle ${app.runde} kamper` : `Etter kamp ${app.runde}`;
     const mixNesteInfo = !erSiste
       ? `<div class="mix-neste-info">🎲 Nye lag trekkes til neste kamp</div>`
       : '';
 
-    const plasseringSymbol = p => p === 1 ? '🥇' : p === 2 ? '🥈' : p === 3 ? '🥉' : `${p}.`;
-
     const rader = alleSpillere.map((s, i) => {
-      const plass = i + 1;
-      const erLeder = plass === 1;
-      return `<div class="rang-rad${erLeder ? ' mix-rang-leder' : ''}">
-        <div class="rang-nummer" style="font-family:'Bebas Neue',cursive;font-size:${plass <= 3 ? '22' : '18'}px;min-width:32px">${plasseringSymbol(plass)}</div>
-        <div class="rang-navn" style="flex:1">${escHtml(s.navn)}</div>
-        <div style="font-family:'DM Mono',monospace;font-size:20px;font-weight:600;color:${erLeder ? 'var(--yellow)' : 'var(--white)'};min-width:36px;text-align:right">${s.poeng}</div>
-        <div style="font-family:'DM Mono',monospace;font-size:14px;color:var(--green2);min-width:28px;text-align:right">${s.seire}S</div>
-        <div style="font-family:'DM Mono',monospace;font-size:14px;color:var(--muted2);min-width:28px;text-align:right">${s.kamper}K</div>
+      const rkl = ['rn-1','rn-2','rn-3','rn-4'][i] ?? '';
+      return `<div class="rang-rad">
+        <div class="rang-nummer ${rkl}">${i + 1}</div>
+        <div class="rang-navn">${escHtml(s.navn)}</div>
+        <div class="rang-statistikk">${s.seire}S +${s.for}−${s.imot}</div>
       </div>`;
     }).join('');
 
@@ -294,7 +289,162 @@ export function beregnForflytninger(rangerteBaner) {
 // ════════════════════════════════════════════════════════
 // SLUTTRESULTAT
 // ════════════════════════════════════════════════════════
+// ────────────────────────────────────────────────────────
+// MIX & MATCH — LIVE SAMMENLAGTABELL (pågående økt)
+// Vises i Resultater-fanen mens Mix-økt er aktiv.
+// Henter alle ferdigspilte kamper og beregner sammenlagt.
+// ────────────────────────────────────────────────────────
+async function visMixLiveTabell() {
+  // Sett header
+  const sluttNavn = document.getElementById('slutt-hdr-navn');
+  const sluttSub  = document.getElementById('slutt-hdr-sub');
+  if (sluttNavn) sluttNavn.textContent = 'Mix & Match';
+  if (sluttSub)  sluttSub.textContent  = 'Sammenlagt';
+
+  // Vis live-indikator
+  const indikator     = document.getElementById('mix-live-indikator');
+  const indikatorTekst = document.getElementById('mix-live-indikator-tekst');
+  if (indikator)      indikator.style.display      = 'flex';
+  if (indikatorTekst) indikatorTekst.textContent   = `Kamp ${app.runde ?? 1} pågår`;
+
+  // Vis live-seksjon, skjul slutt-seksjonene
+  const liveSeksjon   = document.getElementById('mix-live-tabell-seksjon');
+  const mixBanner     = document.getElementById('mix-slutt-banner');
+  const ledLabel      = document.getElementById('slutt-ledertavle-label');
+  const ledertavleEl  = document.getElementById('ledertavle');
+  const ratingEl      = document.getElementById('rating-endringer');
+  const ratingSection = [...document.querySelectorAll('.seksjon-etikett')]
+    .find(el => el.textContent.includes('Ratingendringer'));
+
+  if (liveSeksjon)    liveSeksjon.style.display    = 'block';
+  if (mixBanner)      mixBanner.style.display      = 'none';
+  if (ledLabel)       ledLabel.style.display       = 'none';
+  if (ledertavleEl)   ledertavleEl.closest('.kort').style.display = 'none';
+  if (ratingEl)       ratingEl.closest('.kort').style.display     = 'none';
+  if (ratingSection)  ratingSection.style.display                 = 'none';
+
+  const innhold = document.getElementById('mix-live-tabell-innhold');
+  if (!innhold) return;
+
+  innhold.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted2)">Laster…</div>';
+
+  try {
+    const snap = await getDocs(
+      query(collection(db, SAM.KAMPER), where('treningId', '==', app.treningId))
+    );
+    const alleKamper = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    // Beregn sammenlagt — samme logikk som mix-viewer.html
+    const totaler = {};
+    alleKamper
+      .filter(k => k.ferdig && k.lag1Poeng != null && k.lag2Poeng != null)
+      .forEach(k => {
+        const lag1Vant = k.lag1Poeng > k.lag2Poeng;
+        const lag2Vant = k.lag2Poeng > k.lag1Poeng;
+        const leggTil = (id, navn, mine, vant) => {
+          if (!id) return;
+          if (!totaler[id]) totaler[id] = { navn: navn ?? 'Ukjent', poeng: 0, seire: 0, kamper: 0 };
+          totaler[id].poeng  += mine;
+          totaler[id].kamper += 1;
+          if (vant) totaler[id].seire += 1;
+        };
+        leggTil(k.lag1_s1, k.lag1_s1_navn, k.lag1Poeng, lag1Vant);
+        leggTil(k.lag1_s2, k.lag1_s2_navn, k.lag1Poeng, lag1Vant);
+        leggTil(k.lag2_s1, k.lag2_s1_navn, k.lag2Poeng, lag2Vant);
+        leggTil(k.lag2_s2, k.lag2_s2_navn, k.lag2Poeng, lag2Vant);
+        if (k.hviler_id) {
+          const hvp = k.hvilerPoeng ?? Math.ceil((k.lag1Poeng + k.lag2Poeng) / 2);
+          if (!totaler[k.hviler_id]) totaler[k.hviler_id] = { navn: k.hviler_navn ?? 'Ukjent', poeng: 0, seire: 0, kamper: 0 };
+          totaler[k.hviler_id].poeng += hvp;
+        }
+      });
+
+    const sammenlagt = Object.values(totaler)
+      .sort((a, b) => b.poeng - a.poeng || b.seire - a.seire);
+
+    if (!sammenlagt.length) {
+      innhold.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted2);font-size:15px">Ingen kamper er ferdig ennå.</div>';
+      return;
+    }
+
+    // Engasjementstekst
+    const banner = _lagMixLiveBanner(sammenlagt, app.runde ?? 1);
+
+    // Tabell-header
+    const plasseringSymbol = p => p === 1 ? '🥇' : p === 2 ? '🥈' : p === 3 ? '🥉' : `${p}.`;
+
+    const rader = sammenlagt.map((s, i) => {
+      const plass   = i + 1;
+      const erLeder = plass === 1;
+      return `<div class="rang-rad${erLeder ? ' mix-rang-leder' : ''}">
+        <div style="font-family:'Bebas Neue',cursive;font-size:${plass <= 3 ? '22' : '18'}px;min-width:32px;line-height:1">${plasseringSymbol(plass)}</div>
+        <div class="rang-navn" style="flex:1">${escHtml(s.navn)}</div>
+        <div style="font-family:'DM Mono',monospace;font-size:20px;font-weight:600;color:${erLeder ? 'var(--yellow)' : 'var(--white)'};min-width:36px;text-align:right">${s.poeng}</div>
+        <div style="font-family:'DM Mono',monospace;font-size:14px;color:var(--green2);min-width:28px;text-align:right">${s.seire}S</div>
+        <div style="font-family:'DM Mono',monospace;font-size:14px;color:var(--muted2);min-width:28px;text-align:right">${s.kamper}K</div>
+      </div>`;
+    }).join('');
+
+    innhold.innerHTML = `
+      <div class="kort" style="margin-bottom:10px">
+        <div class="kort-innhold" style="padding:12px 14px">
+          <div style="font-size:15px;font-weight:500;color:var(--accent2);margin-bottom:2px">${banner}</div>
+        </div>
+      </div>
+      <div class="kort">
+        <div class="kort-innhold" style="padding:0">
+          <div style="display:grid;grid-template-columns:32px 1fr 36px 28px 28px;gap:0;padding:8px 14px;border-bottom:1px solid var(--border2);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:600">
+            <span>#</span><span>Navn</span>
+            <span style="text-align:right">Poeng</span>
+            <span style="text-align:right">S</span>
+            <span style="text-align:right">K</span>
+          </div>
+          ${rader}
+        </div>
+      </div>`;
+
+  } catch (e) {
+    if (innhold) innhold.innerHTML =
+      `<div style="padding:16px;color:var(--red2);font-size:14px">Feil ved lasting: ${escHtml(e?.message ?? String(e))}</div>`;
+  }
+}
+
+function _lagMixLiveBanner(sammenlagt, runde) {
+  if (!sammenlagt.length) return `⏸ Venter på resultater fra kamp ${runde}…`;
+  if (sammenlagt.length >= 2) {
+    const diff = sammenlagt[0].poeng - sammenlagt[1].poeng;
+    if (sammenlagt.length >= 3 && sammenlagt[0].poeng - sammenlagt[2].poeng <= 6)
+      return `🔥 Tett i toppen — bare ${sammenlagt[0].poeng - sammenlagt[2].poeng} poeng skiller de tre øverste!`;
+    if (diff <= 5)
+      return `🔥 Tett om toppen — ${diff} poeng skiller de to øverste!`;
+    if (diff >= 15)
+      return `👑 ${escHtml(sammenlagt[0].navn)} leder suverent — ${diff} poeng foran nummer 2!`;
+  }
+  return `🎲 ${escHtml(sammenlagt[0].navn)} leder med ${sammenlagt[0].poeng} poeng etter kamp ${runde}`;
+}
+
 export async function visSluttresultat() {
+  // ── Mix-økt er aktiv — vis live sammenlagtabell ──────────
+  if (erMix() && app.treningId && app._oektAktiv) {
+    await visMixLiveTabell();
+    return;
+  }
+
+  // Nullstill live-visning
+  const liveSeksjon    = document.getElementById('mix-live-tabell-seksjon');
+  const indikator      = document.getElementById('mix-live-indikator');
+  const ledLabel       = document.getElementById('slutt-ledertavle-label');
+  const ledertavleKort = document.getElementById('ledertavle')?.closest('.kort');
+  const ratingKort     = document.getElementById('rating-endringer')?.closest('.kort');
+  const ratingSection  = [...document.querySelectorAll('.seksjon-etikett')]
+    .find(el => el.textContent.includes('Ratingendringer'));
+  if (liveSeksjon)   liveSeksjon.style.display   = 'none';
+  if (indikator)     indikator.style.display      = 'none';
+  if (ledLabel)      ledLabel.style.display       = '';
+  if (ledertavleKort) ledertavleKort.style.display = '';
+  if (ratingKort)    ratingKort.style.display     = '';
+  if (ratingSection) ratingSection.style.display  = '';
+
   let data = app.ratingEndringer ?? [];
 
   if (!data.length && db) {
@@ -437,11 +587,8 @@ function visMixSluttresultat(data) {
     'Strålende! ✨', 'Kjempebra! 🌟',
   ];
 
-  const plasseringSymbol = p => p === 1 ? '🥇' : p === 2 ? '🥈' : p === 3 ? '🥉' : `${p}.`;
-
   document.getElementById('ledertavle').innerHTML = sortert.map((s, i) => {
     const ini          = lagInitialer(s.navn);
-    const plass        = i + 1;
     const totalPoeng   = s.for          ?? 0;
     const antallKamper = s.antallKamper ?? 0;
     const seire        = s.seire        ?? 0;
@@ -462,9 +609,6 @@ function visMixSluttresultat(data) {
       : '';
 
     return `<div class="mix-spiller-kort${erTopp ? ' mix-spiller-kort-topp' : ''}">
-      <div class="mix-plass-rad">
-        <span class="mix-plass-symbol">${plasseringSymbol(plass)}</span>
-      </div>
       <div class="mix-spiller-hoved">
         <div class="mix-spiller-avatar${erTopp ? ' mix-spiller-avatar-topp' : ''}">${ini}</div>
         <div class="mix-spiller-meta">

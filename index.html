@@ -386,8 +386,19 @@
       <div class="app-name" id="slutt-hdr-navn">Sluttresultat</div>
       <div class="app-sub" id="slutt-hdr-sub">Økten er ferdig</div>
     </div>
+    <div class="header-right">
+      <span id="mix-live-indikator" style="display:none" class="runde-indikator" style="margin:0">
+        <div class="runde-prikk-live"></div>
+        <span id="mix-live-indikator-tekst">Kamp 1 pågår</span>
+      </span>
+    </div>
   </div>
   <div class="scroll-omrade">
+    <!-- Live sammenlagtabell under pågående Mix-økt -->
+    <div id="mix-live-tabell-seksjon" style="display:none">
+      <div id="mix-live-tabell-innhold"></div>
+    </div>
+
     <!-- Vises kun i Mix & Match — skjules av JS i konkurranse-modus -->
     <div id="mix-slutt-banner" style="display:none">
       <div class="mix-slutt-intro">
