@@ -151,57 +151,75 @@ export async function visRundeResultat() {
 
   if (erMix()) {
     // ── MIX: Akkumuler statistikk direkte fra alle kamper i økten ────────
-    // Slår opp spillerId direkte i kampdata — uavhengig av baneplassering
     const totaler = {};
     kamperFraDB
       .filter(k => k.ferdig && k.lag1Poeng != null && k.lag2Poeng != null)
       .forEach(k => {
         const lag1Vant = k.lag1Poeng > k.lag2Poeng;
         const lag2Vant = k.lag2Poeng > k.lag1Poeng;
-        const leggTil = (id, navn, mine, deres, vant) => {
+        const leggTil = (id, navn, mine, vant) => {
           if (!id) return;
-          if (!totaler[id]) totaler[id] = { spillerId: id, navn: navn ?? 'Ukjent', seire: 0, for: 0, imot: 0 };
-          totaler[id].for   += mine;
-          totaler[id].imot  += deres;
+          if (!totaler[id]) totaler[id] = { spillerId: id, navn: navn ?? 'Ukjent', seire: 0, poeng: 0, kamper: 0 };
+          totaler[id].poeng  += mine;
+          totaler[id].kamper += 1;
           if (vant) totaler[id].seire += 1;
         };
-        leggTil(k.lag1_s1, k.lag1_s1_navn, k.lag1Poeng, k.lag2Poeng, lag1Vant);
-        leggTil(k.lag1_s2, k.lag1_s2_navn, k.lag1Poeng, k.lag2Poeng, lag1Vant);
-        leggTil(k.lag2_s1, k.lag2_s1_navn, k.lag2Poeng, k.lag1Poeng, lag2Vant);
-        leggTil(k.lag2_s2, k.lag2_s2_navn, k.lag2Poeng, k.lag1Poeng, lag2Vant);
-        // Hvilende spiller (5-spillerbane) får snittpoeng, ingen seir
+        leggTil(k.lag1_s1, k.lag1_s1_navn, k.lag1Poeng, lag1Vant);
+        leggTil(k.lag1_s2, k.lag1_s2_navn, k.lag1Poeng, lag1Vant);
+        leggTil(k.lag2_s1, k.lag2_s1_navn, k.lag2Poeng, lag2Vant);
+        leggTil(k.lag2_s2, k.lag2_s2_navn, k.lag2Poeng, lag2Vant);
         if (k.hviler_id) {
-          const hvilPoeng = k.hvilerPoeng ?? Math.ceil((k.lag1Poeng + k.lag2Poeng) / 2);
-          if (!totaler[k.hviler_id]) totaler[k.hviler_id] = { spillerId: k.hviler_id, navn: k.hviler_navn ?? 'Ukjent', seire: 0, for: 0, imot: 0 };
-          totaler[k.hviler_id].for += hvilPoeng;
+          const hvp = k.hvilerPoeng ?? Math.ceil((k.lag1Poeng + k.lag2Poeng) / 2);
+          if (!totaler[k.hviler_id]) totaler[k.hviler_id] = { spillerId: k.hviler_id, navn: k.hviler_navn ?? 'Ukjent', seire: 0, poeng: 0, kamper: 0 };
+          totaler[k.hviler_id].poeng += hvp;
         }
       });
 
-    const alleSpillere = Object.values(totaler)
-      .sort((a, b) => b.for - a.for || b.seire - a.seire || (b.for - b.imot) - (a.for - a.imot));
+    const sammenlagt = Object.values(totaler)
+      .sort((a, b) => b.poeng - a.poeng || b.seire - a.seire);
 
-    const kampLabel = erSiste ? `Alle ${app.runde} kamper` : `Etter kamp ${app.runde}`;
+    const kampLabel  = erSiste ? `Alle ${app.runde} kamper` : `Etter kamp ${app.runde}`;
+    const banner     = _lagMixLiveBanner(sammenlagt, app.runde);
     const mixNesteInfo = !erSiste
       ? `<div class="mix-neste-info">🎲 Nye lag trekkes til neste kamp</div>`
       : '';
 
-    const rader = alleSpillere.map((s, i) => {
-      const rkl = ['rn-1','rn-2','rn-3','rn-4'][i] ?? '';
-      return `<div class="rang-rad">
-        <div class="rang-nummer ${rkl}">${i + 1}</div>
-        <div class="rang-navn">${escHtml(s.navn)}</div>
-        <div class="rang-statistikk">${s.seire}S +${s.for}−${s.imot}</div>
+    const plasseringSymbol = p => p === 1 ? '🥇' : p === 2 ? '🥈' : p === 3 ? '🥉' : `${p}.`;
+
+    const rader = sammenlagt.map((s, i) => {
+      const plass   = i + 1;
+      const erLeder = plass === 1;
+      return `<div class="rang-rad${erLeder ? ' mix-rang-leder' : ''}">
+        <div style="font-family:'Bebas Neue',cursive;font-size:${plass <= 3 ? '22' : '18'}px;min-width:32px;line-height:1">${plasseringSymbol(plass)}</div>
+        <div class="rang-navn" style="flex:1">${escHtml(s.navn)}</div>
+        <div style="font-family:'DM Mono',monospace;font-size:20px;font-weight:600;color:${erLeder ? 'var(--yellow)' : 'var(--white)'};min-width:36px;text-align:right">${s.poeng}</div>
+        <div style="font-family:'DM Mono',monospace;font-size:14px;color:var(--green2);min-width:28px;text-align:right">${s.seire}S</div>
+        <div style="font-family:'DM Mono',monospace;font-size:14px;color:var(--muted2);min-width:28px;text-align:right">${s.kamper}K</div>
       </div>`;
     }).join('');
 
     document.getElementById('resultat-innhold').innerHTML = `
+      <div class="kort" style="margin-bottom:10px">
+        <div class="kort-innhold" style="padding:12px 14px">
+          <div style="font-size:15px;font-weight:500;color:var(--accent2)">${banner}</div>
+        </div>
+      </div>
       <div class="kort">
         <div class="kort-hode">
           <div style="font-family:'Bebas Neue',cursive;font-size:20px;letter-spacing:1px;color:var(--green2)">
             🎲 ${kampLabel}
           </div>
         </div>
-        <div class="kort-innhold">${rader}${mixNesteInfo}</div>
+        <div class="kort-innhold" style="padding:0">
+          <div style="display:grid;grid-template-columns:32px 1fr 36px 28px 28px;gap:0;padding:8px 14px;border-bottom:1px solid var(--border2);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:600">
+            <span>#</span><span>Navn</span>
+            <span style="text-align:right">Poeng</span>
+            <span style="text-align:right">S</span>
+            <span style="text-align:right">K</span>
+          </div>
+          ${rader}
+          ${mixNesteInfo}
+        </div>
       </div>`;
 
   } else {
