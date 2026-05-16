@@ -116,13 +116,19 @@ async function beregnSesongsKaaring(spillereListe) {
 
     // Hent trenings-IDer for aktiv klubb — kamp-dokumenter har ikke klubbId,
     // men har treningId. Filtrer kamper via treningId for å sikre riktig klubb.
+    // Kun treninger med spillModus !== 'mix' tas med — Mix-kamper gir ikke
+    // ratingpoeng og skal ikke påvirke Formspiller/Beste partner.
     let gyldigeTreningIds = null;
     if (aktivKlubbId) {
       const treningSnap = await getDocs(query(
         collection(db, SAM.TRENINGER),
         where('klubbId', '==', aktivKlubbId)
       ));
-      gyldigeTreningIds = new Set(treningSnap.docs.map(d => d.id));
+      gyldigeTreningIds = new Set(
+        treningSnap.docs
+          .filter(d => (d.data().spillModus ?? 'konkurranse') !== 'mix')
+          .map(d => d.id)
+      );
     }
 
     const snap = await getDocs(query(
