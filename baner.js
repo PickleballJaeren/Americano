@@ -2017,12 +2017,29 @@ export async function apneMixRedigerKamp(kampId) {
     document.getElementById('mix-rk-tittel').textContent    = `Rediger kamp — Bane ${baneNr}`;
     document.getElementById('mix-rk-lag1-navn').textContent = l1Navn;
     document.getElementById('mix-rk-lag2-navn').textContent = l2Navn;
-    document.getElementById('mix-rk-l1').value = kamp.ferdig ? kamp.lag1Poeng : '';
-    document.getElementById('mix-rk-l2').value = kamp.ferdig ? kamp.lag2Poeng : '';
-    document.getElementById('mix-rk-feil').textContent      = '';
-    document.getElementById('mix-rk-lagre').disabled        = false;
 
-    mixRkValider();
+    // Sett picker-boksene til gjeldende verdi eller –
+    const pvb1 = document.getElementById('mix-rk-pvb-l1');
+    const pvb2 = document.getElementById('mix-rk-pvb-l2');
+    if (pvb1) pvb1.textContent = kamp.ferdig && kamp.lag1Poeng != null ? kamp.lag1Poeng : '–';
+    if (pvb2) pvb2.textContent = kamp.ferdig && kamp.lag2Poeng != null ? kamp.lag2Poeng : '–';
+
+    // Lukk eventuelle åpne pickere
+    ['l1','l2'].forEach(lag => {
+      const pp = document.getElementById(`mix-rk-pp-${lag}`);
+      const pvb = document.getElementById(`mix-rk-pvb-${lag}`);
+      if (pp)  pp.style.display = 'none';
+      if (pvb) pvb.classList.remove('aktiv');
+    });
+
+    document.getElementById('mix-rk-feil').textContent = '';
+
+    // Aktiver Lagre-knapp kun om begge verdier er satt
+    const l1Ok = kamp.ferdig && kamp.lag1Poeng != null;
+    const l2Ok = kamp.ferdig && kamp.lag2Poeng != null;
+    document.getElementById('mix-rk-lagre').disabled = !(l1Ok && l2Ok);
+
+    _byggPickerCSS();
     document.getElementById('modal-mix-rediger-kamp').style.display = 'flex';
   } catch (e) {
     visMelding('Feil ved lasting av kamp: ' + (e?.message ?? e), 'feil');
@@ -2030,40 +2047,107 @@ export async function apneMixRedigerKamp(kampId) {
 }
 window.apneMixRedigerKamp = apneMixRedigerKamp;
 
-/** Validerer poeng-input i rediger-kamp-modal. */
+/** Åpner/lukker picker for ett lag i rediger-kamp-modalen. */
+window._apneMixRkPicker = function(lag) {
+  _byggPickerCSS();
+  const annetLag = lag === 'l1' ? 'l2' : 'l1';
+
+  // Lukk alltid den andre pickeren
+  const annetPp  = document.getElementById(`mix-rk-pp-${annetLag}`);
+  const annetPvb = document.getElementById(`mix-rk-pvb-${annetLag}`);
+  if (annetPp)  annetPp.style.display = 'none';
+  if (annetPvb) annetPvb.classList.remove('aktiv');
+
+  const pp  = document.getElementById(`mix-rk-pp-${lag}`);
+  const pvb = document.getElementById(`mix-rk-pvb-${lag}`);
+  if (!pp || !pvb) return;
+
+  const erApen = pp.style.display !== 'none';
+  if (erApen) {
+    pp.style.display = 'none';
+    pvb.classList.remove('aktiv');
+    return;
+  }
+
+  // Bygg picker-grid
+  const gjeldende = parseInt(pvb.textContent);
+  pp.innerHTML = '';
+  for (let n = 0; n <= _mixRkMaksPoeng; n++) {
+    const el = document.createElement('div');
+    el.className = 'poeng-picker-tall' + (n === gjeldende ? ' valgt' : '');
+    el.textContent = n;
+    el.onclick = (e) => { e.stopPropagation(); _velgPoengRk(lag, n); };
+    pp.appendChild(el);
+  }
+
+  pp.style.display = 'grid';
+  pvb.classList.add('aktiv');
+};
+
+/** Velger poeng for ett lag i rediger-modal og autofyller motstanderen. */
+function _velgPoengRk(lag, verdi) {
+  const annetLag   = lag === 'l1' ? 'l2' : 'l1';
+  const pvb        = document.getElementById(`mix-rk-pvb-${lag}`);
+  const pp         = document.getElementById(`mix-rk-pp-${lag}`);
+  const annetPvb   = document.getElementById(`mix-rk-pvb-${annetLag}`);
+  const annetPp    = document.getElementById(`mix-rk-pp-${annetLag}`);
+  const maks       = _mixRkMaksPoeng;
+  const annetVerdi = maks - verdi;
+
+  if (pvb) pvb.textContent = verdi;
+
+  // Marker valgt tall
+  pp?.querySelectorAll('.poeng-picker-tall').forEach(el => {
+    el.classList.toggle('valgt', parseInt(el.textContent) === verdi);
+  });
+
+  // Autofyll motstanderen
+  if (annetPvb) annetPvb.textContent = annetVerdi;
+  annetPp?.querySelectorAll('.poeng-picker-tall').forEach(el => {
+    el.classList.toggle('valgt', parseInt(el.textContent) === annetVerdi);
+  });
+
+  // Lukk picker etter kort forsinkelse
+  setTimeout(() => {
+    if (pp)  pp.style.display = 'none';
+    if (pvb) pvb.classList.remove('aktiv');
+  }, 250);
+
+  mixRkValider();
+}
+
+/** Validerer at begge lag har gyldige poeng i rediger-modal. */
 export function mixRkValider() {
-  const l1  = parseInt(document.getElementById('mix-rk-l1').value, 10);
-  const l2  = parseInt(document.getElementById('mix-rk-l2').value, 10);
-  const btn = document.getElementById('mix-rk-lagre');
+  const l1  = parseInt(document.getElementById('mix-rk-pvb-l1')?.textContent);
+  const l2  = parseInt(document.getElementById('mix-rk-pvb-l2')?.textContent);
+  const btn  = document.getElementById('mix-rk-lagre');
   const feil = document.getElementById('mix-rk-feil');
   const maks = _mixRkMaksPoeng;
 
   if (isNaN(l1) || isNaN(l2)) {
-    feil.textContent = '';
-    btn.disabled = true;
+    if (feil) feil.textContent = '';
+    if (btn)  btn.disabled = true;
     return;
   }
   if (l1 + l2 !== maks) {
-    feil.textContent = `${l1} + ${l2} = ${l1 + l2} — skal være ${maks}`;
-    btn.disabled = true;
+    if (feil) feil.textContent = `${l1} + ${l2} = ${l1 + l2} — skal være ${maks}`;
+    if (btn)  btn.disabled = true;
     return;
   }
-  feil.textContent = '';
-  btn.disabled = false;
+  if (feil) feil.textContent = '';
+  if (btn)  btn.disabled = false;
 }
 window.mixRkValider = mixRkValider;
 
 /** Lagrer korrigert score til Firestore. */
 export async function lagreMixRedigerKamp() {
   if (!db || !_mixRkAktivKampId) return;
-  const l1  = parseInt(document.getElementById('mix-rk-l1').value, 10);
-  const l2  = parseInt(document.getElementById('mix-rk-l2').value, 10);
-  const maks = _mixRkMaksPoeng;
-  if (isNaN(l1) || isNaN(l2) || l1 + l2 !== maks) return;
+  const l1  = parseInt(document.getElementById('mix-rk-pvb-l1')?.textContent);
+  const l2  = parseInt(document.getElementById('mix-rk-pvb-l2')?.textContent);
+  if (isNaN(l1) || isNaN(l2) || l1 + l2 !== _mixRkMaksPoeng) return;
 
   const btn = document.getElementById('mix-rk-lagre');
-  btn.disabled = true;
-  btn.textContent = 'Lagrer…';
+  if (btn) { btn.disabled = true; btn.textContent = 'Lagrer…'; }
 
   try {
     const batch = writeBatch(db);
@@ -2074,12 +2158,10 @@ export async function lagreMixRedigerKamp() {
 
     visMelding('Kamp oppdatert ✓');
     lukkMixRedigerKampModal();
-    // Oppdater listen i rediger-modal automatisk
     await apneMixRedigerModal();
   } catch (e) {
     visMelding('Lagring feilet: ' + (e?.message ?? e), 'feil');
-    btn.disabled = false;
-    btn.textContent = 'Lagre';
+    if (btn) { btn.disabled = false; btn.textContent = 'Lagre'; }
   }
 }
 window.lagreMixRedigerKamp = lagreMixRedigerKamp;
