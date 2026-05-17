@@ -11,15 +11,13 @@ import {
   lagMixKampoppsett, oppdaterMixStatistikk, hentMixStatistikk,
   neste6SpillerRunde,
 } from './rotasjon.js';
-import {
-  getNivaaKlasse, getNivaaLabel, getNivaaRatingHTML,
-  eloForventet, oppdaterRatingForKamp, beregnEloForOkt, beregnTrend,
-} from './rating.js';
+
 import {
   visMelding, visFBFeil, escHtml,
   lasUI, frigiUI, startFailSafe, stoppFailSafe,
   registrerNavigertHandler, registrerBeforeunload,
   registrerProfilCallbacks, registrerHarAktivOkt,
+  lagQRKode,
 } from './ui.js';
 import {
   krevAdmin as _krevAdminBase, pinInput, bekreftPin, lukkPinModal,
@@ -266,7 +264,6 @@ function settSpillModus(modus) {
 
   // Oppdater spillerliste — viser/skjuler rating basert på modus
   visSpillere();
-  // Oppdater rotasjonsvelger
   oppdaterMixRotasjonsVelger();
 }
 window.settSpillModus = settSpillModus;
@@ -296,14 +293,8 @@ function settScoringFormat(format) {
 window.settScoringFormat = settScoringFormat;
 
 // ════════════════════════════════════════════════════════
-// MIX ROTASJONSMODUS — velger mellom dynamisk og fast 7-spl
+// MIX ROTASJONSMODUS
 // ════════════════════════════════════════════════════════
-
-/**
- * Setter Mix & Match rotasjonsmodus og oppdaterer UI.
- * Fast modus er kun tilgjengelig for 7 spillere og 1 bane.
- * @param {'dynamisk'|'fast'} modus
- */
 function settMixRotasjon(modus) {
   app.mixRotasjonsModus = modus;
   const btnDyn  = document.getElementById('mix-rot-knapp-dynamisk');
@@ -312,25 +303,17 @@ function settMixRotasjon(modus) {
   if (btnFast) btnFast.classList.toggle('modus-aktiv', modus === MIX_ROTASJON_FAST);
   const infoDyn  = document.getElementById('mix-rot-info-dynamisk');
   const infoFast = document.getElementById('mix-rot-info-fast');
-  if (infoDyn)  infoDyn.style.display  = modus === 'dynamisk'       ? 'block' : 'none';
+  if (infoDyn)  infoDyn.style.display  = modus === 'dynamisk'        ? 'block' : 'none';
   if (infoFast) infoFast.style.display = modus === MIX_ROTASJON_FAST ? 'block' : 'none';
 }
 window.settMixRotasjon = settMixRotasjon;
 
-/**
- * Oppdaterer synlighet og tilstand av rotasjonsvelgeren basert på
- * antall valgte spillere og antall baner.
- * Kalles fra visSpillere() og juster() når antall endres.
- */
 export function oppdaterMixRotasjonsVelger() {
   const velger = document.getElementById('mix-rotasjon-velger');
   if (!velger) return;
   const kan7 = app.valgtIds.size === 7 && app.antallBaner === 1 && app.spillModus === 'mix';
   velger.style.display = kan7 ? 'block' : 'none';
-  // Tilbakestill til dynamisk automatisk om betingelsene ikke lenger er oppfylt
-  if (!kan7 && app.mixRotasjonsModus === MIX_ROTASJON_FAST) {
-    settMixRotasjon('dynamisk');
-  }
+  if (!kan7 && app.mixRotasjonsModus === MIX_ROTASJON_FAST) settMixRotasjon('dynamisk');
 }
 window.oppdaterMixRotasjonsVelger = oppdaterMixRotasjonsVelger;
 
@@ -347,6 +330,12 @@ function lagMixLiveUrl() {
   return `${base}mix-viewer.html?okt=${app.treningId}`;
 }
 
+function lagMixSkjermUrl() {
+  if (!app.treningId) return null;
+  const base = location.origin + location.pathname.replace(/\/[^/]*$/, '/');
+  return `${base}mix-skjerm.html?okt=${app.treningId}`;
+}
+
 function oppdaterMixLiveKnapp() {
   const knapp = document.getElementById('mix-live-knapp');
   if (!knapp) return;
@@ -355,40 +344,31 @@ function oppdaterMixLiveKnapp() {
 
 function apneMixLiveModal() {
   if (!app.treningId) { visMelding('Ingen aktiv økt.', 'feil'); return; }
-  const url    = lagMixLiveUrl();
-  const urlEl  = document.getElementById('mix-live-url');
-  const qrWrap = document.getElementById('mix-qr-kode');
-  const modal  = document.getElementById('modal-mix-live');
-  if (urlEl)  urlEl.textContent = url;
-  if (modal)  modal.style.display = 'flex';
-  if (qrWrap) qrWrap.innerHTML = '';
-  if (!window.QRCode) {
-    const script   = document.createElement('script');
-    script.src     = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
-    script.onload  = () => _genererMixQR(qrWrap, url);
-    script.onerror = () => {
-      if (qrWrap) qrWrap.innerHTML =
-        '<div style="color:#888;font-size:13px;text-align:center;padding:8px">Kunne ikke laste QR-generator.<br>Kopier lenken manuelt.</div>';
-    };
-    document.head.appendChild(script);
-  } else {
-    _genererMixQR(qrWrap, url);
-  }
+  const url       = lagMixLiveUrl();
+  const skjermUrl = lagMixSkjermUrl();
+  const urlEl        = document.getElementById('mix-live-url');
+  const qrWrap       = document.getElementById('mix-qr-kode');
+  const skjermUrlEl  = document.getElementById('mix-skjerm-url');
+  const skjermQrWrap = document.getElementById('mix-skjerm-qr-kode');
+  const modal        = document.getElementById('modal-mix-live');
+  if (urlEl)       urlEl.textContent       = url;
+  if (skjermUrlEl) skjermUrlEl.textContent = skjermUrl;
+  if (modal)       modal.style.display     = 'flex';
+  lagQRKode(qrWrap,       url,       180, '#050f1f', '#ffffff');
+  lagQRKode(skjermQrWrap, skjermUrl, 132);
 }
 window.apneMixLiveModal = apneMixLiveModal;
 
-function _genererMixQR(container, url) {
-  if (!container || !url || !window.QRCode) return;
-  container.innerHTML = '';
-  new QRCode(container, {
-    text:         url,
-    width:        180,
-    height:       180,
-    colorDark:    '#050f1f',
-    colorLight:   '#ffffff',
-    correctLevel: QRCode.CorrectLevel.M,
+window.kopierMixSkjermUrl = function() {
+  const url = lagMixSkjermUrl();
+  if (!url) return;
+  navigator.clipboard?.writeText(url).then(() => {
+    visMelding('Storskjerm-lenke kopiert!', 'ok');
+  }).catch(() => {
+    visMelding('Kunne ikke kopiere — velg teksten manuelt.', 'advarsel');
   });
-}
+};
+
 
 function lukkMixLiveModal() {
   const modal = document.getElementById('modal-mix-live');
@@ -421,12 +401,13 @@ window.delMixLiveUrl = delMixLiveUrl;
 // ADMIN-BUNNMENY
 // ════════════════════════════════════════════════════════
 function apneAdminMeny() {
-  // Oppdater hvilke knapper som vises basert på modus
   const redigerBaner   = document.getElementById('admin-meny-rediger-baner');
+  const redigerOppsett = document.getElementById('admin-meny-rediger-oppsett');
   const redigerKamper  = document.getElementById('admin-meny-rediger-kamper');
   const erMixAdmin     = erMix() && app.treningId && getErAdmin();
-  if (redigerBaner)  redigerBaner.style.display  = !erMixAdmin ? 'flex' : 'none';
-  if (redigerKamper) redigerKamper.style.display =  erMixAdmin ? 'flex' : 'none';
+  if (redigerBaner)   redigerBaner.style.display   = !erMixAdmin ? 'flex' : 'none';
+  if (redigerOppsett) redigerOppsett.style.display  =  erMixAdmin ? 'flex' : 'none';
+  if (redigerKamper)  redigerKamper.style.display   =  erMixAdmin ? 'flex' : 'none';
   const modal = document.getElementById('modal-admin-meny');
   if (modal) modal.style.display = 'flex';
 }
@@ -491,20 +472,7 @@ window.visDelAppModal = function() {
 
     setTimeout(() => {
       const boks = document.getElementById('del-app-qr-innhold');
-      if (!boks) return;
-      boks.innerHTML = '';
-      if (typeof QRCode !== 'undefined') {
-        new QRCode(boks, {
-          text:         url,
-          width:        132,
-          height:       132,
-          colorDark:    '#000000',
-          colorLight:   '#ffffff',
-          correctLevel: QRCode.CorrectLevel.M,
-        });
-      } else {
-        boks.innerHTML = `<div style="font-size:11px;color:#333;word-break:break-all;padding:4px">${url}</div>`;
-      }
+      if (boks) lagQRKode(boks, url, 132);
     }, 50);
   });
 };
@@ -537,8 +505,6 @@ function juster(key, dir) {
   visSpillere(); // visSpillere oppdaterer spiller-info og min-antall dynamisk
 }
 window.juster = juster;
-
-// Kall oppdaterMixRotasjonsVelger etter at juster() er ferdig
 const _origJuster = window.juster;
 window.juster = function(type, delta) {
   _origJuster(type, delta);
@@ -645,6 +611,7 @@ async function init() {
   utfordrerInit({
     getAktivKlubbId:   () => aktivKlubbId,
     getAktivSpillerId: () => sessionStorage.getItem('aktivSpillerId'),
+    getSpillere:       () => app.spillere ?? [],
   });
 
   // Registrer profil-callbacks i ui.js (erstatter window-globals)
