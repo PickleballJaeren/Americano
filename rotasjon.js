@@ -4,7 +4,7 @@
 // og Mix & Match matchmaking.
 // ════════════════════════════════════════════════════════
 
-import { STARTRATING, PARTER, PARTER_5, PARTER_6_DOBBEL, PARTER_6_SINGEL } from './konstanter.js';
+import { STARTRATING, PARTER, PARTER_5, PARTER_6_DOBBEL, PARTER_6_SINGEL, MIX_7_ROTASJON, MIX_ROTASJON_FAST } from './konstanter.js';
 
 // ════════════════════════════════════════════════════════
 // HJELPER
@@ -52,8 +52,7 @@ export function blandArray(arr) {
 
 /**
  * Lager et minimalt spillerobjekt { id, navn, rating } fra et fullt spillerobjekt.
- * Brukes konsekvent alle steder baneOversikt.spillere bygges opp,
- * slik at mapping-logikken ikke dupliseres.
+ * Brukes konsekvent alle steder baneOversikt.spillere bygges opp.
  */
 export function lagSpillerMiniobjekt(s) {
   return { id: s.id, navn: s.navn ?? 'Ukjent', rating: s.rating ?? STARTRATING };
@@ -93,7 +92,7 @@ export function fordelBaner(spillere, antallBaner, poengPerKamp = 17) {
   // ── 6-SPILLER MIX SPESIALFORMAT ──
   if (n === 6 && antallBaner === 2) {
     const mp       = poengPerKamp;
-    const blandede = blandArray(spillere.map(lagSpillerMiniobjekt));
+    const blandede = blandArray(spillere.map(s => ({ id: s.id, navn: s.navn ?? 'Ukjent' })));
     const dblSpl   = blandede.slice(0, 4);
     const sinSpl   = blandede.slice(4, 6);
     return [
@@ -117,7 +116,9 @@ export function fordelBaner(spillere, antallBaner, poengPerKamp = 17) {
     baner.push({
       baneNr:    i + 1,
       maksPoeng: storr === 5 ? mp5 : mp,
-      spillere:  sorterte.slice(cursor, cursor + storr).map(lagSpillerMiniobjekt),
+      spillere:  sorterte.slice(cursor, cursor + storr).map(s => ({
+        id: s.id, navn: s.navn ?? 'Ukjent', rating: s.rating ?? STARTRATING,
+      })),
     });
     cursor += storr;
   });
@@ -338,6 +339,47 @@ function _lagOptimalMatching(aktive, playedWith, playedAgainst) {
   return bestKamper; // [ [ [id,id], [id,id] ], ... ] — én entry per bane
 }
 
+
+// ════════════════════════════════════════════════════════
+// FAST 7-SPILLERS ROTASJON
+// ════════════════════════════════════════════════════════
+
+/**
+ * Lager kampoppsett for én runde basert på den faste 7-runders rotasjonen.
+ * Rotasjonstabellen bruker posisjon-indekser (0–6) som mappes til
+ * faktiske spillere via spillerRekkefølge — en tilfeldig tildelt liste
+ * som låses ved øktstart og gjenbrukes alle runder.
+ *
+ * Runden wraper automatisk rundt med modulo 7, slik at runde 8 = runde 1 osv.
+ *
+ * @param {object[]} spillerRekkefølge — [{ id, navn, rating }] i fast rekkefølge (lengde 7)
+ * @param {number}   rundeNr           — gjeldende rundenummer (1-basert)
+ * @param {number}   [poengPerKamp=15]
+ * @returns {{ baneOversikt: object[], hviler: object[] }}
+ */
+export function lagFastMix7Oppsett(spillerRekkefølge, rundeNr, poengPerKamp = 15) {
+  if (!spillerRekkefølge || spillerRekkefølge.length !== 7) {
+    console.warn('[lagFastMix7Oppsett] Forventet nøyaktig 7 spillere, fikk', spillerRekkefølge?.length);
+    return { baneOversikt: [], hviler: [] };
+  }
+
+  // Wrap rundeNr til 0–6 (modulo 7, 1-basert → 0-basert)
+  const rotasjonsIndeks = (rundeNr - 1) % 7;
+  const rad             = MIX_7_ROTASJON[rotasjonsIndeks];
+
+  const baneOversikt = [{
+    baneNr:    1,
+    maksPoeng: poengPerKamp,
+    erDobbel:  true,
+    erSingel:  false,
+    spillere:  [...rad.lag1, ...rad.lag2].map(i => lagSpillerMiniobjekt(spillerRekkefølge[i])),
+  }];
+
+  const hviler = rad.hviler.map(i => lagSpillerMiniobjekt(spillerRekkefølge[i]));
+
+  return { baneOversikt, hviler };
+}
+
 // ════════════════════════════════════════════════════════
 // MIX & MATCH — OFFENTLIG API
 // ════════════════════════════════════════════════════════
@@ -535,11 +577,11 @@ export function neste6SpillerRunde(
     baneOversikt: [
       {
         baneNr: 1, erDobbel: true, erSingel: false, maksPoeng: poengPerKamp,
-        spillere: dobbelSpillere.map(lagSpillerMiniobjekt),
+        spillere: dobbelSpillere.map(s => ({ id: s.id, navn: s.navn ?? 'Ukjent' })),
       },
       {
         baneNr: 2, erDobbel: false, erSingel: true, maksPoeng: poengPerKamp,
-        spillere: nesteSingel.map(lagSpillerMiniobjekt),
+        spillere: nesteSingel.map(s => ({ id: s.id, navn: s.navn ?? 'Ukjent' })),
       },
     ],
   };

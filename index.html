@@ -61,6 +61,27 @@
         <div class="mix-info-rad" style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(34,197,94,.15);font-size:13px;color:var(--muted2)">Ingen rating · Ingen opprykk · Ingen nedrykk</div>
       </div>
 
+      <!-- Rotasjonsmodus — kun synlig i Mix-modus med 7 spillere og 1 bane -->
+      <div id="mix-rotasjon-velger" style="display:none;margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
+        <div class="config-etikett" style="margin-bottom:8px">Rotasjon</div>
+        <div class="modus-velger" style="gap:8px">
+          <button id="mix-rot-knapp-dynamisk" class="modus-knapp modus-aktiv" onclick="settMixRotasjon('dynamisk')" style="flex:1">
+            <span class="modus-ikon">🎲</span>
+            <span class="modus-tekst">Dynamisk</span>
+          </button>
+          <button id="mix-rot-knapp-fast" class="modus-knapp" onclick="settMixRotasjon('fast')" style="flex:1">
+            <span class="modus-ikon">📋</span>
+            <span class="modus-tekst">Fast (7 spl)</span>
+          </button>
+        </div>
+        <div id="mix-rot-info-dynamisk" style="font-size:13px;color:var(--muted2);margin-top:8px">
+          Optimal matching hver runde basert på hvem du har spilt med.
+        </div>
+        <div id="mix-rot-info-fast" style="font-size:13px;color:var(--muted2);margin-top:8px;display:none">
+          Fast 7-runders rotasjon — alle spiller nøyaktig like mye. Starter på ny etter 7 runder.
+        </div>
+      </div>
+
       <!-- Scoringsformat — kun synlig i konkurransemodus -->
       <div id="scoring-format-velger" style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
         <div class="config-etikett" style="margin-bottom:8px">Scoringsformat</div>
@@ -1670,14 +1691,6 @@
       <div>
         <div style="font-weight:600">Rediger baner</div>
         <div style="font-size:13px;color:var(--muted2);margin-top:1px">Endre baneoppsett for gjeldende runde</div>
-      </div>
-    </button>
-    <button id="admin-meny-rediger-oppsett" onclick="lukkAdminMeny();apneRedigerBaner()"
-      style="display:none;width:100%;text-align:left;background:var(--navy3);border:1px solid var(--border2);border-radius:12px;padding:14px 16px;margin-bottom:10px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:16px;color:var(--white);align-items:center;gap:12px">
-      <span style="font-size:20px">🎯</span>
-      <div>
-        <div style="font-weight:600">Rediger oppsett</div>
-        <div style="font-size:13px;color:var(--muted2);margin-top:1px">Endre baner og poenggrense for runden</div>
       </div>
     </button>
     <button id="admin-meny-rediger-kamper" onclick="lukkAdminMeny();apneMixRedigerModal()"

@@ -29,6 +29,12 @@ export const app = {
   aktivTurnering:    null,
   // Spillere tatt ut av rotasjonen midt i økten (Set av spillerId-strenger)
   ekskluderteIds:    new Set(),
+  // Mix & Match rotasjonsmodus: 'dynamisk' | 'fast'
+  // 'fast' bruker MIX_7_ROTASJON fra konstanter.js (kun for 7 spl, 1 bane)
+  mixRotasjonsModus:   'dynamisk',
+  // Tilfeldig tildelt spillerrekkefølge for fast rotasjon [id, id, id, id, id, id, id]
+  // Posisjon 0 = A, 1 = B, ... 6 = G i rotasjonstabellen
+  mixRotasjonSpillere: [],
 };
 
 /** Returnerer true når gjeldende økt kjøres i Mix & Match-modus. */

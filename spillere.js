@@ -314,6 +314,10 @@ export function visSpillere() {
     lagSpillerHTML(s, aktiveIds.has(s.id), ventendeIds.has(s.id))
   ).join('');
   _oppdaterSpillerTellere(min, er6Format);
+  // Oppdater rotasjonsvelger for Mix 7-spillers fast modus
+  if (typeof window.oppdaterMixRotasjonsVelger === 'function') {
+    window.oppdaterMixRotasjonsVelger();
+  }
 }
 window.visSpillere = visSpillere;
 

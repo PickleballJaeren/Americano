@@ -11,8 +11,10 @@ import {
   getParter, blandArray, lagSpillerMiniobjekt,
   fordelBaner, fordelBanerMix,
   lagMixKampoppsett, oppdaterMixStatistikk, hentMixStatistikk,
+  lagFastMix7Oppsett,
   neste6SpillerRunde, oppdater6SpillerStreak, hent6SpillerStreak,
 } from './rotasjon.js';
+import { MIX_ROTASJON_FAST } from './konstanter.js';
 import { beregnEloForOkt } from './rating.js';
 import {
   visMelding, visFBFeil,
@@ -132,16 +134,29 @@ export async function startTrening() {
       // 6-spiller mix: tilfeldig fordeling til dobbel + singel
       const blandede = blandArray([...valgte]);
       const mp = app.poengPerKamp ?? 15;
-      const dblSpl = blandede.slice(0, 4).map(lagSpillerMiniobjekt);
-      const sinSpl = blandede.slice(4, 6).map(lagSpillerMiniobjekt);
+      const dblSpl = blandede.slice(0, 4).map(s => ({ id: s.id, navn: s.navn ?? 'Ukjent', rating: s.rating ?? STARTRATING }));
+      const sinSpl = blandede.slice(4, 6).map(s => ({ id: s.id, navn: s.navn ?? 'Ukjent', rating: s.rating ?? STARTRATING }));
       baneOversikt = [
         { baneNr: 1, erDobbel: true,  erSingel: false, maksPoeng: mp, spillere: dblSpl },
         { baneNr: 2, erDobbel: false, erSingel: true,  maksPoeng: mp, spillere: sinSpl },
       ];
     } else {
-      const resultat = fordelBanerMix(valgte, app.antallBaner, app.poengPerKamp ?? 15);
-      baneOversikt = resultat.baneOversikt;
-      mixHviler    = resultat.hviler ?? [];
+      const brukFastRotasjon = app.mixRotasjonsModus === MIX_ROTASJON_FAST
+        && valgte.length === 7
+        && app.antallBaner === 1;
+
+      if (brukFastRotasjon) {
+        const rekkefølge = blandArray(valgte).map(lagSpillerMiniobjekt);
+        app.mixRotasjonSpillere = rekkefølge;
+        const resultat = lagFastMix7Oppsett(rekkefølge, 1, app.poengPerKamp ?? 15);
+        baneOversikt = resultat.baneOversikt;
+        mixHviler    = resultat.hviler ?? [];
+      } else {
+        if (app.mixRotasjonsModus === MIX_ROTASJON_FAST) app.mixRotasjonsModus = 'dynamisk';
+        const resultat = fordelBanerMix(valgte, app.antallBaner, app.poengPerKamp ?? 15);
+        baneOversikt = resultat.baneOversikt;
+        mixHviler    = resultat.hviler ?? [];
+      }
     }
   } else {
     baneOversikt = fordelBaner(valgte, app.antallBaner, app.poengPerKamp ?? 17);
@@ -156,10 +171,10 @@ export async function startTrening() {
 
   // Spillere som ikke fikk plass: i mix brukes hviler fra algoritmen, ellers beregnes det
   const venteliste = erMix()
-    ? mixHviler.map(lagSpillerMiniobjekt)
+    ? mixHviler.map(s => ({ id: s.id, navn: s.navn ?? 'Ukjent', rating: s.rating ?? STARTRATING }))
     : valgte
         .filter(s => !new Set(baneOversikt.flatMap(b => b.spillere.map(x => x.id))).has(s.id))
-        .map(lagSpillerMiniobjekt);
+        .map(s => ({ id: s.id, navn: s.navn ?? 'Ukjent', rating: s.rating ?? STARTRATING }));
 
   // Ingen fast rundetgrense — admin avslutter manuelt
   const effektivMaksRunder = 99;
@@ -172,14 +187,15 @@ export async function startTrening() {
     // Tomme ved runde 1 — oppdateres etter hver runde i bekreftNesteRunde.
     // Konkurranse-modus berøres ikke av disse feltene.
     const mixFelter = erMix() ? {
-      mixPlayedWith:      {},
-      mixPlayedAgainst:   {},
-      mixGamesPlayed:     {},
-      mixSitOutCount:     {},
-      mixLastSitOutRunde: {},
-      // 6-spiller streak — initialiseres alltid, brukes kun for er6SpillerFormat
-      mix6DobbelStreak:   {},
-      mix6DobbelTotalt:   {},
+      mixPlayedWith:       {},
+      mixPlayedAgainst:    {},
+      mixGamesPlayed:      {},
+      mixSitOutCount:      {},
+      mixLastSitOutRunde:  {},
+      mix6DobbelStreak:    {},
+      mix6DobbelTotalt:    {},
+      mixRotasjonsModus:   app.mixRotasjonsModus ?? 'dynamisk',
+      mixRotasjonSpillere: app.mixRotasjonSpillere ?? [],
     } : {};
 
     batch.set(treningRef, {
@@ -475,16 +491,30 @@ export async function bekreftNesteRunde() {
 
         nyBaneOversikt = ny6Baner;
       } else {
-        const resultat = lagMixKampoppsett(
-          alleSpillere,
-          playedWith, playedAgainst, gamesPlayed,
-          sitOutCount, lastSitOutRunde,
-          app.baneOversikt.length,
-          nyRunde,
-          mp
-        );
-        nyBaneOversikt = resultat.baneOversikt;
-        nyVenteliste   = resultat.hviler ?? [];
+        const brukFast = treningData?.mixRotasjonsModus === MIX_ROTASJON_FAST
+          && Array.isArray(treningData?.mixRotasjonSpillere)
+          && treningData.mixRotasjonSpillere.length === 7;
+
+        if (brukFast) {
+          const resultat = lagFastMix7Oppsett(
+            treningData.mixRotasjonSpillere,
+            nyRunde,
+            mp
+          );
+          nyBaneOversikt = resultat.baneOversikt;
+          nyVenteliste   = resultat.hviler ?? [];
+        } else {
+          const resultat = lagMixKampoppsett(
+            alleSpillere,
+            playedWith, playedAgainst, gamesPlayed,
+            sitOutCount, lastSitOutRunde,
+            app.baneOversikt.length,
+            nyRunde,
+            mp
+          );
+          nyBaneOversikt = resultat.baneOversikt;
+          nyVenteliste   = resultat.hviler ?? [];
+        }
       }
 
       const batch = writeBatch(db);
@@ -657,7 +687,9 @@ export async function bekreftNesteRunde() {
     const baneOversikt = neste.map(b => ({
       baneNr:    b.baneNr,
       maksPoeng: b.maksPoeng, // bevares fra runde til runde
-      spillere:  b.spillere.filter(Boolean).map(lagSpillerMiniobjekt),
+      spillere:  b.spillere.filter(Boolean).map(s => ({
+        id: s.id, navn: s.navn ?? 'Ukjent', rating: s.rating ?? STARTRATING,
+      })),
     }));
 
     const batch = writeBatch(db);

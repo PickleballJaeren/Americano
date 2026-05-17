@@ -3,6 +3,7 @@ import {
   collection, doc, addDoc, updateDoc, getDoc, getDocs,
   query, where, orderBy, limit, serverTimestamp, writeBatch, runTransaction,
 } from './firebase.js';
+import { MIX_ROTASJON_FAST } from './konstanter.js';
 import { app, erMix } from './state.js';
 import {
   getParter, blandArray, beregnPoengForKamp,
@@ -265,6 +266,8 @@ function settSpillModus(modus) {
 
   // Oppdater spillerliste — viser/skjuler rating basert på modus
   visSpillere();
+  // Oppdater rotasjonsvelger
+  oppdaterMixRotasjonsVelger();
 }
 window.settSpillModus = settSpillModus;
 
@@ -291,6 +294,45 @@ function settScoringFormat(format) {
   if (infoB3) infoB3.style.display = format === 'best_of_3' ? 'block' : 'none';
 }
 window.settScoringFormat = settScoringFormat;
+
+// ════════════════════════════════════════════════════════
+// MIX ROTASJONSMODUS — velger mellom dynamisk og fast 7-spl
+// ════════════════════════════════════════════════════════
+
+/**
+ * Setter Mix & Match rotasjonsmodus og oppdaterer UI.
+ * Fast modus er kun tilgjengelig for 7 spillere og 1 bane.
+ * @param {'dynamisk'|'fast'} modus
+ */
+function settMixRotasjon(modus) {
+  app.mixRotasjonsModus = modus;
+  const btnDyn  = document.getElementById('mix-rot-knapp-dynamisk');
+  const btnFast = document.getElementById('mix-rot-knapp-fast');
+  if (btnDyn)  btnDyn.classList.toggle('modus-aktiv',  modus === 'dynamisk');
+  if (btnFast) btnFast.classList.toggle('modus-aktiv', modus === MIX_ROTASJON_FAST);
+  const infoDyn  = document.getElementById('mix-rot-info-dynamisk');
+  const infoFast = document.getElementById('mix-rot-info-fast');
+  if (infoDyn)  infoDyn.style.display  = modus === 'dynamisk'       ? 'block' : 'none';
+  if (infoFast) infoFast.style.display = modus === MIX_ROTASJON_FAST ? 'block' : 'none';
+}
+window.settMixRotasjon = settMixRotasjon;
+
+/**
+ * Oppdaterer synlighet og tilstand av rotasjonsvelgeren basert på
+ * antall valgte spillere og antall baner.
+ * Kalles fra visSpillere() og juster() når antall endres.
+ */
+export function oppdaterMixRotasjonsVelger() {
+  const velger = document.getElementById('mix-rotasjon-velger');
+  if (!velger) return;
+  const kan7 = app.valgtIds.size === 7 && app.antallBaner === 1 && app.spillModus === 'mix';
+  velger.style.display = kan7 ? 'block' : 'none';
+  // Tilbakestill til dynamisk automatisk om betingelsene ikke lenger er oppfylt
+  if (!kan7 && app.mixRotasjonsModus === MIX_ROTASJON_FAST) {
+    settMixRotasjon('dynamisk');
+  }
+}
+window.oppdaterMixRotasjonsVelger = oppdaterMixRotasjonsVelger;
 
 // ════════════════════════════════════════════════════════
 // MIX LIVE-SKJERM — QR-kode og del-knapp
@@ -382,11 +424,9 @@ function apneAdminMeny() {
   // Oppdater hvilke knapper som vises basert på modus
   const redigerBaner   = document.getElementById('admin-meny-rediger-baner');
   const redigerKamper  = document.getElementById('admin-meny-rediger-kamper');
-  const redigerOppsett = document.getElementById('admin-meny-rediger-oppsett');
   const erMixAdmin     = erMix() && app.treningId && getErAdmin();
-  if (redigerBaner)   redigerBaner.style.display   = !erMixAdmin ? 'flex' : 'none';
-  if (redigerOppsett) redigerOppsett.style.display  =  erMixAdmin ? 'flex' : 'none';
-  if (redigerKamper)  redigerKamper.style.display   =  erMixAdmin ? 'flex' : 'none';
+  if (redigerBaner)  redigerBaner.style.display  = !erMixAdmin ? 'flex' : 'none';
+  if (redigerKamper) redigerKamper.style.display =  erMixAdmin ? 'flex' : 'none';
   const modal = document.getElementById('modal-admin-meny');
   if (modal) modal.style.display = 'flex';
 }
@@ -497,6 +537,13 @@ function juster(key, dir) {
   visSpillere(); // visSpillere oppdaterer spiller-info og min-antall dynamisk
 }
 window.juster = juster;
+
+// Kall oppdaterMixRotasjonsVelger etter at juster() er ferdig
+const _origJuster = window.juster;
+window.juster = function(type, delta) {
+  _origJuster(type, delta);
+  oppdaterMixRotasjonsVelger();
+};
 
 // ════════════════════════════════════════════════════════
 // SPILLERLISTE — delegerer til lyttere.js
