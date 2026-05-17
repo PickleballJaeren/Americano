@@ -319,20 +319,27 @@ function apneMixLiveModal() {
   if (!app.treningId) { visMelding('Ingen aktiv økt.', 'feil'); return; }
   const url       = lagMixLiveUrl();
   const skjermUrl = lagMixSkjermUrl();
-  const urlEl  = document.getElementById('mix-live-url');
-  const qrWrap = document.getElementById('mix-qr-kode');
-  const modal  = document.getElementById('modal-mix-live');
-  const skjermLenkeEl = document.getElementById('mix-skjerm-url');
-  if (urlEl)         urlEl.textContent = url;
-  if (skjermLenkeEl) skjermLenkeEl.href = skjermUrl;
-  if (modal)         modal.style.display = 'flex';
-  lagQRKode(qrWrap, url, 180, '#050f1f', '#ffffff');
+  const urlEl        = document.getElementById('mix-live-url');
+  const qrWrap       = document.getElementById('mix-qr-kode');
+  const skjermUrlEl  = document.getElementById('mix-skjerm-url');
+  const skjermQrWrap = document.getElementById('mix-skjerm-qr-kode');
+  const modal        = document.getElementById('modal-mix-live');
+  if (urlEl)       urlEl.textContent       = url;
+  if (skjermUrlEl) skjermUrlEl.textContent = skjermUrl;
+  if (modal)       modal.style.display     = 'flex';
+  lagQRKode(qrWrap,       url,       180, '#050f1f', '#ffffff');
+  lagQRKode(skjermQrWrap, skjermUrl, 132);
 }
 window.apneMixLiveModal = apneMixLiveModal;
 
-window.apneMixSkjerm = function() {
+window.kopierMixSkjermUrl = function() {
   const url = lagMixSkjermUrl();
-  if (url) window.open(url, '_blank');
+  if (!url) return;
+  navigator.clipboard?.writeText(url).then(() => {
+    visMelding('Storskjerm-lenke kopiert!', 'ok');
+  }).catch(() => {
+    visMelding('Kunne ikke kopiere — velg teksten manuelt.', 'advarsel');
+  });
 };
 
 
