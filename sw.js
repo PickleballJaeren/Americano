@@ -40,6 +40,7 @@ const SHELL = [
   './turnering-skjermer.html',
   './viewer.html',
   './mix-viewer.html',
+  './mix-skjerm.html',
   './logo.svg',
   './icon-192.png',
   './icon-512.png',

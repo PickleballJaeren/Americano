@@ -51,6 +51,15 @@ export function blandArray(arr) {
 }
 
 /**
+ * Lager et minimalt spillerobjekt { id, navn, rating } fra et fullt spillerobjekt.
+ * Brukes konsekvent alle steder baneOversikt.spillere bygges opp,
+ * slik at mapping-logikken ikke dupliseres.
+ */
+export function lagSpillerMiniobjekt(s) {
+  return { id: s.id, navn: s.navn ?? 'Ukjent', rating: s.rating ?? STARTRATING };
+}
+
+/**
  * Gir poeng til spillere i en kamp, inkl. hviler-logikk for 5-spillerbaner.
  */
 export function beregnPoengForKamp(par, spillere, lag1Poeng, lag2Poeng) {
@@ -84,7 +93,7 @@ export function fordelBaner(spillere, antallBaner, poengPerKamp = 17) {
   // ── 6-SPILLER MIX SPESIALFORMAT ──
   if (n === 6 && antallBaner === 2) {
     const mp       = poengPerKamp;
-    const blandede = blandArray(spillere.map(s => ({ id: s.id, navn: s.navn ?? 'Ukjent' })));
+    const blandede = blandArray(spillere.map(lagSpillerMiniobjekt));
     const dblSpl   = blandede.slice(0, 4);
     const sinSpl   = blandede.slice(4, 6);
     return [
@@ -108,9 +117,7 @@ export function fordelBaner(spillere, antallBaner, poengPerKamp = 17) {
     baner.push({
       baneNr:    i + 1,
       maksPoeng: storr === 5 ? mp5 : mp,
-      spillere:  sorterte.slice(cursor, cursor + storr).map(s => ({
-        id: s.id, navn: s.navn ?? 'Ukjent', rating: s.rating ?? STARTRATING,
-      })),
+      spillere:  sorterte.slice(cursor, cursor + storr).map(lagSpillerMiniobjekt),
     });
     cursor += storr;
   });
@@ -528,11 +535,11 @@ export function neste6SpillerRunde(
     baneOversikt: [
       {
         baneNr: 1, erDobbel: true, erSingel: false, maksPoeng: poengPerKamp,
-        spillere: dobbelSpillere.map(s => ({ id: s.id, navn: s.navn ?? 'Ukjent' })),
+        spillere: dobbelSpillere.map(lagSpillerMiniobjekt),
       },
       {
         baneNr: 2, erDobbel: false, erSingel: true, maksPoeng: poengPerKamp,
-        spillere: nesteSingel.map(s => ({ id: s.id, navn: s.navn ?? 'Ukjent' })),
+        spillere: nesteSingel.map(lagSpillerMiniobjekt),
       },
     ],
   };

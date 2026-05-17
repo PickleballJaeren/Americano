@@ -8,7 +8,7 @@ import {
 } from './firebase.js';
 import { app, erMix } from './state.js';
 import {
-  getParter, blandArray,
+  getParter, blandArray, lagSpillerMiniobjekt,
   fordelBaner, fordelBanerMix,
   lagMixKampoppsett, oppdaterMixStatistikk, hentMixStatistikk,
   neste6SpillerRunde, oppdater6SpillerStreak, hent6SpillerStreak,
@@ -132,8 +132,8 @@ export async function startTrening() {
       // 6-spiller mix: tilfeldig fordeling til dobbel + singel
       const blandede = blandArray([...valgte]);
       const mp = app.poengPerKamp ?? 15;
-      const dblSpl = blandede.slice(0, 4).map(s => ({ id: s.id, navn: s.navn ?? 'Ukjent', rating: s.rating ?? STARTRATING }));
-      const sinSpl = blandede.slice(4, 6).map(s => ({ id: s.id, navn: s.navn ?? 'Ukjent', rating: s.rating ?? STARTRATING }));
+      const dblSpl = blandede.slice(0, 4).map(lagSpillerMiniobjekt);
+      const sinSpl = blandede.slice(4, 6).map(lagSpillerMiniobjekt);
       baneOversikt = [
         { baneNr: 1, erDobbel: true,  erSingel: false, maksPoeng: mp, spillere: dblSpl },
         { baneNr: 2, erDobbel: false, erSingel: true,  maksPoeng: mp, spillere: sinSpl },
@@ -156,10 +156,10 @@ export async function startTrening() {
 
   // Spillere som ikke fikk plass: i mix brukes hviler fra algoritmen, ellers beregnes det
   const venteliste = erMix()
-    ? mixHviler.map(s => ({ id: s.id, navn: s.navn ?? 'Ukjent', rating: s.rating ?? STARTRATING }))
+    ? mixHviler.map(lagSpillerMiniobjekt)
     : valgte
         .filter(s => !new Set(baneOversikt.flatMap(b => b.spillere.map(x => x.id))).has(s.id))
-        .map(s => ({ id: s.id, navn: s.navn ?? 'Ukjent', rating: s.rating ?? STARTRATING }));
+        .map(lagSpillerMiniobjekt);
 
   // Ingen fast rundetgrense — admin avslutter manuelt
   const effektivMaksRunder = 99;
@@ -657,9 +657,7 @@ export async function bekreftNesteRunde() {
     const baneOversikt = neste.map(b => ({
       baneNr:    b.baneNr,
       maksPoeng: b.maksPoeng, // bevares fra runde til runde
-      spillere:  b.spillere.filter(Boolean).map(s => ({
-        id: s.id, navn: s.navn ?? 'Ukjent', rating: s.rating ?? STARTRATING,
-      })),
+      spillere:  b.spillere.filter(Boolean).map(lagSpillerMiniobjekt),
     }));
 
     const batch = writeBatch(db);

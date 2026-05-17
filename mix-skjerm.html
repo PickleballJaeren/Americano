@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#050f1f">
+<title>Mix &amp; Match — Storskjerm</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy:    #050f1f;
+    --navy2:   #0b1a30;
+    --navy3:   #0f2040;
+    --border:  rgba(255,255,255,.07);
+    --border2: rgba(255,255,255,.13);
+    --white:   #f1f5f9;
+    --muted:   #64748b;
+    --muted2:  #94a3b8;
+    --green:   #16a34a;
+    --green2:  #22c55e;
+    --yellow:  #eab308;
+    --accent:  #2563eb;
+    --accent2: #3b82f6;
+    --red2:    #ef4444;
+    --orange:  #ea580c;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--navy);
+    color: var(--white);
+    font-family: 'DM Sans', system-ui, sans-serif;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ══════════════════════════════════════════════
+     LAYOUT — 3-kolonne fullskjerm
+  ══════════════════════════════════════════════ */
+  #app {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 14px 32px;
+    background: var(--navy2);
+    border-bottom: 1px solid var(--border2);
+    position: relative;
+    z-index: 10;
+  }
+
+  .logo {
+    width: 52px; height: 52px; flex-shrink: 0;
+    background: var(--accent);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Bebas Neue', cursive;
+    font-size: 26px; color: #fff;
+    box-shadow: 0 4px 20px rgba(37,99,235,.5);
+  }
+
+  .header-tekst { flex: 1; }
+  .header-klubb {
+    font-family: 'Bebas Neue', cursive;
+    font-size: 30px; letter-spacing: 2px;
+    line-height: 1; color: var(--white);
+  }
+  .header-sub {
+    font-size: 13px; color: var(--muted2);
+    text-transform: uppercase; letter-spacing: 1.5px;
+    margin-top: 2px;
+  }
+
+  .header-midt {
+    display: flex; align-items: center; gap: 16px;
+  }
+
+  .runde-display {
+    text-align: center;
+  }
+  .runde-label {
+    font-size: 11px; text-transform: uppercase;
+    letter-spacing: 2px; color: var(--muted2);
+    font-weight: 600;
+  }
+  .runde-tall {
+    font-family: 'Bebas Neue', cursive;
+    font-size: 52px; line-height: 1;
+    color: var(--yellow);
+    text-shadow: 0 0 30px rgba(234,179,8,.4);
+  }
+
+  .live-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(34,197,94,.12);
+    border: 1px solid rgba(34,197,94,.3);
+    color: var(--green2);
+    font-size: 15px; font-weight: 700;
+    padding: 8px 18px; border-radius: 30px;
+    letter-spacing: 1px;
+  }
+  .live-dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--green2);
+    animation: puls 1.5s ease-in-out infinite;
+  }
+  .ferdig-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(234,179,8,.12);
+    border: 1px solid rgba(234,179,8,.3);
+    color: var(--yellow);
+    font-size: 15px; font-weight: 700;
+    padding: 8px 18px; border-radius: 30px;
+  }
+  @keyframes puls { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  .klokke {
+    font-family: 'DM Mono', monospace;
+    font-size: 28px; color: var(--muted);
+    letter-spacing: 1px;
+    min-width: 90px; text-align: right;
+  }
+
+  /* ── HOVEDDEL — 3 kolonner ── */
+  .hoved {
+    display: grid;
+    grid-template-columns: 1fr 2fr 1fr;
+    gap: 0;
+    overflow: hidden;
+    height: 100%;
+  }
+
+  /* ── VENSTRE: POENGSTILLING ── */
+  .kolonne-venstre {
+    border-right: 1px solid var(--border2);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+
+  .kolonne-tittel {
+    padding: 16px 20px 12px;
+    font-size: 11px; text-transform: uppercase;
+    letter-spacing: 2px; color: var(--muted2);
+    font-weight: 700;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+    flex-shrink: 0;
+  }
+  .kolonne-tittel::after {
+    content: ''; flex: 1; height: 1px;
+    background: var(--border);
+  }
+
+  .rangering-liste {
+    flex: 1; overflow-y: auto;
+    padding: 10px 0;
+    scrollbar-width: none;
+  }
+  .rangering-liste::-webkit-scrollbar { display: none; }
+
+  .rangering-rad {
+    display: grid;
+    grid-template-columns: 52px 1fr 60px;
+    align-items: center;
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    transition: background .3s;
+  }
+  .rangering-rad:last-child { border-bottom: none; }
+  .rangering-rad.plass-1 {
+    background: linear-gradient(90deg, rgba(234,179,8,.1) 0%, transparent 80%);
+  }
+  .rangering-rad.plass-2 {
+    background: linear-gradient(90deg, rgba(96,165,250,.06) 0%, transparent 80%);
+  }
+  .rangering-rad.plass-3 {
+    background: linear-gradient(90deg, rgba(180,100,50,.05) 0%, transparent 80%);
+  }
+  .rangering-rad.hviler-rad {
+    opacity: .55;
+  }
+
+  .rad-plass {
+    font-family: 'Bebas Neue', cursive;
+    font-size: 28px; line-height: 1;
+    color: var(--muted);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .rad-plass.p1 { color: var(--yellow); }
+  .rad-plass.p2 { color: var(--accent2); }
+  .rad-plass.p3 { color: #cd7c3f; }
+
+  .pil-ind {
+    font-size: 11px; font-weight: 700;
+  }
+  .pil-opp { color: var(--green2); }
+  .pil-ned { color: var(--red2); }
+
+  .rad-info { min-width: 0; }
+  .rad-navn {
+    font-size: 17px; font-weight: 600;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    color: var(--white);
+  }
+  .rad-sub {
+    font-size: 12px; color: var(--muted2);
+    margin-top: 1px;
+  }
+  .merke-hviler {
+    display: inline-block;
+    font-size: 10px; font-weight: 700;
+    background: rgba(234,88,12,.15); color: var(--orange);
+    padding: 1px 6px; border-radius: 4px;
+  }
+
+  .rad-poeng {
+    text-align: right;
+    font-family: 'Bebas Neue', cursive;
+    font-size: 30px; line-height: 1;
+    color: var(--white);
+  }
+  .rad-poeng.leder { color: var(--yellow); }
+
+  /* Fremgang-bar under poenget */
+  .bar-wrap {
+    grid-column: 1 / -1;
+    padding: 0 20px 8px;
+    margin-top: -2px;
+  }
+  .bar-bg {
+    height: 3px; background: var(--border2);
+    border-radius: 2px; overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%; border-radius: 2px;
+    background: var(--accent2);
+    transition: width .8s cubic-bezier(.4,0,.2,1);
+  }
+  .bar-fill.leder { background: var(--yellow); }
+
+  /* ── MIDTRE: BANER ── */
+  .kolonne-midt {
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    background: var(--navy);
+  }
+
+  .baner-grid {
+    flex: 1;
+    display: grid;
+    gap: 16px;
+    padding: 16px;
+    align-content: start;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  .baner-grid::-webkit-scrollbar { display: none; }
+
+  /* Dynamisk grid basert på antall baner */
+  .baner-grid.baner-1 { grid-template-columns: 1fr; }
+  .baner-grid.baner-2 { grid-template-columns: 1fr 1fr; }
+  .baner-grid.baner-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .baner-grid.baner-4 { grid-template-columns: 1fr 1fr; }
+  .baner-grid.baner-5 { grid-template-columns: 1fr 1fr 1fr; }
+  .baner-grid.baner-6 { grid-template-columns: 1fr 1fr 1fr; }
+
+  .bane-kort {
+    background: var(--navy2);
+    border: 1px solid var(--border2);
+    border-radius: 18px;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    position: relative;
+    transition: border-color .3s, box-shadow .3s;
+  }
+  .bane-kort.pagar {
+    border-color: rgba(34,197,94,.3);
+    box-shadow: 0 0 24px rgba(34,197,94,.08);
+  }
+  .bane-kort.ferdig-kort {
+    border-color: var(--border);
+    opacity: .75;
+  }
+
+  .bane-hode {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .bane-nr-stor {
+    font-family: 'Bebas Neue', cursive;
+    font-size: 38px; line-height: 1;
+    color: var(--accent2);
+  }
+  .bane-type-merke {
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1px;
+    padding: 3px 10px; border-radius: 6px;
+    background: rgba(96,165,250,.1); color: var(--accent2);
+  }
+  .bane-type-merke.singel {
+    background: rgba(234,179,8,.1); color: var(--yellow);
+  }
+
+  .bane-status-merke {
+    font-size: 12px; font-weight: 700;
+    padding: 4px 10px; border-radius: 8px;
+    letter-spacing: .5px;
+  }
+  .bane-status-merke.pagar {
+    background: rgba(34,197,94,.15); color: var(--green2);
+  }
+  .bane-status-merke.ferdig {
+    background: rgba(100,116,139,.15); color: var(--muted2);
+  }
+
+  .bane-innhold { padding: 12px 16px 14px; flex: 1; }
+
+  .lag-rad {
+    display: flex; align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    gap: 10px;
+  }
+  .lag-rad:last-child { border-bottom: none; }
+
+  .lag-avatar-gruppe {
+    display: flex; gap: -4px; flex-shrink: 0;
+  }
+  .avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: rgba(37,99,235,.2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; color: var(--accent2);
+    border: 2px solid var(--navy2);
+    flex-shrink: 0;
+  }
+  .avatar:nth-child(2) { margin-left: -10px; }
+
+  .lag-navn-wrap { flex: 1; min-width: 0; }
+  .lag-navn-tekst {
+    font-size: 17px; font-weight: 600;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    color: var(--white);
+    line-height: 1.2;
+  }
+  .lag-navn-tekst.vinner { color: var(--green2); }
+
+  .lag-poeng-stor {
+    font-family: 'Bebas Neue', cursive;
+    font-size: 44px; line-height: 1;
+    color: var(--white); flex-shrink: 0;
+    min-width: 52px; text-align: right;
+  }
+  .lag-poeng-stor.vinner { color: var(--green2); }
+  .lag-poeng-stor.pagar  { color: var(--muted2); font-size: 30px; padding-top: 7px; }
+
+  .vs-divider {
+    text-align: center;
+    font-size: 11px; letter-spacing: 2px;
+    color: var(--muted); text-transform: uppercase;
+    margin: 2px 0;
+  }
+
+  /* Fremdriftslinje på bunnen av banekortet */
+  .bane-progress {
+    height: 4px; background: var(--border2);
+    border-radius: 0 0 18px 18px; overflow: hidden;
+  }
+  .bane-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--green2));
+    transition: width .8s ease;
+  }
+  .bane-progress-fill.ferdig-fill {
+    background: var(--muted);
+  }
+
+  /* ── HØYRE: HISTORIKK ── */
+  .kolonne-hoyre {
+    border-left: 1px solid var(--border2);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+
+  .historikk-liste {
+    flex: 1; overflow-y: auto;
+    padding: 10px 0;
+    scrollbar-width: none;
+  }
+  .historikk-liste::-webkit-scrollbar { display: none; }
+
+  .hist-runde-blokk {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .hist-runde-blokk:last-child { border-bottom: none; }
+
+  .hist-runde-hdr {
+    font-family: 'Bebas Neue', cursive;
+    font-size: 16px; color: var(--accent2);
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+  }
+
+  .hist-kamp {
+    background: rgba(255,255,255,.02);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 10px;
+    margin-bottom: 6px;
+    font-size: 13px;
+  }
+  .hist-kamp:last-child { margin-bottom: 0; }
+
+  .hist-bane-label {
+    font-size: 10px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .8px;
+    margin-bottom: 4px;
+  }
+
+  .hist-lag-rad {
+    display: flex; justify-content: space-between;
+    align-items: center; padding: 2px 0;
+  }
+  .hist-lag-navn {
+    color: var(--muted2); font-size: 13px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 75%;
+  }
+  .hist-lag-navn.vinner { color: var(--white); font-weight: 600; }
+  .hist-score {
+    font-family: 'DM Mono', monospace;
+    font-size: 14px; font-weight: 500;
+    color: var(--green2); flex-shrink: 0;
+  }
+  .hist-score.tap { color: var(--muted2); }
+
+  /* ── HVILER-BOKS ── */
+  .hviler-boks {
+    margin: 0 16px 12px;
+    background: rgba(234,88,12,.07);
+    border: 1px solid rgba(234,88,12,.2);
+    border-radius: 10px;
+    padding: 10px 14px;
+  }
+  .hviler-tittel {
+    font-size: 10px; text-transform: uppercase;
+    letter-spacing: 1.5px; color: var(--orange);
+    font-weight: 700; margin-bottom: 6px;
+  }
+  .hviler-navn {
+    font-size: 15px; color: var(--white); font-weight: 500;
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  /* ── BANNER ── */
+  .banner-stripe {
+    padding: 10px 20px;
+    font-size: 15px; font-weight: 600;
+    text-align: center; letter-spacing: .3px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    min-height: 44px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .banner-stripe.tett   { background: rgba(234,179,8,.07);   color: var(--yellow);  }
+  .banner-stripe.leder  { background: rgba(34,197,94,.06);   color: var(--green2);  }
+  .banner-stripe.live   { background: rgba(37,99,235,.06);   color: var(--accent2); }
+  .banner-stripe.venter { color: var(--muted2); font-style: italic; }
+  .banner-stripe.ferdig { background: rgba(234,179,8,.07);   color: var(--yellow);  }
+
+  /* ── LASTER / FEIL ── */
+  .fullside-melding {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 20px; color: var(--muted2);
+    font-size: 18px; text-align: center;
+    padding: 40px;
+    background: var(--navy);
+    z-index: 999;
+  }
+  .snurr {
+    width: 52px; height: 52px; border-radius: 50%;
+    border: 3px solid var(--border2);
+    border-top-color: var(--yellow);
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .feil-boks {
+    background: rgba(220,38,38,.1);
+    border: 1px solid rgba(220,38,38,.3);
+    border-radius: 14px; color: #fca5a5;
+    padding: 24px 32px; font-size: 16px;
+    line-height: 1.6; max-width: 500px;
+  }
+
+  /* ── INGEN AKTIVITET ── */
+  .venter-skjerm {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    height: 100%; gap: 16px;
+    color: var(--muted2);
+  }
+  .venter-ikon { font-size: 64px; opacity: .4; }
+  .venter-tekst { font-size: 20px; }
+  .venter-sub { font-size: 14px; color: var(--muted); }
+
+  /* ── AVSLUTTET SKJERM ── */
+  .avsluttet-overlay {
+    position: fixed; inset: 0;
+    background: rgba(5,15,31,.92);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 24px; z-index: 50;
+  }
+  .avsluttet-tittel {
+    font-family: 'Bebas Neue', cursive;
+    font-size: 80px; letter-spacing: 4px;
+    color: var(--yellow);
+    text-shadow: 0 0 60px rgba(234,179,8,.5);
+  }
+  .vinner-stor {
+    font-size: 28px; font-weight: 600;
+    color: var(--white); text-align: center;
+  }
+  .podium {
+    display: flex; gap: 20px; align-items: flex-end;
+    margin-top: 10px;
+  }
+  .podium-plass {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 8px;
+  }
+  .podium-emoji { font-size: 40px; }
+  .podium-navn {
+    font-size: 18px; font-weight: 600;
+    color: var(--white); text-align: center;
+    max-width: 140px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .podium-poeng {
+    font-family: 'Bebas Neue', cursive;
+    font-size: 32px; color: var(--muted2);
+  }
+  .podium-plass.p1 .podium-poeng { color: var(--yellow); }
+  .podium-plass.p2 .podium-poeng { color: var(--accent2); }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div class="fullside-melding" id="global-laster">
+    <div class="snurr"></div>
+    Kobler til økt…
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import {
+  getFirestore, doc, collection,
+  query, where, onSnapshot,
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+// ── Firebase-konfig ──────────────────────────────────────
+const BRUK_MILJO = 'test'; // bytt til 'prod' ved deploy til produksjon
+const FB_CONFIGS = {
+  prod: {
+    apiKey:            'AIzaSyB_0rxDzHpV2HB6JdHm8SEHoGc8vE2F_rE',
+    authDomain:        'pickle-rank-5fbe5.firebaseapp.com',
+    projectId:         'pickle-rank-5fbe5',
+    storageBucket:     'pickle-rank-5fbe5.firebasestorage.app',
+    messagingSenderId: '761601873916',
+    appId:             '1:761601873916:web:f3c13d21e809658fd80479',
+  },
+  test: {
+    apiKey:            'AIzaSyByUGIQJwohLKWB2x7_qqOMWdi965Ph7ZE',
+    authDomain:        'pickle-rank-test.firebaseapp.com',
+    projectId:         'pickle-rank-test',
+    storageBucket:     'pickle-rank-test.firebasestorage.app',
+    messagingSenderId: '491693932367',
+    appId:             '1:491693932367:web:b3c13902ef6adb981dcf3a',
+  },
+};
+
+let db;
+try {
+  const fbApp = initializeApp(FB_CONFIGS[BRUK_MILJO], 'mix-skjerm');
+  db = getFirestore(fbApp);
+} catch (e) {
+  document.getElementById('app').innerHTML =
+    `<div class="fullside-melding"><div class="feil-boks">Firebase-feil: ${esc(e?.message ?? e)}</div></div>`;
+}
+
+// ── URL-parameter ─────────────────────────────────────────
+const params = new URLSearchParams(location.search);
+const oktId  = params.get('okt');
+
+// ── Tilstand ──────────────────────────────────────────────
+let _treningData  = null;
+let _alleKamper   = [];
+let _forrigeRang  = {};
+let _kamperLytter = null;
+
+if (!db) {
+  // feil allerede vist
+} else if (!oktId) {
+  document.getElementById('app').innerHTML =
+    `<div class="fullside-melding"><div class="feil-boks">
+      Ingen økt-ID i URL.<br>Bruk <code>?okt=ØKT_ID</code>
+    </div></div>`;
+} else {
+  startLyttere(oktId);
+  startKlokke();
+}
+
+// ── Sanntids-lyttere ─────────────────────────────────────
+function startLyttere(id) {
+  onSnapshot(
+    doc(db, 'treninger', id),
+    snap => {
+      if (!snap.exists()) {
+        document.getElementById('app').innerHTML =
+          `<div class="fullside-melding"><div class="feil-boks">Økt ikke funnet.</div></div>`;
+        return;
+      }
+      _treningData = { id: snap.id, ...snap.data() };
+      render();
+    },
+    err => {
+      document.getElementById('app').innerHTML =
+        `<div class="fullside-melding"><div class="feil-boks">Tilkoblingsfeil: ${esc(err.message)}</div></div>`;
+    }
+  );
+
+  if (_kamperLytter) { try { _kamperLytter(); } catch(_) {} }
+  _kamperLytter = onSnapshot(
+    query(collection(db, 'kamper'), where('treningId', '==', id)),
+    snap => {
+      _alleKamper = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      render();
+    },
+    err => console.warn('[kamper-lytter]', err.message)
+  );
+}
+
+// ── Klokke ───────────────────────────────────────────────
+function startKlokke() {
+  function oppdater() {
+    const el = document.getElementById('klokke');
+    if (el) {
+      const n = new Date();
+      el.textContent =
+        String(n.getHours()).padStart(2, '0') + ':' +
+        String(n.getMinutes()).padStart(2, '0');
+    }
+  }
+  oppdater();
+  setInterval(oppdater, 10000);
+}
+
+// ── Hoved-render ─────────────────────────────────────────
+function render() {
+  if (!_treningData) return;
+  const t = _treningData;
+
+  const erFerdig   = t.status === 'avsluttet';
+  const runde      = t.gjeldendRunde ?? 1;
+  const klubb      = t.klubbNavn ?? 'Mix & Match';
+  const baneOversikt = t.baneOversikt ?? [];
+  const venteliste   = t.venteliste   ?? [];
+
+  document.title = `${klubb} — Storskjerm`;
+
+  // Beregn sammenlagt
+  const sammenlagt = beregnSammenlagt(_alleKamper);
+  const pilar      = beregnPilar(sammenlagt, _forrigeRang);
+  sammenlagt.forEach((s, i) => { _forrigeRang[s.spillerId] = i + 1; });
+
+  const banner   = lagBanner(sammenlagt, runde, erFerdig, _alleKamper);
+  const hvilerIds = new Set(venteliste.map(s => s.id));
+  const maksPo   = sammenlagt.length ? sammenlagt[0].poeng : 1;
+
+  const pill = erFerdig
+    ? `<span class="ferdig-pill">🎉 Ferdig</span>`
+    : `<span class="live-pill"><span class="live-dot"></span>LIVE</span>`;
+
+  const antallBaner = baneOversikt.length;
+  const gridKlasse  = `baner-grid baner-${Math.min(antallBaner, 6)}`;
+
+  // Kamper for gjeldende runde
+  const kamperDenneRunden = _alleKamper.filter(k => k.rundeNr === runde);
+
+  // ── Rangering HTML ──
+  const rangeringHTML = sammenlagt.length
+    ? sammenlagt.map((s, i) => {
+        const plass    = i + 1;
+        const pil      = pilar[s.spillerId];
+        const hviler   = hvilerIds.has(s.spillerId);
+        const erLeder  = plass === 1;
+        const prosent  = maksPo > 0 ? (s.poeng / maksPo) * 100 : 0;
+
+        const radKl = ['rangering-rad',
+          plass === 1 ? 'plass-1' : plass === 2 ? 'plass-2' : plass === 3 ? 'plass-3' : '',
+          hviler ? 'hviler-rad' : '',
+        ].filter(Boolean).join(' ');
+
+        const plassKl = ['rad-plass',
+          plass === 1 ? 'p1' : plass === 2 ? 'p2' : plass === 3 ? 'p3' : '',
+        ].filter(Boolean).join(' ');
+
+        const plassSymbol = plass === 1 ? '🥇' : plass === 2 ? '🥈' : plass === 3 ? '🥉' : plass + '.';
+
+        const pilHTML = pil === 'opp'
+          ? `<span class="pil-ind pil-opp">▲</span>`
+          : pil === 'ned'
+            ? `<span class="pil-ind pil-ned">▼</span>`
+            : '';
+
+        const subHTML = hviler
+          ? `<span class="merke-hviler">😴 Hviler</span>`
+          : `${s.seire}V · ${s.kamper}K`;
+
+        return `
+          <div class="${radKl}">
+            <div class="${plassKl}">${plassSymbol}${pilHTML}</div>
+            <div class="rad-info">
+              <div class="rad-navn">${esc(s.navn)}</div>
+              <div class="rad-sub">${subHTML}</div>
+            </div>
+            <div class="rad-poeng${erLeder ? ' leder' : ''}">${s.poeng}</div>
+            <div class="bar-wrap">
+              <div class="bar-bg">
+                <div class="bar-fill${erLeder ? ' leder' : ''}" style="width:${prosent.toFixed(1)}%"></div>
+              </div>
+            </div>
+          </div>`;
+      }).join('')
+    : `<div class="venter-skjerm">
+        <div class="venter-ikon">⏸</div>
+        <div class="venter-tekst">Venter på første resultat…</div>
+       </div>`;
+
+  // ── Baner HTML ──
+  const banerHTML = antallBaner
+    ? baneOversikt.map(bane => {
+        const baneNr   = bane.baneNr;
+        const spillere = bane.spillere ?? [];
+        const kamp     = kamperDenneRunden.find(k => k.baneNr === `bane${baneNr}`);
+        const ferdig   = kamp?.ferdig === true;
+        const erSingel = bane.erSingel === true || spillere.length === 2;
+
+        const kortKl = `bane-kort ${ferdig ? 'ferdig-kort' : 'pagar'}`;
+        const statusKl = `bane-status-merke ${ferdig ? 'ferdig' : 'pagar'}`;
+        const statusTekst = ferdig ? 'Ferdig' : 'Pågår';
+        const typeTekst = erSingel ? 'Singel' : 'Dobbel';
+        const typeKl = `bane-type-merke${erSingel ? ' singel' : ''}`;
+
+        let lagHTML = '';
+        const lag1p = kamp?.ferdig ? kamp.lag1Poeng : null;
+        const lag2p = kamp?.ferdig ? kamp.lag2Poeng : null;
+        const v1 = lag1p != null && lag2p != null && lag1p > lag2p;
+        const v2 = lag1p != null && lag2p != null && lag2p > lag1p;
+
+        if (erSingel) {
+          const s1 = spillere[0]?.navn ?? '?';
+          const s2 = spillere[1]?.navn ?? '?';
+          const p1KL = lag1p != null ? (v1 ? 'vinner' : '') : 'pagar';
+          const p2KL = lag2p != null ? (v2 ? 'vinner' : '') : 'pagar';
+          lagHTML = `
+            <div class="lag-rad">
+              <div class="lag-avatar-gruppe">${avatar(s1)}</div>
+              <div class="lag-navn-wrap">
+                <div class="lag-navn-tekst${v1 ? ' vinner' : ''}">${esc(s1)}</div>
+              </div>
+              <div class="lag-poeng-stor${lag1p != null ? (v1 ? ' vinner' : '') : ' pagar'}">
+                ${lag1p != null ? lag1p : '–'}
+              </div>
+            </div>
+            <div class="vs-divider">vs</div>
+            <div class="lag-rad">
+              <div class="lag-avatar-gruppe">${avatar(s2)}</div>
+              <div class="lag-navn-wrap">
+                <div class="lag-navn-tekst${v2 ? ' vinner' : ''}">${esc(s2)}</div>
+              </div>
+              <div class="lag-poeng-stor${lag2p != null ? (v2 ? ' vinner' : '') : ' pagar'}">
+                ${lag2p != null ? lag2p : '–'}
+              </div>
+            </div>`;
+        } else {
+          const s1 = spillere[0]?.navn ?? '?';
+          const s2 = spillere[1]?.navn ?? '?';
+          const s3 = spillere[2]?.navn ?? '?';
+          const s4 = spillere[3]?.navn ?? '?';
+          const lag1Navn = `${esc(s1)} + ${esc(s2)}`;
+          const lag2Navn = `${esc(s3)} + ${esc(s4)}`;
+          lagHTML = `
+            <div class="lag-rad">
+              <div class="lag-avatar-gruppe">${avatar(s1)}${avatar(s2)}</div>
+              <div class="lag-navn-wrap">
+                <div class="lag-navn-tekst${v1 ? ' vinner' : ''}">${lag1Navn}</div>
+              </div>
+              <div class="lag-poeng-stor${lag1p != null ? (v1 ? ' vinner' : '') : ' pagar'}">
+                ${lag1p != null ? lag1p : '–'}
+              </div>
+            </div>
+            <div class="vs-divider">vs</div>
+            <div class="lag-rad">
+              <div class="lag-avatar-gruppe">${avatar(s3)}${avatar(s4)}</div>
+              <div class="lag-navn-wrap">
+                <div class="lag-navn-tekst${v2 ? ' vinner' : ''}">${lag2Navn}</div>
+              </div>
+              <div class="lag-poeng-stor${lag2p != null ? (v2 ? ' vinner' : '') : ' pagar'}">
+                ${lag2p != null ? lag2p : '–'}
+              </div>
+            </div>`;
+        }
+
+        // Fremdriftslinje: andel av makspoeng scoret
+        const maks = bane.maksPoeng ?? 15;
+        const scoret = lag1p != null && lag2p != null ? Math.max(lag1p, lag2p) : 0;
+        const prog = ferdig ? 100 : Math.min(100, (scoret / maks) * 100);
+
+        return `
+          <div class="${kortKl}">
+            <div class="bane-hode">
+              <div class="bane-nr-stor">${baneNr}</div>
+              <span class="${typeKl}">${typeTekst}</span>
+              <span class="${statusKl}">${statusTekst}</span>
+            </div>
+            <div class="bane-innhold">${lagHTML}</div>
+            <div class="bane-progress">
+              <div class="bane-progress-fill${ferdig ? ' ferdig-fill' : ''}" style="width:${prog.toFixed(1)}%"></div>
+            </div>
+          </div>`;
+      }).join('')
+    : `<div class="venter-skjerm">
+        <div class="venter-ikon">🏓</div>
+        <div class="venter-tekst">Klar for ny runde</div>
+        <div class="venter-sub">Baner vises her når runden starter</div>
+       </div>`;
+
+  // ── Historikk HTML ──
+  const historikkHTML = lagHistorikkHTML(_alleKamper, runde);
+
+  // ── Hviler-boks ──
+  const hvilerHTML = venteliste.length && !erFerdig
+    ? `<div class="hviler-boks">
+        <div class="hviler-tittel">Hviler denne runden</div>
+        ${venteliste.map(s =>
+          `<div class="hviler-navn">😴 ${esc(s.navn ?? 'Ukjent')}</div>`
+        ).join('')}
+       </div>`
+    : '';
+
+  // ── Sett alt sammen ──
+  document.getElementById('app').innerHTML = `
+    <div class="header">
+      <div class="logo">PB</div>
+      <div class="header-tekst">
+        <div class="header-klubb">${esc(klubb)}</div>
+        <div class="header-sub">Mix &amp; Match · ${erFerdig ? 'Avsluttet' : `Runde ${runde} pågår`}</div>
+      </div>
+      <div class="header-midt">
+        <div class="runde-display">
+          <div class="runde-label">Runde</div>
+          <div class="runde-tall">${runde}</div>
+        </div>
+        ${pill}
+      </div>
+      <div class="klokke" id="klokke"></div>
+    </div>
+
+    <div class="hoved">
+      <div class="kolonne-venstre">
+        <div class="kolonne-tittel">Poengstilling</div>
+        <div class="banner-stripe ${banner.kl}">${banner.tekst}</div>
+        <div class="rangering-liste">${rangeringHTML}</div>
+      </div>
+
+      <div class="kolonne-midt">
+        <div class="kolonne-tittel">Baner — Runde ${runde}</div>
+        ${hvilerHTML}
+        <div class="${gridKlasse}">${banerHTML}</div>
+      </div>
+
+      <div class="kolonne-hoyre">
+        <div class="kolonne-tittel">Historikk</div>
+        <div class="historikk-liste">${historikkHTML}</div>
+      </div>
+    </div>
+
+    ${erFerdig ? renderAvsluttet(sammenlagt) : ''}
+  `;
+
+  // Start klokke etter render
+  startKlokke();
+}
+
+// ── Avsluttet-overlay ────────────────────────────────────
+function renderAvsluttet(sammenlagt) {
+  if (!sammenlagt.length) return '';
+  const topp3 = sammenlagt.slice(0, 3);
+  const rekkef = [1, 0, 2]; // rekkefølge: 2.plass, 1.plass, 3.plass
+
+  const podiumHTML = rekkef
+    .filter(i => topp3[i])
+    .map(i => {
+      const s = topp3[i];
+      const plass = i + 1;
+      const emoji = plass === 1 ? '🥇' : plass === 2 ? '🥈' : '🥉';
+      return `
+        <div class="podium-plass p${plass}">
+          <div class="podium-emoji">${emoji}</div>
+          <div class="podium-navn">${esc(s.navn)}</div>
+          <div class="podium-poeng">${s.poeng} poeng</div>
+        </div>`;
+    }).join('');
+
+  return `
+    <div class="avsluttet-overlay">
+      <div class="avsluttet-tittel">🎉 Mix &amp; Match Ferdig!</div>
+      ${sammenlagt[0] ? `<div class="vinner-stor">🏆 ${esc(sammenlagt[0].navn)} vinner med ${sammenlagt[0].poeng} poeng!</div>` : ''}
+      <div class="podium">${podiumHTML}</div>
+    </div>`;
+}
+
+// ── Historikk HTML ───────────────────────────────────────
+function lagHistorikkHTML(alleKamper, gjeldendeRunde) {
+  const perRunde = {};
+  alleKamper
+    .filter(k => k.ferdig && k.lag1Poeng != null && k.lag2Poeng != null)
+    .forEach(k => {
+      const r = k.rundeNr ?? 1;
+      if (!perRunde[r]) perRunde[r] = [];
+      perRunde[r].push(k);
+    });
+
+  const runder = Object.keys(perRunde).map(Number).sort((a, b) => b - a);
+
+  if (!runder.length) {
+    return `<div style="padding:20px 16px;color:var(--muted2);font-size:14px">Ingen fullførte kamper ennå.</div>`;
+  }
+
+  return runder.map(r => {
+    const kamper = perRunde[r];
+    const antall = kamper.length;
+
+    const kamperHTML = kamper
+      .sort((a, b) => (a.baneNr ?? '').localeCompare(b.baneNr ?? ''))
+      .map(k => {
+        const baneNr = k.baneNr?.replace('bane', '') ?? '?';
+        const l1 = lagNavn(k, 1);
+        const l2 = lagNavn(k, 2);
+        const v1 = k.lag1Poeng > k.lag2Poeng;
+        return `
+          <div class="hist-kamp">
+            <div class="hist-bane-label">Bane ${baneNr}</div>
+            <div class="hist-lag-rad">
+              <span class="hist-lag-navn${v1 ? ' vinner' : ''}">${l1}</span>
+              <span class="hist-score${v1 ? '' : ' tap'}">${k.lag1Poeng}</span>
+            </div>
+            <div class="hist-lag-rad">
+              <span class="hist-lag-navn${!v1 ? ' vinner' : ''}">${l2}</span>
+              <span class="hist-score${!v1 ? '' : ' tap'}">${k.lag2Poeng}</span>
+            </div>
+          </div>`;
+      }).join('');
+
+    return `
+      <div class="hist-runde-blokk">
+        <div class="hist-runde-hdr">Runde ${r} · ${antall} kamp${antall > 1 ? 'er' : ''}</div>
+        ${kamperHTML}
+      </div>`;
+  }).join('');
+}
+
+// ── Beregn sammenlagt ────────────────────────────────────
+function beregnSammenlagt(kamper) {
+  const totaler = {};
+  kamper
+    .filter(k => k.ferdig && k.lag1Poeng != null && k.lag2Poeng != null)
+    .forEach(k => {
+      const lag1Vant = k.lag1Poeng > k.lag2Poeng;
+      const lag2Vant = k.lag2Poeng > k.lag1Poeng;
+      const leggTil = (id, navn, mine, vant) => {
+        if (!id) return;
+        if (!totaler[id]) totaler[id] = { spillerId: id, navn: navn ?? 'Ukjent', poeng: 0, seire: 0, kamper: 0 };
+        totaler[id].poeng  += mine;
+        totaler[id].kamper += 1;
+        if (vant) totaler[id].seire += 1;
+      };
+      leggTil(k.lag1_s1, k.lag1_s1_navn, k.lag1Poeng, lag1Vant);
+      leggTil(k.lag1_s2, k.lag1_s2_navn, k.lag1Poeng, lag1Vant);
+      leggTil(k.lag2_s1, k.lag2_s1_navn, k.lag2Poeng, lag2Vant);
+      leggTil(k.lag2_s2, k.lag2_s2_navn, k.lag2Poeng, lag2Vant);
+      if (k.hviler_id) {
+        const hvil = k.hvilerPoeng ?? Math.ceil((k.lag1Poeng + k.lag2Poeng) / 2);
+        const id   = k.hviler_id;
+        if (!totaler[id]) totaler[id] = { spillerId: id, navn: k.hviler_navn ?? 'Ukjent', poeng: 0, seire: 0, kamper: 0 };
+        totaler[id].poeng += hvil;
+      }
+    });
+  return Object.values(totaler).sort((a, b) => b.poeng - a.poeng || b.seire - a.seire);
+}
+
+// ── Pilar ────────────────────────────────────────────────
+function beregnPilar(sammenlagt, forrige) {
+  const pilar = {};
+  if (!Object.keys(forrige).length) return pilar;
+  sammenlagt.forEach((s, i) => {
+    const ny     = i + 1;
+    const gammel = forrige[s.spillerId];
+    if (gammel == null) { pilar[s.spillerId] = null; return; }
+    pilar[s.spillerId] = ny < gammel ? 'opp' : ny > gammel ? 'ned' : null;
+  });
+  return pilar;
+}
+
+// ── Banner ───────────────────────────────────────────────
+function lagBanner(sammenlagt, runde, erFerdig, alleKamper) {
+  if (erFerdig) {
+    if (!sammenlagt.length) return { kl: 'ferdig', tekst: '🎉 Mix & Match er ferdig!' };
+    return { kl: 'ferdig', tekst: `🎉 ${esc(sammenlagt[0].navn)} vinner!` };
+  }
+  const ferdigeNaa = alleKamper.filter(k => k.ferdig && k.rundeNr === runde);
+  if (!sammenlagt.length || !ferdigeNaa.length)
+    return { kl: 'venter', tekst: `⏸ Venter på resultater fra runde ${runde}…` };
+  if (sammenlagt.length >= 2) {
+    const diff = sammenlagt[0].poeng - sammenlagt[1].poeng;
+    if (sammenlagt.length >= 3 && diff <= 3) {
+      const diff3 = sammenlagt[0].poeng - sammenlagt[2].poeng;
+      if (diff3 <= 6) return { kl: 'tett', tekst: `🔥 Tett i toppen — kun ${diff3} poeng skiller de tre øverste!` };
+    }
+    if (diff <= 5) return { kl: 'tett', tekst: `🔥 Tett kamp! Kun ${diff} poeng skiller de to øverste!` };
+    if (diff >= 15) return { kl: 'leder', tekst: `👑 ${esc(sammenlagt[0].navn)} leder med ${diff} poeng foran nummer to!` };
+  }
+  return { kl: 'live', tekst: `🎲 Runde ${runde} pågår · ${esc(sammenlagt[0].navn)} leder med ${sammenlagt[0].poeng} poeng` };
+}
+
+// ── Hjelpere ─────────────────────────────────────────────
+function lagNavn(kamp, lag) {
+  if (lag === 1) {
+    const s1 = esc(kamp.lag1_s1_navn ?? '?');
+    const s2 = kamp.lag1_s2_navn ? ` + ${esc(kamp.lag1_s2_navn)}` : '';
+    return s1 + s2;
+  }
+  const s1 = esc(kamp.lag2_s1_navn ?? '?');
+  const s2 = kamp.lag2_s2_navn ? ` + ${esc(kamp.lag2_s2_navn)}` : '';
+  return s1 + s2;
+}
+
+function initialer(navn) {
+  return (navn ?? '?').split(' ').map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase() || '?';
+}
+
+function avatar(navn) {
+  return `<div class="avatar">${initialer(navn)}</div>`;
+}
+
+function esc(str) {
+  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+</script>
+</body>
+</html>

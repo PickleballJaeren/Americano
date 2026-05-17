@@ -7,7 +7,7 @@ import {
   query, where, getDocs, writeBatch,
 } from './firebase.js';
 import { app, erMix } from './state.js';
-import { getParter } from './rotasjon.js';
+import { getParter, erSingelBane } from './rotasjon.js';
 import { PARTER_6_SINGEL, PARTER_6_DOBBEL } from './firebase.js';
 import { visFBFeil } from './ui.js';
 import { getKampStatusCache } from './baner.js';
@@ -33,7 +33,7 @@ export function validerInndata(i, endretFelt) {
   const l1   = parseInt(el1.value, 10);
   const l2   = parseInt(el2.value, 10);
   const bane = (app.baneOversikt ?? []).find(b => b.baneNr === app.aktivBane);
-  const erSingelValider = bane?.erSingel === true || (bane?.spillere?.length === 2);
+  const erSingelValider = erSingelBane(bane);
   const maks = bane?.maksPoeng ?? (app.poengPerKamp ?? 17);
 
   // Autofyll motstanderens poeng
@@ -48,7 +48,7 @@ export function validerInndata(i, endretFelt) {
 
   // Auto-hopp til neste tomme kamp etter autofyll
   if (autofylte) {
-    const erSingelHopp = bane?.erSingel === true || (bane?.spillere?.length === 2);
+    const erSingelHopp = erSingelBane(bane);
     const erDobbelHopp6 = app.er6SpillerFormat && (bane?.erDobbel === true);
     const antallKamper = erSingelHopp
       ? PARTER_6_SINGEL.length
@@ -117,7 +117,7 @@ export async function autolagreKamp(i, l1, l2) {
 
   const baneNr = app.aktivBane;
   const bane   = (app.baneOversikt ?? []).find(b => b.baneNr === baneNr);
-  const erSingelLagre  = bane?.erSingel === true || (bane?.spillere?.length === 2);
+  const erSingelLagre  = erSingelBane(bane);
   const erDobbelLagre6 = app.er6SpillerFormat && (bane?.erDobbel === true);
   const parter = erMix()
     ? (erSingelLagre
@@ -177,7 +177,7 @@ export function lukkTastaturOgScrollTilLagre() {
 window.lukkTastaturOgScrollTilLagre = lukkTastaturOgScrollTilLagre;
 export function lesOgValiderPoeng() {
   const bane   = (app.baneOversikt ?? []).find(b => b.baneNr === app.aktivBane);
-  const erSingelLOV = bane?.erSingel === true || (bane?.spillere?.length === 2);
+  const erSingelLOV = erSingelBane(bane);
   const erDobbelLOV6 = app.er6SpillerFormat && (bane?.erDobbel === true);
   const parter = erMix()
     ? (erSingelLOV ? PARTER_6_SINGEL : [{ nr: 1, lag1: [0,1], lag2: [2,3] }])

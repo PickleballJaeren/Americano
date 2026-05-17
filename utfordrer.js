@@ -15,10 +15,12 @@ import { lagInitialer } from './render-helpers.js';
 // ── Avhengigheter injisert fra app.js ────────────────────
 let _getAktivKlubbId    = () => null;
 let _getAktivSpillerId  = () => sessionStorage.getItem('aktivSpillerId');
+let _getSpillere        = () => [];
 
 export function utfordrerInit(deps) {
   _getAktivKlubbId   = deps.getAktivKlubbId   ?? (() => null);
   _getAktivSpillerId = deps.getAktivSpillerId  ?? (() => sessionStorage.getItem('aktivSpillerId'));
+  _getSpillere       = deps.getSpillere        ?? (() => []);
 }
 
 // ════════════════════════════════════════════════════════
@@ -95,7 +97,7 @@ async function _kanUtfordre(utfordrerSpiller, motstanderSpiller, klubbId) {
   const motRating = _hentUtfordrerRating(motstanderSpiller);
   const diff      = Math.abs(utfRating - motRating);
 
-  const alleSpillere = [...(window._app?.spillere ?? [])].sort((a, b) => _hentUtfordrerRating(b) - _hentUtfordrerRating(a));
+  const alleSpillere = [..._getSpillere()].sort((a, b) => _hentUtfordrerRating(b) - _hentUtfordrerRating(a));
   const utfIdx = alleSpillere.findIndex(s => s.id === utfordrerSpiller.id);
   const spillerenOverIdx = utfIdx > 0 ? utfIdx - 1 : -1;
   const erSpillerenOverMeg = spillerenOverIdx >= 0 && alleSpillere[spillerenOverIdx]?.id === motstanderSpiller.id;
@@ -226,7 +228,7 @@ export function startUtfordrerLytter() {
   _utfordringLytterAvmeld = onSnapshot(
     query(collection(db, SAM.UTFORDRINGER), where('klubbId', '==', klubbId)),
     async () => {
-      const spillere = [...(window._app?.spillere ?? [])];
+      const spillere = [..._getSpillere()];
       await Promise.all([
         _lastAktiveUtfordringer(klubbId, spillere),
         _lastSisteResultater(klubbId, spillere),
@@ -259,7 +261,7 @@ window.toggleSingelRanking = function() {
 export async function visUtfordrerSkjerm() {
   const klubbId = _getAktivKlubbId();
 
-  let spillere = [...(window._app?.spillere ?? [])];
+  let spillere = [..._getSpillere()];
   if (db && klubbId) {
     try {
       const snap = await getDocs(query(collection(db, SAM.SPILLERE), where('klubbId', '==', klubbId)));
@@ -289,7 +291,7 @@ export async function visUtfordrerSkjerm() {
 window.visUtfordrerSkjerm = visUtfordrerSkjerm;
 
 window.oppdaterUtfordrerVelger = function() {
-  const spillere = [...(window._app?.spillere ?? [])].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+  const spillere = [..._getSpillere()].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
   _oppdaterMotstanderVelger(spillere, sessionStorage.getItem('aktivSpillerId'));
   visUtfordrerSkjerm();
 };
@@ -1094,7 +1096,7 @@ window.bekreftUtfordringGame = async function() {
       _utfResetModal(nyeGames.length + 1, `Stilling: ${megSeireNy}–${demSeireNy}`);
       setTimeout(() => window.utfApnePicker('p1'), 80);
       const klubbId = _getAktivKlubbId();
-      if (klubbId) await _lastAktiveUtfordringer(klubbId, window._app?.spillere ?? []);
+      if (klubbId) await _lastAktiveUtfordringer(klubbId, _getSpillere());
     }
   } catch (e) {
     feilEl.textContent = 'Feil ved lagring: ' + (e?.message ?? e);

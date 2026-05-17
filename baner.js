@@ -1182,7 +1182,6 @@ export function apneRedigerBaner() {
     : _visRedigerModal();
 }
 window.apneRedigerBaner = apneRedigerBaner;
-window.visRedigerBanerModal = apneRedigerBaner;
 
 function _visRedigerModal() {
   // Dyp kopi av baneOversikt så vi ikke muterer app-state før lagring

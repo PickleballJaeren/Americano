@@ -10,15 +10,13 @@ import {
   lagMixKampoppsett, oppdaterMixStatistikk, hentMixStatistikk,
   neste6SpillerRunde,
 } from './rotasjon.js';
-import {
-  getNivaaKlasse, getNivaaLabel, getNivaaRatingHTML,
-  eloForventet, oppdaterRatingForKamp, beregnEloForOkt, beregnTrend,
-} from './rating.js';
+
 import {
   visMelding, visFBFeil, escHtml,
   lasUI, frigiUI, startFailSafe, stoppFailSafe,
   registrerNavigertHandler, registrerBeforeunload,
   registrerProfilCallbacks, registrerHarAktivOkt,
+  lagQRKode,
 } from './ui.js';
 import {
   krevAdmin as _krevAdminBase, pinInput, bekreftPin, lukkPinModal,
@@ -305,6 +303,12 @@ function lagMixLiveUrl() {
   return `${base}mix-viewer.html?okt=${app.treningId}`;
 }
 
+function lagMixSkjermUrl() {
+  if (!app.treningId) return null;
+  const base = location.origin + location.pathname.replace(/\/[^/]*$/, '/');
+  return `${base}mix-skjerm.html?okt=${app.treningId}`;
+}
+
 function oppdaterMixLiveKnapp() {
   const knapp = document.getElementById('mix-live-knapp');
   if (!knapp) return;
@@ -313,40 +317,24 @@ function oppdaterMixLiveKnapp() {
 
 function apneMixLiveModal() {
   if (!app.treningId) { visMelding('Ingen aktiv økt.', 'feil'); return; }
-  const url    = lagMixLiveUrl();
+  const url       = lagMixLiveUrl();
+  const skjermUrl = lagMixSkjermUrl();
   const urlEl  = document.getElementById('mix-live-url');
   const qrWrap = document.getElementById('mix-qr-kode');
   const modal  = document.getElementById('modal-mix-live');
-  if (urlEl)  urlEl.textContent = url;
-  if (modal)  modal.style.display = 'flex';
-  if (qrWrap) qrWrap.innerHTML = '';
-  if (!window.QRCode) {
-    const script   = document.createElement('script');
-    script.src     = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
-    script.onload  = () => _genererMixQR(qrWrap, url);
-    script.onerror = () => {
-      if (qrWrap) qrWrap.innerHTML =
-        '<div style="color:#888;font-size:13px;text-align:center;padding:8px">Kunne ikke laste QR-generator.<br>Kopier lenken manuelt.</div>';
-    };
-    document.head.appendChild(script);
-  } else {
-    _genererMixQR(qrWrap, url);
-  }
+  const skjermLenkeEl = document.getElementById('mix-skjerm-url');
+  if (urlEl)         urlEl.textContent = url;
+  if (skjermLenkeEl) skjermLenkeEl.href = skjermUrl;
+  if (modal)         modal.style.display = 'flex';
+  lagQRKode(qrWrap, url, 180, '#050f1f', '#ffffff');
 }
 window.apneMixLiveModal = apneMixLiveModal;
 
-function _genererMixQR(container, url) {
-  if (!container || !url || !window.QRCode) return;
-  container.innerHTML = '';
-  new QRCode(container, {
-    text:         url,
-    width:        180,
-    height:       180,
-    colorDark:    '#050f1f',
-    colorLight:   '#ffffff',
-    correctLevel: QRCode.CorrectLevel.M,
-  });
-}
+window.apneMixSkjerm = function() {
+  const url = lagMixSkjermUrl();
+  if (url) window.open(url, '_blank');
+};
+
 
 function lukkMixLiveModal() {
   const modal = document.getElementById('modal-mix-live');
@@ -449,20 +437,7 @@ window.visDelAppModal = function() {
 
     setTimeout(() => {
       const boks = document.getElementById('del-app-qr-innhold');
-      if (!boks) return;
-      boks.innerHTML = '';
-      if (typeof QRCode !== 'undefined') {
-        new QRCode(boks, {
-          text:         url,
-          width:        132,
-          height:       132,
-          colorDark:    '#000000',
-          colorLight:   '#ffffff',
-          correctLevel: QRCode.CorrectLevel.M,
-        });
-      } else {
-        boks.innerHTML = `<div style="font-size:11px;color:#333;word-break:break-all;padding:4px">${url}</div>`;
-      }
+      if (boks) lagQRKode(boks, url, 132);
     }, 50);
   });
 };
@@ -596,6 +571,7 @@ async function init() {
   utfordrerInit({
     getAktivKlubbId:   () => aktivKlubbId,
     getAktivSpillerId: () => sessionStorage.getItem('aktivSpillerId'),
+    getSpillere:       () => app.spillere ?? [],
   });
 
   // Registrer profil-callbacks i ui.js (erstatter window-globals)

@@ -14,6 +14,7 @@ import {
 } from './rating.js';
 import { visMelding, visFBFeil, escHtml } from './ui.js';
 import { lagInitialer } from './render-helpers.js';
+import { beregnKampStatistikk } from './global-profil.js';
 
 // ── Avhengigheter injisert fra app.js ────────────────────
 let _krevAdmin        = () => {};
@@ -294,27 +295,6 @@ async function beregnSesongsKaaring(spillereListe) {
 // ════════════════════════════════════════════════════════
 // SPILLERSAMMENLIGNING
 // ════════════════════════════════════════════════════════
-function beregnKampStatistikkEnkel(spillerId, kamper) {
-  if (!kamper?.length) return { winRate: null, avgPoints: null, totalKamper: 0 };
-  let seire = 0, totaltPoeng = 0, antallKamper = 0;
-  for (const k of kamper) {
-    if (!k.ferdig || k.lag1Poeng == null || k.lag2Poeng == null) continue;
-    const erLag1 = k.lag1_s1 === spillerId || k.lag1_s2 === spillerId;
-    const erLag2 = k.lag2_s1 === spillerId || k.lag2_s2 === spillerId;
-    if (!erLag1 && !erLag2) continue;
-    const egnePoeng = erLag1 ? k.lag1Poeng : k.lag2Poeng;
-    const vant      = erLag1 ? k.lag1Poeng > k.lag2Poeng : k.lag2Poeng > k.lag1Poeng;
-    totaltPoeng += egnePoeng;
-    antallKamper++;
-    if (vant) seire++;
-  }
-  if (antallKamper === 0) return { winRate: null, avgPoints: null, totalKamper: 0 };
-  return {
-    winRate:     Math.round((seire / antallKamper) * 100),
-    avgPoints:   Math.round((totaltPoeng / antallKamper) * 10) / 10,
-    totalKamper: antallKamper,
-  };
-}
 
 export function nullstillSammenligning() {
   const s1 = document.getElementById('sammenlign-s1')?.value;
@@ -356,7 +336,7 @@ async function kjorSammenligning() {
       return ids.includes(s2Id);
     });
 
-    const stat1 = beregnKampStatistikkEnkel(s1Id, alleKamperS1);
+    const stat1 = beregnKampStatistikk(s1Id, alleKamperS1);
 
     const [b1, b2, b3, b4] = await Promise.all([
       getDocs(query(collection(db, SAM.KAMPER), where('lag1_s1', '==', s2Id), where('ferdig', '==', true))),
@@ -367,7 +347,7 @@ async function kjorSammenligning() {
     const sett2 = new Map();
     for (const snap of [b1, b2, b3, b4]) snap.docs.forEach(d => sett2.set(d.id, { id: d.id, ...d.data() }));
     const alleKamperS2 = [...sett2.values()];
-    const stat2 = beregnKampStatistikkEnkel(s2Id, alleKamperS2);
+    const stat2 = beregnKampStatistikk(s2Id, alleKamperS2);
 
     let sammenLag = 0, sammenSeire = 0, motHverandre = 0, s1VantMot = 0;
     for (const k of fellesKamper) {

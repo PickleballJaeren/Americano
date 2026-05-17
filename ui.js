@@ -236,3 +236,43 @@ export function registrerBeforeunload(harAktivOkt) {
     if (harAktivOkt()) { e.preventDefault(); e.returnValue = ''; }
   });
 }
+
+// ════════════════════════════════════════════════════════
+// QR-KODE — felles hjelper
+// Brukes av app.js (Mix Live, Del App) og turnering-ui.js.
+// Lazy-laster qrcodejs fra CDN første gang den kalles.
+// @param {HTMLElement} container — tømmes og fylles med QR-kode
+// @param {string}      tekst     — URL eller tekst som kodes
+// @param {number}      [storrelse=132] — bredde og høyde i px
+// @param {string}      [mork='#000000']  — mørk farge
+// @param {string}      [lys='#ffffff']   — lys farge
+// ════════════════════════════════════════════════════════
+const QR_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+
+export function lagQRKode(container, tekst, storrelse = 132, mork = '#000000', lys = '#ffffff') {
+  if (!container || !tekst) return;
+  container.innerHTML = '';
+  const _generer = () => {
+    if (!window.QRCode) return;
+    new window.QRCode(container, {
+      text:         tekst,
+      width:        storrelse,
+      height:       storrelse,
+      colorDark:    mork,
+      colorLight:   lys,
+      correctLevel: window.QRCode.CorrectLevel.M,
+    });
+  };
+  if (window.QRCode) {
+    _generer();
+  } else {
+    const script    = document.createElement('script');
+    script.src      = QR_CDN;
+    script.onload   = _generer;
+    script.onerror  = () => {
+      container.innerHTML =
+        '<div style="color:#888;font-size:13px;text-align:center;padding:8px">Kunne ikke laste QR-generator.<br>Kopier lenken manuelt.</div>';
+    };
+    document.head.appendChild(script);
+  }
+}

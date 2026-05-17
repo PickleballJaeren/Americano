@@ -4,7 +4,7 @@
 // Live-spill (pulje, bracket, resultat) bor i turnering-spill-ui.js.
 // ════════════════════════════════════════════════════════
 
-import { escHtml, visMelding, visFBFeil } from './ui.js';
+import { escHtml, visMelding, visFBFeil, lagQRKode } from './ui.js';
 import { app } from './state.js';
 import {
   T_STATUS, SEEDING_MODUS, STANDARD_KAMPFORMAT,
@@ -95,7 +95,7 @@ window.visDelModal = function() {
   document.getElementById('modal-del-live').style.display = 'flex';
 
   // Generer QR-kode etter at modalen er synlig
-  setTimeout(() => _genererQR(url), 50);
+  setTimeout(() => lagQRKode(document.getElementById('del-qr-boks'), url, 132), 50);
 };
 
 window.lukkDelModal = function() {
@@ -114,36 +114,6 @@ window.kopierLiveUrl = async function() {
   }
 };
 
-function _genererQR(tekst) {
-  const canvas = document.getElementById('del-qr-canvas');
-  if (!canvas) return;
-  const ctx  = canvas.getContext('2d');
-  const size = 132;
-
-  // Enkel QR-matrise via qrcodejs
-  if (typeof QRCode !== 'undefined') {
-    const boks = document.getElementById('del-qr-boks');
-    boks.innerHTML = '';
-    new QRCode(boks, {
-      text:          tekst,
-      width:         132,
-      height:        132,
-      colorDark:     '#000000',
-      colorLight:    '#ffffff',
-      correctLevel:  QRCode.CorrectLevel.M,
-    });
-    return;
-  }
-
-  // Fallback: vis URL som tekst om biblioteket ikke er lastet
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, size, size);
-  ctx.fillStyle = '#000';
-  ctx.font = '10px monospace';
-  ctx.fillText('Skan URL:', 8, 20);
-  const ord = tekst.split('/');
-  ord.forEach((del, i) => ctx.fillText(del, 8, 36 + i * 14));
-}
 
 window.turneringTilbake = async function() {
   const forrige = _navStack.pop();
