@@ -220,11 +220,7 @@
     margin-top: 2px;
   }
   .rangering-rad.topp3 .rad-sub { font-size: 13px; }
-  .rad-gap {
-    font-size: 11px; color: var(--muted);
-    margin-top: 1px;
-  }
-  .rangering-rad.topp3 .rad-gap { font-size: 12px; }
+
   .merke-hviler {
     display: inline-block;
     font-size: 10px; font-weight: 700;
@@ -872,9 +868,7 @@ function render() {
           ? `<span class="merke-hviler">😴 Hviler</span>`
           : `${seierTekst} · ${kampTekst} ${pilHTML}`;
 
-        const gapHTML = erLeder
-          ? `<div class="rad-gap">Leder</div>`
-          : `<div class="rad-gap">−${gap} fra leder</div>`;
+        const gapHTML = '';
 
         const barKl = erLeder ? 'leder' : plass === 2 ? 'p2' : plass === 3 ? 'p3' : '';
 
