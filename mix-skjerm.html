@@ -168,16 +168,20 @@
   }
   .rangering-liste::-webkit-scrollbar { display: none; }
 
+  /* ── Topp 3 — større rader ── */
   .rangering-rad {
     display: grid;
-    grid-template-columns: 58px 1fr 70px;
+    grid-template-columns: 52px 1fr auto;
     align-items: center;
-    padding: 12px 24px;
+    padding: 10px 20px;
     border-bottom: 1px solid var(--border);
     position: relative;
     transition: background .3s;
   }
   .rangering-rad:last-child { border-bottom: none; }
+  .rangering-rad.topp3 {
+    padding: 14px 24px;
+  }
   .rangering-rad.plass-1 {
     background: linear-gradient(90deg, rgba(234,179,8,.1) 0%, transparent 80%);
   }
@@ -187,36 +191,40 @@
   .rangering-rad.plass-3 {
     background: linear-gradient(90deg, rgba(180,100,50,.05) 0%, transparent 80%);
   }
-  .rangering-rad.hviler-rad {
-    opacity: .55;
-  }
+  .rangering-rad.hviler-rad { opacity: .55; }
 
   .rad-plass {
     font-family: 'Bebas Neue', cursive;
-    font-size: 34px; line-height: 1;
+    font-size: 28px; line-height: 1;
     color: var(--muted);
-    display: flex; align-items: center; gap: 6px;
+    display: flex; align-items: center; gap: 4px;
   }
+  .rangering-rad.topp3 .rad-plass { font-size: 36px; }
   .rad-plass.p1 { color: var(--yellow); }
   .rad-plass.p2 { color: var(--accent2); }
   .rad-plass.p3 { color: #cd7c3f; }
 
-  .pil-ind {
-    font-size: 11px; font-weight: 700;
-  }
+  .pil-ind { font-size: 11px; font-weight: 700; }
   .pil-opp { color: var(--green2); }
   .pil-ned { color: var(--red2); }
 
-  .rad-info { min-width: 0; }
+  .rad-info { min-width: 0; flex: 1; padding: 0 10px; }
   .rad-navn {
-    font-size: 20px; font-weight: 600;
+    font-size: 17px; font-weight: 600;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     color: var(--white);
   }
+  .rangering-rad.topp3 .rad-navn { font-size: 22px; }
   .rad-sub {
-    font-size: 13px; color: var(--muted2);
+    font-size: 12px; color: var(--muted2);
     margin-top: 2px;
   }
+  .rangering-rad.topp3 .rad-sub { font-size: 13px; }
+  .rad-gap {
+    font-size: 11px; color: var(--muted);
+    margin-top: 1px;
+  }
+  .rangering-rad.topp3 .rad-gap { font-size: 12px; }
   .merke-hviler {
     display: inline-block;
     font-size: 10px; font-weight: 700;
@@ -224,30 +232,36 @@
     padding: 1px 6px; border-radius: 4px;
   }
 
+  .rad-poeng-wrap { text-align: right; flex-shrink: 0; }
   .rad-poeng {
-    text-align: right;
     font-family: 'Bebas Neue', cursive;
-    font-size: 36px; line-height: 1;
+    font-size: 30px; line-height: 1;
     color: var(--white);
+    display: block;
   }
+  .rangering-rad.topp3 .rad-poeng { font-size: 44px; }
   .rad-poeng.leder { color: var(--yellow); }
 
   /* Fremgang-bar under poenget */
   .bar-wrap {
     grid-column: 1 / -1;
-    padding: 0 24px 10px;
+    padding: 0 20px 8px;
     margin-top: -2px;
   }
+  .rangering-rad.topp3 .bar-wrap { padding: 0 24px 10px; }
   .bar-bg {
     height: 4px; background: var(--border2);
     border-radius: 2px; overflow: hidden;
   }
+  .rangering-rad.topp3 .bar-bg { height: 6px; }
   .bar-fill {
     height: 100%; border-radius: 2px;
     background: var(--accent2);
     transition: width .8s cubic-bezier(.4,0,.2,1);
   }
   .bar-fill.leder { background: var(--yellow); }
+  .bar-fill.p2 { background: var(--accent2); }
+  .bar-fill.p3 { background: #cd7c3f; }
 
   /* ── KAMPOPPSETT-KORT (venstre kolonne) ── */
   .kampoppsett-liste {
@@ -468,7 +482,7 @@
   .historikk-liste::-webkit-scrollbar { display: none; }
 
   .hist-runde-blokk {
-    padding: 10px 16px;
+    padding: 10px 12px;
     border-bottom: 1px solid var(--border);
   }
   .hist-runde-blokk:last-child { border-bottom: none; }
@@ -481,29 +495,40 @@
   }
 
   .hist-kamp {
-    background: rgba(255,255,255,.02);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 7px 10px;
-    margin-bottom: 6px;
+    background: var(--navy2);
+    border: 1px solid var(--border2);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
     font-size: 13px;
   }
   .hist-kamp:last-child { margin-bottom: 0; }
 
   .hist-bane-label {
-    font-size: 10px; color: var(--muted);
-    text-transform: uppercase; letter-spacing: .8px;
-    margin-bottom: 4px;
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: 8px;
+  }
+  .hist-bane-nr {
+    font-family: 'Bebas Neue', cursive;
+    font-size: 20px; line-height: 1;
+    color: var(--accent2);
+  }
+  .hist-bane-tekst {
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1px;
+    color: var(--muted2);
   }
 
   .hist-lag-rad {
     display: flex; justify-content: space-between;
-    align-items: center; padding: 2px 0;
+    align-items: center; padding: 5px 0;
+    border-bottom: 1px solid var(--border);
   }
+  .hist-lag-rad:last-child { border-bottom: none; }
   .hist-lag-navn {
-    color: var(--muted2); font-size: 13px;
+    color: var(--muted2); font-size: 15px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    max-width: 75%;
+    max-width: 78%;
   }
   .hist-lag-navn.vinner { color: var(--white); font-weight: 600; }
   .hist-score {
@@ -811,15 +836,19 @@ function render() {
     : `<div style="padding:20px 16px;color:var(--muted2);font-size:14px">Ingen baner satt opp.</div>`;
 
   // ── Rangering HTML ──
+  const lederPoeng = sammenlagt.length ? sammenlagt[0].poeng : 0;
   const rangeringHTML = sammenlagt.length
     ? sammenlagt.map((s, i) => {
         const plass    = i + 1;
+        const erTopp3  = plass <= 3;
         const pil      = pilar[s.spillerId];
         const hviler   = hvilerIds.has(s.spillerId);
         const erLeder  = plass === 1;
         const prosent  = maksPo > 0 ? (s.poeng / maksPo) * 100 : 0;
+        const gap      = lederPoeng - s.poeng;
 
         const radKl = ['rangering-rad',
+          erTopp3 ? 'topp3' : '',
           plass === 1 ? 'plass-1' : plass === 2 ? 'plass-2' : plass === 3 ? 'plass-3' : '',
           hviler ? 'hviler-rad' : '',
         ].filter(Boolean).join(' ');
@@ -836,21 +865,33 @@ function render() {
             ? `<span class="pil-ind pil-ned">▼</span>`
             : '';
 
+        const seierTekst = s.seire === 1 ? '1 seier' : `${s.seire} seire`;
+        const kampTekst  = s.kamper === 1 ? '1 kamp' : `${s.kamper} kamper`;
+
         const subHTML = hviler
           ? `<span class="merke-hviler">😴 Hviler</span>`
-          : `${s.seire}V · ${s.kamper}K`;
+          : `${seierTekst} · ${kampTekst} ${pilHTML}`;
+
+        const gapHTML = erLeder
+          ? `<div class="rad-gap">Leder</div>`
+          : `<div class="rad-gap">−${gap} fra leder</div>`;
+
+        const barKl = erLeder ? 'leder' : plass === 2 ? 'p2' : plass === 3 ? 'p3' : '';
 
         return `
           <div class="${radKl}">
-            <div class="${plassKl}">${plassSymbol}${pilHTML}</div>
+            <div class="${plassKl}">${plassSymbol}</div>
             <div class="rad-info">
               <div class="rad-navn">${esc(s.navn)}</div>
               <div class="rad-sub">${subHTML}</div>
+              ${erTopp3 ? gapHTML : ''}
             </div>
-            <div class="rad-poeng${erLeder ? ' leder' : ''}">${s.poeng}</div>
+            <div class="rad-poeng-wrap">
+              <span class="rad-poeng${erLeder ? ' leder' : ''}">${s.poeng}</span>
+            </div>
             <div class="bar-wrap">
               <div class="bar-bg">
-                <div class="bar-fill${erLeder ? ' leder' : ''}" style="width:${prosent.toFixed(1)}%"></div>
+                <div class="bar-fill ${barKl}" style="width:${prosent.toFixed(1)}%"></div>
               </div>
             </div>
           </div>`;
@@ -1070,7 +1111,10 @@ function lagHistorikkHTML(alleKamper, gjeldendeRunde) {
         const v1 = k.lag1Poeng > k.lag2Poeng;
         return `
           <div class="hist-kamp">
-            <div class="hist-bane-label">Bane ${baneNr}</div>
+            <div class="hist-bane-label">
+              <span class="hist-bane-nr">${baneNr}</span>
+              <span class="hist-bane-tekst">Bane</span>
+            </div>
             <div class="hist-lag-rad">
               <span class="hist-lag-navn${v1 ? ' vinner' : ''}">${l1}</span>
               <span class="hist-score${v1 ? '' : ' tap'}">${k.lag1Poeng}</span>
