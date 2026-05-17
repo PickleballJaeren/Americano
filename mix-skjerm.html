@@ -261,18 +261,17 @@
     display: grid;
     gap: 16px;
     padding: 16px;
-    align-content: start;
-    overflow-y: auto;
-    scrollbar-width: none;
+    align-content: stretch;
+    align-items: stretch;
+    overflow: hidden;
   }
-  .baner-grid::-webkit-scrollbar { display: none; }
 
-  /* Dynamisk grid basert på antall baner */
+  /* Dynamisk grid basert på antall baner — maks 2 kolonner for ≤5 baner */
   .baner-grid.baner-1 { grid-template-columns: 1fr; }
   .baner-grid.baner-2 { grid-template-columns: 1fr 1fr; }
   .baner-grid.baner-3 { grid-template-columns: 1fr 1fr 1fr; }
   .baner-grid.baner-4 { grid-template-columns: 1fr 1fr; }
-  .baner-grid.baner-5 { grid-template-columns: 1fr 1fr 1fr; }
+  .baner-grid.baner-5 { grid-template-columns: 1fr 1fr; }
   .baner-grid.baner-6 { grid-template-columns: 1fr 1fr 1fr; }
 
   .bane-kort {
@@ -300,16 +299,17 @@
   }
   .bane-nr-stor {
     font-family: 'Bebas Neue', cursive;
-    font-size: 38px; line-height: 1;
+    font-size: 42px; line-height: 1;
     color: var(--accent2);
   }
   .bane-type-merke {
+    display: none; /* skjules — dobbel er standard i Mix */
+  }
+  .bane-type-merke.singel {
+    display: inline-block; /* vis kun singel som avvik */
     font-size: 11px; font-weight: 700;
     text-transform: uppercase; letter-spacing: 1px;
     padding: 3px 10px; border-radius: 6px;
-    background: rgba(96,165,250,.1); color: var(--accent2);
-  }
-  .bane-type-merke.singel {
     background: rgba(234,179,8,.1); color: var(--yellow);
   }
 
@@ -325,32 +325,21 @@
     background: rgba(100,116,139,.15); color: var(--muted2);
   }
 
-  .bane-innhold { padding: 12px 16px 14px; flex: 1; }
+  .bane-innhold { padding: 14px 20px 16px; flex: 1; }
 
   .lag-rad {
     display: flex; align-items: center;
-    padding: 8px 0;
+    padding: 12px 0;
     border-bottom: 1px solid var(--border);
     gap: 10px;
   }
   .lag-rad:last-child { border-bottom: none; }
 
-  .lag-avatar-gruppe {
-    display: flex; gap: -4px; flex-shrink: 0;
-  }
-  .avatar {
-    width: 36px; height: 36px; border-radius: 50%;
-    background: rgba(37,99,235,.2);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 13px; font-weight: 700; color: var(--accent2);
-    border: 2px solid var(--navy2);
-    flex-shrink: 0;
-  }
-  .avatar:nth-child(2) { margin-left: -10px; }
+  .lag-avatar-gruppe { display: none; }
 
   .lag-navn-wrap { flex: 1; min-width: 0; }
   .lag-navn-tekst {
-    font-size: 17px; font-weight: 600;
+    font-size: 19px; font-weight: 600;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     color: var(--white);
     line-height: 1.2;
@@ -359,12 +348,12 @@
 
   .lag-poeng-stor {
     font-family: 'Bebas Neue', cursive;
-    font-size: 44px; line-height: 1;
+    font-size: 52px; line-height: 1;
     color: var(--white); flex-shrink: 0;
-    min-width: 52px; text-align: right;
+    min-width: 60px; text-align: right;
   }
   .lag-poeng-stor.vinner { color: var(--green2); }
-  .lag-poeng-stor.pagar  { color: var(--muted2); font-size: 30px; padding-top: 7px; }
+  .lag-poeng-stor.pagar  { color: var(--muted2); font-size: 36px; padding-top: 10px; }
 
   .vs-divider {
     text-align: center;
@@ -699,7 +688,7 @@ function render() {
     : `<span class="live-pill"><span class="live-dot"></span>LIVE</span>`;
 
   const antallBaner = baneOversikt.length;
-  const gridKlasse  = `baner-grid baner-${Math.min(antallBaner, 6)}`;
+  const gridKlasse  = `baner-grid baner-${Math.min(Math.max(antallBaner, 1), 6)}`;
 
   // Kamper for gjeldende runde
   const kamperDenneRunden = _alleKamper.filter(k => k.rundeNr === runde);
