@@ -790,30 +790,64 @@ function finnGjeldendeRunde(alleKamper) {
 }
 
 /**
- * Finner hvilke kamper i nesteRunde som kan spilles nå
- * (begge lag er ferdige i gjeldende runde / ikke opptatt),
- * og hvilken bane de er tildelt.
- * Returnerer Map<kampId, baneNr>.
+ * Finner hvilke lag i nesteRunde som er klare til å spille,
+ * og om det er ledige baner til dem.
+ *
+ * Et lag er klart hvis alle kamper i gjeldende runde i SAMME pulje er ferdig.
+ * En kamp «kan spilles» hvis begge lag er klare OG det er en ledig bane
+ * (antall pågående kamper i aktiv runde < antallBaner).
  */
-function finnKlarSet(alleKamper, gjeldendeRunde) {
-  // Lag med uferdig kamp i gjeldende runde er opptatt
-  const opptattIRunde = new Set();
+function finnKlarSet(alleKamper, gjeldendeRunde, puljeNavnPerId = {}, antallBaner = 99) {
+  // Tell antall baner i bruk akkurat nå (aktiv runde, ikke ferdig)
+  const banerIBruk = alleKamper.filter(
+    k => k.runde === gjeldendeRunde && !k.ferdig && k.lag1Id && k.lag2Id
+  ).length;
+  const ledigeBaner = Math.max(0, antallBaner - banerIBruk);
+
+  // Bygg map: puljeNavn -> kamper i gjeldende runde
+  const puljeKamperIRunde = {};
   for (const k of alleKamper) {
-    if (k.runde !== gjeldendeRunde || k.ferdig) continue;
-    [k.lag1Id, k.lag2Id].filter(Boolean).forEach(id => opptattIRunde.add(id));
+    if (k.runde !== gjeldendeRunde) continue;
+    const pulje = puljeNavnPerId[k.lag1Id] ?? puljeNavnPerId[k.lag2Id] ?? '__ukjent__';
+    if (!puljeKamperIRunde[pulje]) puljeKamperIRunde[pulje] = [];
+    puljeKamperIRunde[pulje].push(k);
   }
 
-  // Et lag er klart hvis det ikke er opptatt
-  const klarSet = new Set();
+  // En pulje er ferdig i gjeldende runde hvis alle dens kamper er ferdig
+  const puljeErFerdig = {};
+  for (const [pulje, kamper] of Object.entries(puljeKamperIRunde)) {
+    puljeErFerdig[pulje] = kamper.every(k => k.ferdig);
+  }
+
+  // Et lag er klart hvis puljen er ferdig i gjeldende runde
+  const lagKlart = new Set();
   const nesteRunde = gjeldendeRunde + 1;
   for (const k of alleKamper) {
     if (k.runde !== nesteRunde || k.ferdig) continue;
     if (!k.lag1Id || !k.lag2Id) continue;
-    if (!opptattIRunde.has(k.lag1Id)) klarSet.add(k.lag1Id);
-    if (!opptattIRunde.has(k.lag2Id)) klarSet.add(k.lag2Id);
+    const pulje1 = puljeNavnPerId[k.lag1Id] ?? '__ukjent__';
+    const pulje2 = puljeNavnPerId[k.lag2Id] ?? '__ukjent__';
+    if ((puljeKamperIRunde[pulje1] ?? null) && puljeErFerdig[pulje1]) lagKlart.add(k.lag1Id);
+    if ((puljeKamperIRunde[pulje2] ?? null) && puljeErFerdig[pulje2]) lagKlart.add(k.lag2Id);
   }
 
-  return { klarSet, opptattIRunde };
+  // En kamp kan spilles hvis begge lag er klare OG det er ledig bane
+  // klarSet inneholder kun lag i kamper som faktisk kan spilles nå
+  const klarSet = new Set();
+  let tildelteBaner = 0;
+  for (const k of alleKamper) {
+    if (k.runde !== nesteRunde || k.ferdig) continue;
+    if (!k.lag1Id || !k.lag2Id) continue;
+    if (lagKlart.has(k.lag1Id) && lagKlart.has(k.lag2Id)) {
+      if (tildelteBaner < ledigeBaner) {
+        klarSet.add(k.lag1Id);
+        klarSet.add(k.lag2Id);
+        tildelteBaner++;
+      }
+    }
+  }
+
+  return { klarSet, lagKlart, ledigeBaner };
 }
 
 /**
@@ -1005,7 +1039,7 @@ function renderKampskjema(t, lagMap) {
 
   // Finn hvilke lag er klare for neste runde
   const { klarSet } = aktivRunde != null
-    ? finnKlarSet(alleKamper, aktivRunde)
+    ? finnKlarSet(alleKamper, aktivRunde, puljeNavnPerId, antallBaner)
     : { klarSet: new Set() };
 
   // De tre synlige rundene: aktiv + neste + etter-neste
@@ -1240,26 +1274,38 @@ function renderSluttspillKampskjema(t, lagMap) {
 function _slRundeRad(rundeNavn, kamper, lagMap, opts = {}) {
   const { erAktiv, visNivaaPrikk, NIVAA_INFO } = opts;
 
-  // Kategoriser hvert kampkort
   const kortHTMLer = kamper.map(k => {
-    const klar = !!(k.lag1Id && k.lag2Id && !k.ferdig);
+    const klar    = !!(k.lag1Id && k.lag2Id && !k.ferdig);
     const lag1Klar = klar && erAktiv;
     const lag2Klar = klar && erAktiv;
     return _slKort(k, lagMap, { visNivaaPrikk, NIVAA_INFO, erAktiv, lag1Klar, lag2Klar });
   });
 
-  let statusTekst = erAktiv ? 'Spilles nå' : 'Neste';
-  let statusKl    = erAktiv ? 'gronn' : 'graa';
-  let overTekst   = erAktiv ? '' : 'Kommende';
+  const statusTekst = erAktiv ? 'Spilles nå' : 'Neste';
+  const statusKl    = erAktiv ? 'gronn' : 'graa';
+  const overTekst   = erAktiv ? '' : 'Kommende';
 
-  const mobilLabelHTML = `<div class="ks-rl ks-rl-mobil">
+  const labelHTML = `<div class="ks-rl">
     ${overTekst ? `<div class="ks-rl-over">${overTekst}</div>` : ''}
-    <div class="ks-rl-nr" style="font-size:13px;letter-spacing:.5px;line-height:1.3;white-space:normal">${esc(rundeNavn)}</div>
+    <div class="ks-rl-nr" style="font-size:16px;letter-spacing:.5px;line-height:1.2;white-space:normal">${esc(rundeNavn)}</div>
     <div class="ks-rl-status ${statusKl}">${statusTekst}</div>
     ${erAktiv ? '<div class="ks-rl-info">Flyttes ned når alle er ferdige.</div>' : ''}
   </div>`;
 
-  return `<div class="ks-runde-blokk">
+  const n         = kamper.length;
+  const kolBredde = '154px';
+  const gridKols  = `130px repeat(${n}, ${kolBredde})`;
+
+  // Desktop: grid (vises på ≥700px)
+  const desktopHTML = `
+    <div class="ks-grid" style="grid-template-columns:${gridKols}">
+      ${labelHTML}
+      ${kortHTMLer.join('')}
+    </div>`;
+
+  // Mobil: låst label + horisontal scroll (vises på <700px)
+  const mobilLabelHTML = labelHTML.replace('class="ks-rl"', 'class="ks-rl ks-rl-mobil"');
+  const mobilHTML = `
     <div class="ks-runde-rad-mobil">
       ${mobilLabelHTML}
       <div class="ks-scroll-wrap">
@@ -1267,8 +1313,9 @@ function _slRundeRad(rundeNavn, kamper, lagMap, opts = {}) {
           <div class="ks-kort-rad-mobil">${kortHTMLer.join('')}</div>
         </div>
       </div>
-    </div>
-  </div>`;
+    </div>`;
+
+  return `<div class="ks-runde-blokk">${desktopHTML}${mobilHTML}</div>`;
 }
 
 /**
