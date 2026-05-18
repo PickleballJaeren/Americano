@@ -348,6 +348,10 @@ function _oppdaterSpillerListeInPlace() {
   });
   _oppdaterSpillerTellere(min, er6Format);
   oppdaterSisteDeltakereInPlace();
+  // Oppdater rotasjonsvelger for Mix 7-spillers fast modus
+  if (typeof window.oppdaterMixRotasjonsVelger === 'function') {
+    window.oppdaterMixRotasjonsVelger();
+  }
 }
 
 // Debounce på søkefeltet — kun ved faktisk bruker-input (ikke programmatisk tømming)

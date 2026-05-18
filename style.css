@@ -853,3 +853,26 @@ html,body{height:100%;background:var(--navy);color:var(--white);font-family:'DM 
   flex-shrink: 0;
   padding-left: 12px;
 }
+
+/* ════════════════════════════════════════════════════════
+   POENG-PICKER — delt mellom alle modi
+   (Flyttes hit fra baner.js for å sikre at pickeren alltid
+   er stylet, uavhengig av hvilken modus som er aktiv.)
+   ════════════════════════════════════════════════════════ */
+.poeng-velger-boks{cursor:pointer;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;padding:15px 12px;font-size:39px;font-weight:600;text-align:center;color:var(--white);min-height:78px;display:flex;align-items:center;justify-content:center;transition:border-color .15s;user-select:none}
+.poeng-velger-boks.aktiv{border-color:var(--blue,#378ADD)}
+.poeng-picker{margin-top:8px;display:grid;grid-template-columns:repeat(8,1fr);gap:8px}
+.poeng-picker-tall{cursor:pointer;border-radius:6px;padding:12px 3px;text-align:center;font-size:23px;font-weight:500;border:.5px solid var(--border);background:var(--card2);color:var(--white);transition:background .1s;user-select:none}
+.poeng-picker-tall.valgt{background:var(--blue,#378ADD);border-color:var(--blue,#378ADD);color:#fff}
+
+/* ════════════════════════════════════════════════════════
+   MIX-ROTASJONSVELGER — aktiv-tilstand (grønn ring)
+   Samme visuell behandling som Mix & Match-modus-knappen.
+   ════════════════════════════════════════════════════════ */
+.modus-knapp#mix-rot-knapp-dynamisk.modus-aktiv,
+.modus-knapp#mix-rot-knapp-fast.modus-aktiv {
+  border-color: var(--green2);
+  background: rgba(34,197,94,.08);
+  color: var(--green2);
+  box-shadow: 0 0 16px rgba(34,197,94,.15);
+}

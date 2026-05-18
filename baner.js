@@ -662,20 +662,6 @@ function _hentEllerLagB3Modal(l1n, l2n) {
     return;
   }
 
-  // Injiser CSS om ikke lastet
-  if (!document.getElementById('poeng-picker-css')) {
-    const s = document.createElement('style');
-    s.id = 'poeng-picker-css';
-    s.textContent = `
-      .poeng-velger-boks{cursor:pointer;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;padding:15px 12px;font-size:39px;font-weight:600;text-align:center;color:var(--white);min-height:78px;display:flex;align-items:center;justify-content:center;transition:border-color .15s;user-select:none}
-      .poeng-velger-boks.aktiv{border-color:var(--blue,#378ADD)}
-      .poeng-picker{margin-top:8px;display:grid;grid-template-columns:repeat(8,1fr);gap:8px}
-      .poeng-picker-tall{cursor:pointer;border-radius:6px;padding:12px 3px;text-align:center;font-size:23px;font-weight:500;border:.5px solid var(--border);background:var(--card2);color:var(--white);transition:background .1s;user-select:none}
-      .poeng-picker-tall.valgt{background:var(--blue,#378ADD);border-color:var(--blue,#378ADD);color:#fff}
-    `;
-    document.head.appendChild(s);
-  }
-
   const modal = document.createElement('div');
   modal.id = 'modal-b3-konkurranse';
   modal.className = 'modal-bakgrunn';
@@ -986,59 +972,8 @@ async function _hentKampDokIdB3(baneNr, kampNr) {
   return snap.docs[0]?.id ?? null;
 }
 
-// ── Poeng-picker: tallvelger 0–15 ──────────────────────────────
-function _byggPickerCSS() {
-  if (document.getElementById('poeng-picker-css')) return;
-  const s = document.createElement('style');
-  s.id = 'poeng-picker-css';
-  s.textContent = `
-    .poeng-velger-boks {
-      cursor: pointer;
-      background: var(--card2);
-      border: 1.5px solid var(--border);
-      border-radius: 10px;
-      padding: 15px 12px;
-      font-size: 39px;
-      font-weight: 600;
-      text-align: center;
-      color: var(--white);
-      min-height: 78px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: border-color 0.15s;
-      user-select: none;
-    }
-    .poeng-velger-boks.aktiv {
-      border-color: var(--blue, #378ADD);
-    }
-    .poeng-picker {
-      margin-top: 8px;
-      display: grid;
-      grid-template-columns: repeat(8, 1fr);
-      gap: 8px;
-    }
-    .poeng-picker-tall {
-      cursor: pointer;
-      border-radius: 6px;
-      padding: 12px 3px;
-      text-align: center;
-      font-size: 23px;
-      font-weight: 500;
-      border: 0.5px solid var(--border);
-      background: var(--card2);
-      color: var(--white);
-      transition: background 0.1s;
-      user-select: none;
-    }
-    .poeng-picker-tall.valgt {
-      background: var(--blue, #378ADD);
-      border-color: var(--blue, #378ADD);
-      color: #fff;
-    }
-  `;
-  document.head.appendChild(s);
-}
+// CSS for poeng-picker bor nå i style.css — denne funksjonen gjør ingenting lenger.
+function _byggPickerCSS() { /* no-op */ }
 
 function _byggPickerGrid(kampIdx, lag) {
   const pickerId = `pp_${kampIdx}_${lag}`;

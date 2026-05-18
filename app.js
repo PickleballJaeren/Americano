@@ -347,17 +347,53 @@ function apneMixLiveModal() {
   const url       = lagMixLiveUrl();
   const skjermUrl = lagMixSkjermUrl();
   const urlEl        = document.getElementById('mix-live-url');
-  const qrWrap       = document.getElementById('mix-qr-kode');
   const skjermUrlEl  = document.getElementById('mix-skjerm-url');
-  const skjermQrWrap = document.getElementById('mix-skjerm-qr-kode');
   const modal        = document.getElementById('modal-mix-live');
   if (urlEl)       urlEl.textContent       = url;
   if (skjermUrlEl) skjermUrlEl.textContent = skjermUrl;
   if (modal)       modal.style.display     = 'flex';
-  lagQRKode(qrWrap,       url,       180, '#050f1f', '#ffffff');
-  lagQRKode(skjermQrWrap, skjermUrl, 132);
+  // Start alltid på mobil-fanen og generer QR for den
+  byttMixLiveFane('mobil');
 }
 window.apneMixLiveModal = apneMixLiveModal;
+
+// Bytter mellom mobil- og storskjerm-fanen i mix-live-modalen.
+// Genererer QR-kode kun når fanen aktiveres (lazy loading).
+window.byttMixLiveFane = function(fane) {
+  const erMobil = fane === 'mobil';
+  // Vis/skjul innhold
+  const innholdMobil   = document.getElementById('mix-live-innhold-mobil');
+  const innholdSkjerm  = document.getElementById('mix-live-innhold-skjerm');
+  if (innholdMobil)  innholdMobil.style.display  = erMobil ? 'block' : 'none';
+  if (innholdSkjerm) innholdSkjerm.style.display = erMobil ? 'none'  : 'block';
+  // Oppdater fane-knapper
+  const faneMobil  = document.getElementById('mix-live-fane-mobil');
+  const faneSkjerm = document.getElementById('mix-live-fane-skjerm');
+  if (faneMobil) {
+    faneMobil.style.borderBottomColor = erMobil ? 'var(--white)' : 'transparent';
+    faneMobil.style.color             = erMobil ? 'var(--white)' : 'var(--muted2)';
+    faneMobil.style.fontWeight        = erMobil ? '600' : '400';
+  }
+  if (faneSkjerm) {
+    faneSkjerm.style.borderBottomColor = erMobil ? 'transparent' : 'var(--white)';
+    faneSkjerm.style.color             = erMobil ? 'var(--muted2)' : 'var(--white)';
+    faneSkjerm.style.fontWeight        = erMobil ? '400' : '600';
+  }
+  // Generer QR-kode for aktiv fane
+  if (erMobil) {
+    const qrWrap = document.getElementById('mix-qr-kode');
+    if (qrWrap && !qrWrap.dataset.generert) {
+      lagQRKode(qrWrap, lagMixLiveUrl(), 132, '#050f1f', '#ffffff');
+      qrWrap.dataset.generert = '1';
+    }
+  } else {
+    const qrWrap = document.getElementById('mix-skjerm-qr-kode');
+    if (qrWrap && !qrWrap.dataset.generert) {
+      lagQRKode(qrWrap, lagMixSkjermUrl(), 132);
+      qrWrap.dataset.generert = '1';
+    }
+  }
+};
 
 window.kopierMixSkjermUrl = function() {
   const url = lagMixSkjermUrl();
@@ -373,6 +409,11 @@ window.kopierMixSkjermUrl = function() {
 function lukkMixLiveModal() {
   const modal = document.getElementById('modal-mix-live');
   if (modal) modal.style.display = 'none';
+  // Nullstill QR-generert-flagg slik at neste åpning genererer fersk kode
+  const qrMobil  = document.getElementById('mix-qr-kode');
+  const qrSkjerm = document.getElementById('mix-skjerm-qr-kode');
+  if (qrMobil)  { qrMobil.innerHTML  = ''; delete qrMobil.dataset.generert; }
+  if (qrSkjerm) { qrSkjerm.innerHTML = ''; delete qrSkjerm.dataset.generert; }
 }
 window.lukkMixLiveModal = lukkMixLiveModal;
 

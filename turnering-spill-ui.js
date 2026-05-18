@@ -604,29 +604,56 @@ export async function visBracket(turnering) {
   const bKamper = t.sluttspill?.B?.kamper ?? [];
   const cKamper = t.sluttspill?.C?.kamper ?? [];
 
-  container.innerHTML = [
-    aKamper.length ? bracketNivaaHTML('🥇 A-sluttspill', 'var(--yellow)',   aKamper, lagMap, 'A') : '',
-    bKamper.length ? bracketNivaaHTML('🥈 B-sluttspill', 'var(--accent2)',  bKamper, lagMap, 'B') : '',
-    cKamper.length ? bracketNivaaHTML('🥉 C-sluttspill', 'var(--muted2)',   cKamper, lagMap, 'C') : '',
-  ].filter(Boolean).join('');
+  // Bygg opp én global liste med {kamp, nivaa, farge} for alle kamper
+  const alleKamper = [
+    ...aKamper.map(k => ({ kamp: k, nivaa: 'A', farge: 'var(--yellow)' })),
+    ...bKamper.map(k => ({ kamp: k, nivaa: 'B', farge: 'var(--accent2)' })),
+    ...cKamper.map(k => ({ kamp: k, nivaa: 'C', farge: 'var(--muted2)' })),
+  ];
+
+  // Grupper alle kamper i globale spillerunder basert på runde-navn
+  const rundeRekkefølge = ['Åttedelsfinale', 'Kvartfinale', 'Plass 5–8', 'Plass 5–6', 'Semifinale', '5. plass', '7. plass', '3. plass', '1. plass', 'Finale', '9. plass', '11. plass', '13. plass', '15. plass', '17. plass', '19. plass'];
+  const rundeMap = {};
+  for (const { kamp, nivaa, farge } of alleKamper) {
+    const r = kamp.runde ?? 'Ukjent';
+    if (!rundeMap[r]) rundeMap[r] = [];
+    rundeMap[r].push({ kamp, nivaa, farge });
+  }
+  const sorterteRunder = Object.entries(rundeMap).sort(([a], [b]) => {
+    const ia = rundeRekkefølge.indexOf(a);
+    const ib = rundeRekkefølge.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+
+  // En kamp er spilleklar når begge lag er kjent og kampen ikke er ferdig
+  const erKlar = (k) => !!(k.lag1Id && k.lag2Id && !k.ferdig);
+
+  container.innerHTML = sorterteRunder.map(([rundeNavn, kampListe]) => {
+    // Vis runden dersom minst én kamp er ferdig eller spilleklar
+    const harSynligeKamper = kampListe.some(({ kamp }) => kamp.ferdig || erKlar(kamp));
+    if (!harSynligeKamper) return '';
+
+    const harFlereNivaa = new Set(kampListe.map(x => x.nivaa)).size > 1;
+
+    return `
+      <div class="seksjon-etikett" style="margin-top:16px">${escHtml(rundeNavn)}</div>
+      <div class="kort"><div class="kort-innhold" style="padding:8px 0">
+        ${kampListe.map(({ kamp, nivaa, farge }) => {
+          // Skjul kamper der ingen av lagene er kjent ennå
+          if (!kamp.ferdig && !erKlar(kamp) && !kamp.lag1Id && !kamp.lag2Id) return '';
+          return bracketKampHTML(kamp, lagMap, nivaa, farge, harFlereNivaa);
+        }).join('')}
+      </div></div>`;
+  }).filter(Boolean).join('');
 
   const avsluttKnapp = document.getElementById('avslutt-turnering-knapp');
   if (avsluttKnapp) avsluttKnapp.style.display = erAltFerdig(t) ? 'block' : 'none';
 }
 
-function bracketNivaaHTML(tittel, farge, kamper, lagMap, nivaa) {
-  const runder = grupperKamperIRunder(kamper);
-  return `
-    <div class="seksjon-etikett" style="color:${farge}">${tittel}</div>
-    <div class="kort"><div class="kort-innhold" style="padding:8px 0">
-      <div style="display:flex;gap:16px;overflow-x:auto;padding:4px 8px">
-        ${runder.map(r => bracketRundeHTML(r, lagMap, nivaa, farge)).join('')}
-      </div>
-    </div></div>`;
-}
+// bracketNivaaHTML beholdes ikke lenger — visBracket håndterer all visning direkte.
 
 function grupperKamperIRunder(kamper) {
-  const rundeRekkefølge = ['Åttedelsfinale', 'Kvartfinale', 'Semifinale', 'Plass 5–8', '5. plass', '7. plass', '3. plass', '1. plass', 'Finale', '9. plass', '17. plass'];
+  const rundeRekkefølge = ['Åttedelsfinale', 'Kvartfinale', 'Plass 5–8', 'Plass 5–6', 'Semifinale', '5. plass', '7. plass', '3. plass', '1. plass', 'Finale', '9. plass', '11. plass', '13. plass', '15. plass', '17. plass', '19. plass'];
   const rundeMap = {};
   for (const k of kamper) {
     if (!rundeMap[k.runde]) rundeMap[k.runde] = [];
@@ -641,15 +668,8 @@ function grupperKamperIRunder(kamper) {
     .map(([runde, kamper]) => ({ runde, kamper }));
 }
 
-function bracketRundeHTML(runde, lagMap, nivaa, farge) {
-  return `
-    <div class="bracket-kolonne">
-      <div class="bracket-runde-tittel" style="color:${farge}">${escHtml(runde.runde)}</div>
-      ${runde.kamper.map(k => bracketKampHTML(k, lagMap, nivaa)).join('')}
-    </div>`;
-}
 
-function bracketKampHTML(kamp, lagMap, nivaa) {
+function bracketKampHTML(kamp, lagMap, nivaa, farge = 'var(--muted2)', harFlereNivaa = false) {
   const l1     = lagMap[kamp.lag1Id]?.navn ?? (kamp.lag1Id ? '?' : 'TBD');
   const l2     = lagMap[kamp.lag2Id]?.navn ?? (kamp.lag2Id ? '?' : 'TBD');
   const v1     = kamp.ferdig && kamp.lag1Poeng > kamp.lag2Poeng;
@@ -665,10 +685,16 @@ function bracketKampHTML(kamp, lagMap, nivaa) {
        </div>`
     : '';
 
+  // Nivå-prikk — vises kun når runden inneholder kamper fra flere bracket-nivåer (A/B/C)
+  const nivaaIndikator = harFlereNivaa
+    ? `<div style="font-size:11px;color:${farge};margin-bottom:4px;display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${farge};flex-shrink:0"></span>${nivaa}-sluttspill</div>`
+    : '';
+
   return `
     <div class="kamp-rad bracket-kamp-rad" style="cursor:${kanReg ? 'pointer' : 'default'}"
       ${kanReg ? `onclick="apneResultatModal('${nivaa}','${escHtml(kamp.id)}','${escHtml(kamp.lag1Id)}','${escHtml(kamp.lag2Id)}',true)"` : ''}>
       <div class="lb-navn" style="min-width:0">
+        ${nivaaIndikator}
         <div class="kamp-lag-${v1 ? 'vinner' : 'taper'}" style="font-size:15px">${escHtml(l1)}</div>
         <div class="kamp-lag-${v2 ? 'vinner' : 'taper'}" style="font-size:15px;margin-top:4px">${escHtml(l2)}</div>
         ${gameDetaljer}
@@ -682,6 +708,7 @@ function bracketKampHTML(kamp, lagMap, nivaa) {
       ? `<div style="text-align:right;margin-bottom:4px">
            <button class="knapp-tekst bracket-rediger-knapp" onclick="redigerSluttspillKamp('${nivaa}','${escHtml(kamp.id)}')">Rediger</button>
          </div>` : ''}`;
+}
 }
 
 

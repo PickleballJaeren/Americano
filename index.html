@@ -1730,29 +1730,51 @@
 
 <div class="modal-bakgrunn" id="modal-mix-live" style="display:none"
   onclick="if(event.target===this)lukkMixLiveModal()">
-  <div class="modal" style="border-radius:22px 22px 0 0;padding-bottom:calc(28px + var(--safe-bottom))">
-    <div class="modal-tittel">📲 Live-skjerm</div>
-    <div class="modal-tekst" style="margin-bottom:16px">
-      Scan QR-koden eller del lenken — spillerne kan følge sammenlagtabellen live på mobilen. Bruk storskjerm-lenken for å vise poengtavlen på en stor skjerm.
+  <div class="modal" style="border-radius:22px 22px 0 0;padding-bottom:calc(28px + var(--safe-bottom));padding-left:0;padding-right:0">
+    <div class="modal-tittel" style="padding:0 20px">📲 Live-visning</div>
+
+    <!-- Fane-header -->
+    <div style="display:flex;border-bottom:1px solid var(--border);margin-bottom:0;padding:0 20px">
+      <button id="mix-live-fane-mobil"
+        onclick="byttMixLiveFane('mobil')"
+        style="flex:1;padding:10px 0;background:none;border:none;border-bottom:2px solid var(--white);color:var(--white);font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:-1px">
+        📱 Mobil
+      </button>
+      <button id="mix-live-fane-skjerm"
+        onclick="byttMixLiveFane('skjerm')"
+        style="flex:1;padding:10px 0;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted2);font-family:'DM Sans',sans-serif;font-size:15px;font-weight:400;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:-1px">
+        🖥️ Storskjerm
+      </button>
     </div>
-    <div id="mix-qr-wrap" style="display:flex;justify-content:center;align-items:center;background:#fff;border-radius:14px;padding:16px;margin-bottom:16px;min-height:212px">
-      <div id="mix-qr-kode"></div>
+
+    <!-- Mobil-fane -->
+    <div id="mix-live-innhold-mobil" style="padding:20px">
+      <div style="font-size:13px;color:var(--muted2);margin-bottom:16px;text-align:center">Scan for å følge kamper live på mobil</div>
+      <div id="mix-qr-wrap" style="display:flex;justify-content:center;align-items:center;background:#fff;border-radius:14px;padding:16px;margin-bottom:16px;min-height:164px">
+        <div id="mix-qr-kode"></div>
+      </div>
+      <div style="background:var(--navy3);border:1px solid var(--border2);border-radius:10px;padding:11px 14px;margin-bottom:14px;font-family:'DM Mono',monospace;font-size:13px;color:var(--muted2);word-break:break-all;display:flex;align-items:center;gap:10px">
+        <span id="mix-live-url" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+        <button onclick="kopierMixLiveUrl()" style="flex-shrink:0;background:var(--accent);border:none;color:#fff;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer">Kopier</button>
+      </div>
+      <button class="knapp knapp-gronn" onclick="delMixLiveUrl()">🔗 Del lenke</button>
     </div>
-    <div style="background:var(--navy3);border:1px solid var(--border2);border-radius:10px;padding:11px 14px;margin-bottom:14px;font-family:'DM Mono',monospace;font-size:13px;color:var(--muted2);word-break:break-all;display:flex;align-items:center;gap:10px">
-      <span id="mix-live-url" style="flex:1"></span>
-      <button onclick="kopierMixLiveUrl()" style="flex-shrink:0;background:var(--accent);border:none;color:#fff;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer">Kopier</button>
+
+    <!-- Storskjerm-fane -->
+    <div id="mix-live-innhold-skjerm" style="display:none;padding:20px">
+      <div style="font-size:13px;color:var(--muted2);margin-bottom:16px;text-align:center">Scan for å vise resultattavle på storskjerm</div>
+      <div id="mix-skjerm-qr-wrap" style="display:flex;justify-content:center;align-items:center;background:#fff;border-radius:14px;padding:16px;margin-bottom:16px;min-height:164px">
+        <div id="mix-skjerm-qr-kode"></div>
+      </div>
+      <div style="background:var(--navy3);border:1px solid var(--border2);border-radius:10px;padding:11px 14px;margin-bottom:14px;font-family:'DM Mono',monospace;font-size:13px;color:var(--muted2);word-break:break-all;display:flex;align-items:center;gap:10px">
+        <span id="mix-skjerm-url" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+        <button onclick="kopierMixSkjermUrl()" style="flex-shrink:0;background:var(--accent);border:none;color:#fff;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer">Kopier</button>
+      </div>
     </div>
-    <button class="knapp knapp-gronn" onclick="delMixLiveUrl()" style="margin-bottom:10px">🔗 Del lenke til mobil</button>
-    <div style="height:1px;background:var(--border);margin:6px 0 14px"></div>
-    <div style="font-size:13px;color:var(--muted2);margin-bottom:10px">🖥 Storskjerm — scan QR-koden eller kopier lenken og åpne den i nettleseren på den store skjermen.</div>
-    <div id="mix-skjerm-qr-wrap" style="display:flex;justify-content:center;align-items:center;background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;min-height:160px">
-      <div id="mix-skjerm-qr-kode"></div>
+
+    <div style="padding:0 20px">
+      <button class="knapp knapp-omriss" onclick="lukkMixLiveModal()">Lukk</button>
     </div>
-    <div style="background:var(--navy3);border:1px solid var(--border2);border-radius:10px;padding:11px 14px;margin-bottom:10px;font-family:'DM Mono',monospace;font-size:13px;color:var(--muted2);word-break:break-all;display:flex;align-items:center;gap:10px">
-      <span id="mix-skjerm-url" style="flex:1"></span>
-      <button onclick="kopierMixSkjermUrl()" style="flex-shrink:0;background:var(--accent);border:none;color:#fff;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer">Kopier</button>
-    </div>
-    <button class="knapp knapp-omriss" onclick="lukkMixLiveModal()">Lukk</button>
   </div>
 </div>
 
