@@ -1481,9 +1481,8 @@ function _slBracketSeksjon(t, lagMap, aktiveNivaaer, visNivaaPrikk, NIVAA_INFO, 
   const sl = t.sluttspill;
   let html = `<div class="sl-bracket-seksjon">
     <div class="sl-bracket-hdr">Live bracket</div>
-    <div style="display:flex;gap:16px;align-items:flex-start;overflow-x:auto">`;
+    <div style="display:flex;gap:24px;align-items:flex-start;overflow-x:auto">`;
 
-  // Bestem startPlass per nivå fra konfig, eller utled fra bracket-navnene
   const startPlassForNivaa = (nivaa) => {
     if (nivaa === 'A') return 1;
     if (nivaa === 'B') return t.konfig?.startPlassB ?? 9;
@@ -1491,57 +1490,111 @@ function _slBracketSeksjon(t, lagMap, aktiveNivaaer, visNivaaPrikk, NIVAA_INFO, 
     return 1;
   };
 
-  // Map 'Semifinale' til 'Plass X–Y' for B/C basert på startPlass
   const visningsNavn = (rundeNavn, nivaa) => {
     if (rundeNavn !== 'Semifinale' || nivaa === 'A') return rundeNavn;
     const sp = startPlassForNivaa(nivaa);
     return `Plass ${sp}–${sp + 3}`;
   };
 
+  const kampHTML = (k) => {
+    const l1 = lagMap[k.lag1Id]?.navn ?? (k.lag1Id ? '?' : null);
+    const l2 = lagMap[k.lag2Id]?.navn ?? (k.lag2Id ? '?' : null);
+    const v1 = k.ferdig && k.lag1Poeng > k.lag2Poeng;
+    const v2 = k.ferdig && k.lag2Poeng > k.lag1Poeng;
+    return `<div class="sl-kamp">
+      <div class="sl-lag${v1?' v':''}${!l1?' tbd':''}">${esc(l1??'TBD')}${k.ferdig?`<span class="sl-score${v1?'':' tap'}">${k.lag1Poeng}</span>`:''}</div>
+      <div class="sl-divider"></div>
+      <div class="sl-lag${v2?' v':''}${!l2?' tbd':''}">${esc(l2??'TBD')}${k.ferdig?`<span class="sl-score${v2?'':' tap'}">${k.lag2Poeng}</span>`:''}</div>
+    </div>`;
+  };
+
+  const celleHTML = (col, row, rundeNavn, kamper, visHdr) => {
+    const hdr = visHdr ? `<div class="sl-runde-navn" style="margin-bottom:4px">${esc(rundeNavn)}</div>` : '';
+    return `<div style="grid-column:${col};grid-row:${row};display:flex;flex-direction:column;gap:5px">${hdr}${kamper.map(kampHTML).join('')}</div>`;
+  };
+
   for (const nivaa of aktiveNivaaer) {
     const kamper = sl[nivaa]?.kamper ?? [];
     if (!kamper.length) continue;
 
-    const info   = NIVAA_INFO[nivaa];
-    const runder = {};
+    const info = NIVAA_INFO[nivaa];
+    const sp   = startPlassForNivaa(nivaa);
+
+    const rMap = {};
     for (const k of kamper) {
       const r = k.runde ?? 'Ukjent';
-      if (!runder[r]) runder[r] = [];
-      runder[r].push(k);
+      if (!rMap[r]) rMap[r] = [];
+      rMap[r].push(k);
     }
-    const sortertRunder = Object.entries(runder).sort(([a],[b]) => {
-      const ia = RUNDE_REKKEFØLGE.indexOf(a), ib = RUNDE_REKKEFØLGE.indexOf(b);
-      return (ia===-1?99:ia)-(ib===-1?99:ib);
-    });
+    const hentR = (navn) => rMap[navn] ?? [];
 
-    if (visNivaaPrikk) {
-      html += `<div class="sl-nivaa">
-        <div class="sl-nivaa-tittel">
-          <span class="ks-nivaa-prikk" style="background:${info.farge};width:7px;height:7px"></span>
-          ${esc(info.label)}
-        </div>`;
+    const titelHTML = visNivaaPrikk
+      ? `<div class="sl-nivaa-tittel" style="margin-bottom:8px"><span class="ks-nivaa-prikk" style="background:${info.farge};width:7px;height:7px"></span>${esc(info.label)}</div>`
+      : '';
+
+    let gridHTML = '';
+
+    if (nivaa === 'A') {
+      const qf  = hentR('Kvartfinale');
+      const p58 = hentR('Plass 5–8');
+      const sf  = hentR('Semifinale');
+      const p1  = hentR('1. plass');
+      const p5  = hentR('5. plass');
+      const p7  = hentR('7. plass');
+      const p3  = hentR('3. plass');
+      const nQF = qf.length;
+      const nedreRad = nQF + 1;
+
+      gridHTML = `<div style="display:grid;grid-template-columns:repeat(5,118px);gap:5px 10px;min-width:max-content">`;
+      gridHTML += `<div style="grid-column:1;grid-row:1" class="sl-runde-navn">Kvartfinale</div>`;
+      if (p58.length) gridHTML += `<div style="grid-column:2;grid-row:1" class="sl-runde-navn">Plass 5–8</div>`;
+      if (sf.length)  gridHTML += `<div style="grid-column:3;grid-row:1" class="sl-runde-navn">Semifinale</div>`;
+      if (p1.length)  gridHTML += `<div style="grid-column:4;grid-row:1" class="sl-runde-navn">1. plass</div>`;
+      qf.forEach((k, i)  => { gridHTML += celleHTML(1, i + 2, '', [k], false); });
+      p58.forEach((k, i) => { gridHTML += celleHTML(2, i + 2, '', [k], false); });
+      if (sf.length >= 1) gridHTML += celleHTML(3, 2, '', [sf[0]], false);
+      if (sf.length >= 2) gridHTML += celleHTML(3, 3, '', [sf[1]], false);
+      if (p1.length) gridHTML += celleHTML(4, 2, '', p1, false);
+      if (p5.length) gridHTML += celleHTML(3, nedreRad, '5. plass', p5, true);
+      if (p7.length) gridHTML += celleHTML(4, nedreRad, '7. plass', p7, true);
+      if (p3.length) gridHTML += celleHTML(5, nedreRad, '3. plass', p3, true);
+      gridHTML += `</div>`;
+
     } else {
-      html += `<div class="sl-nivaa">`;
+      const p9navn   = `${sp}. plass`;
+      const p11navn  = `${sp+2}. plass`;
+      const p13navn  = `${sp+4}. plass`;
+      const p15navn  = `${sp+6}. plass`;
+      const sf9navn  = `Plass ${sp}–${sp+3}`;
+      const sf13navn = `Plass ${sp+4}–${sp+7}`;
+
+      const qf   = hentR('Kvartfinale');
+      const sf13 = hentR(sf13navn);
+      const sf9  = hentR(sf9navn).length ? hentR(sf9navn) : hentR('Semifinale');
+      const p9   = hentR(p9navn);
+      const p11  = hentR(p11navn);
+      const p13  = hentR(p13navn);
+      const p15  = hentR(p15navn);
+      const nQF  = qf.length;
+      const nedreRad = nQF + 1;
+
+      gridHTML = `<div style="display:grid;grid-template-columns:repeat(5,118px);gap:5px 10px;min-width:max-content">`;
+      gridHTML += `<div style="grid-column:1;grid-row:1" class="sl-runde-navn">Kvartfinale</div>`;
+      if (sf13.length) gridHTML += `<div style="grid-column:2;grid-row:1" class="sl-runde-navn">${esc(sf13navn)}</div>`;
+      if (sf9.length)  gridHTML += `<div style="grid-column:3;grid-row:1" class="sl-runde-navn">${esc(sf9navn)}</div>`;
+      if (p9.length)   gridHTML += `<div style="grid-column:4;grid-row:1" class="sl-runde-navn">${esc(p9navn)}</div>`;
+      qf.forEach((k, i)   => { gridHTML += celleHTML(1, i + 2, '', [k], false); });
+      sf13.forEach((k, i) => { gridHTML += celleHTML(2, i + 2, '', [k], false); });
+      if (sf9.length >= 1) gridHTML += celleHTML(3, 2, '', [sf9[0]], false);
+      if (sf9.length >= 2) gridHTML += celleHTML(3, 3, '', [sf9[1]], false);
+      if (p9.length)  gridHTML += celleHTML(4, 2, '', p9, false);
+      if (p11.length) gridHTML += celleHTML(3, nedreRad, p11navn, p11, true);
+      if (p13.length) gridHTML += celleHTML(4, nedreRad, p13navn, p13, true);
+      if (p15.length) gridHTML += celleHTML(5, nedreRad, p15navn, p15, true);
+      gridHTML += `</div>`;
     }
 
-    html += `<div class="sl-scroll">`;
-    for (const [rundeNavn, rKamper] of sortertRunder) {
-      html += `<div class="sl-runde">
-        <div class="sl-runde-navn">${esc(visningsNavn(rundeNavn, nivaa))}</div>`;
-      for (const k of rKamper) {
-        const l1  = lagMap[k.lag1Id]?.navn ?? (k.lag1Id ? '?' : null);
-        const l2  = lagMap[k.lag2Id]?.navn ?? (k.lag2Id ? '?' : null);
-        const v1  = k.ferdig && k.lag1Poeng > k.lag2Poeng;
-        const v2  = k.ferdig && k.lag2Poeng > k.lag1Poeng;
-        html += `<div class="sl-kamp">
-          <div class="sl-lag${v1?' v':''}${!l1?' tbd':''}">${esc(l1??'TBD')}${k.ferdig?` <span class="sl-score${v1?'':' tap'}">${k.lag1Poeng}</span>`:''}</div>
-          <div class="sl-divider"></div>
-          <div class="sl-lag${v2?' v':''}${!l2?' tbd':''}">${esc(l2??'TBD')}${k.ferdig?` <span class="sl-score${v2?'':' tap'}">${k.lag2Poeng}</span>`:''}</div>
-        </div>`;
-      }
-      html += `</div>`;
-    }
-    html += `</div></div>`;
+    html += `<div class="sl-nivaa">${titelHTML}${gridHTML}</div>`;
   }
 
   html += `</div></div>`;
