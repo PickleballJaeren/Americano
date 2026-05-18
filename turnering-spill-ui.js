@@ -709,7 +709,6 @@ function bracketKampHTML(kamp, lagMap, nivaa, farge = 'var(--muted2)', harFlereN
            <button class="knapp-tekst bracket-rediger-knapp" onclick="redigerSluttspillKamp('${nivaa}','${escHtml(kamp.id)}')">Rediger</button>
          </div>` : ''}`;
 }
-}
 
 
 // ════════════════════════════════════════════════════════
