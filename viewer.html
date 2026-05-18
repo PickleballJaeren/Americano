@@ -1213,20 +1213,6 @@ function renderSluttspillKampskjema(t, lagMap) {
       return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
     });
 
-  // Grupper ferdige kamper per runde-navn for ferdigspilt-seksjonen
-  const ferdigePerRunde = {};
-  for (const k of alleKamper.filter(k => k.ferdig)) {
-    const r = k.runde ?? 'Ukjent';
-    if (!ferdigePerRunde[r]) ferdigePerRunde[r] = [];
-    ferdigePerRunde[r].push(k);
-  }
-  const ferdigeRunderNavn = Object.keys(ferdigePerRunde)
-    .filter(r => alleKamper.filter(k => k.runde === r).every(k => k.ferdig))
-    .sort((a, b) => {
-      const ia = RUNDE_REKKEFØLGE.indexOf(a), ib = RUNDE_REKKEFØLGE.indexOf(b);
-      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-    });
-
   // Rad 1: første antallBaner spilleklare (begge lag kjent)
   const spilleklare = uferdige.filter(k => k.lag1Id && k.lag2Id);
   const rad1 = spilleklare.slice(0, antallBaner);
@@ -1285,29 +1271,6 @@ function renderSluttspillKampskjema(t, lagMap) {
       `<div class="ks-leg-item"><span class="ks-nivaa-prikk" style="background:${NIVAA_INFO[n].farge}"></span>${esc(NIVAA_INFO[n].label)}</div>`
     ).join('') : ''}
   </div>`;
-
-  // ── FERDIGSPILTE RUNDER ──
-  if (ferdigeRunderNavn.length) {
-    html += `<div class="ks-kollaps-knapp" style="cursor:default;pointer-events:none">
-      <div class="ks-kollaps-tittel" style="color:var(--muted2)">Ferdigspilte runder</div>
-    </div>`;
-    for (const rundeNavn of [...ferdigeRunderNavn].reverse()) {
-      const kamper = ferdigePerRunde[rundeNavn] ?? [];
-      const id = `sl-rf-${rundeNavn.replace(/[^a-z0-9]/gi,'_')}`;
-      html += `
-        <div class="ks-rf-hdr" onclick="ksToggleRf('${id}', this)">
-          <div class="ks-rf-check">✓</div>
-          <div class="ks-rf-navn">${esc(rundeNavn)}</div>
-          <div class="ks-rf-status">– Ferdigspilt</div>
-          <div class="ks-rf-chevron">▼</div>
-        </div>
-        <div class="ks-kollaps-innhold" id="${id}">
-          <div class="ks-rf-baner">
-            ${kamper.map(k => _slKort(k, lagMap, { visNivaaPrikk, NIVAA_INFO, erAktiv: false, lag1Klar: false, lag2Klar: false, kampFraMap })).join('')}
-          </div>
-        </div>`;
-    }
-  }
 
   // ── LIVE BRACKET ──
   html += _slBracketSeksjon(t, lagMap, aktiveNivaaer, visNivaaPrikk, NIVAA_INFO, RUNDE_REKKEFØLGE);
