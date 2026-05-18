@@ -50,19 +50,19 @@ export const PARTER_6_SINGEL = [
 // fortsatt perfekt balansert over 14 runder.
 // ════════════════════════════════════════════════════════
 // Matematisk optimal rotasjon for 7 spillere på 1 bane.
-// Garantier (verifisert):
+// Garantier (verifisert med uttømmende søk):
 //   • Alle hviler nøyaktig 3 ganger over 7 runder
-//   • Ingen hviler mer enn 2 runder på rad
+//   • Ingen hviler mer enn 1 runde på rad (teoretisk optimum)
 //   • Ingen partnerpar gjentas innad i én rotasjon
 //   • Alle spiller nøyaktig 4 kamper
 export const MIX_7_ROTASJON = [
-  { lag1: [3, 4], lag2: [5, 6], hviler: [0, 1, 2] }, // runde 1
-  { lag1: [3, 5], lag2: [4, 6], hviler: [0, 1, 2] }, // runde 2
-  { lag1: [0, 1], lag2: [2, 6], hviler: [3, 4, 5] }, // runde 3
-  { lag1: [2, 3], lag2: [4, 5], hviler: [0, 1, 6] }, // runde 4
-  { lag1: [0, 5], lag2: [1, 6], hviler: [2, 3, 4] }, // runde 5
-  { lag1: [0, 2], lag2: [1, 4], hviler: [3, 5, 6] }, // runde 6
-  { lag1: [0, 3], lag2: [1, 2], hviler: [4, 5, 6] }, // runde 7
+  { lag1: [3, 6], lag2: [2, 5], hviler: [0, 1, 4] }, // runde 1
+  { lag1: [0, 6], lag2: [1, 4], hviler: [2, 3, 5] }, // runde 2
+  { lag1: [2, 4], lag2: [3, 5], hviler: [0, 1, 6] }, // runde 3
+  { lag1: [0, 2], lag2: [1, 6], hviler: [3, 4, 5] }, // runde 4
+  { lag1: [1, 3], lag2: [4, 5], hviler: [0, 2, 6] }, // runde 5
+  { lag1: [0, 5], lag2: [2, 6], hviler: [1, 3, 4] }, // runde 6
+  { lag1: [3, 4], lag2: [0, 1], hviler: [2, 5, 6] }, // runde 7
 ];
 
 // Rotasjonsmodus for Mix & Match
