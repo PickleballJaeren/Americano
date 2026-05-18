@@ -1481,7 +1481,7 @@ function _slBracketSeksjon(t, lagMap, aktiveNivaaer, visNivaaPrikk, NIVAA_INFO, 
   const sl = t.sluttspill;
   let html = `<div class="sl-bracket-seksjon">
     <div class="sl-bracket-hdr">Live bracket</div>
-    <div style="display:flex;gap:24px;align-items:flex-start;overflow-x:auto">`;
+    <div style="display:flex;gap:0;align-items:flex-start;overflow-x:auto">`;
 
   const startPlassForNivaa = (nivaa) => {
     if (nivaa === 'A') return 1;
@@ -1513,9 +1513,11 @@ function _slBracketSeksjon(t, lagMap, aktiveNivaaer, visNivaaPrikk, NIVAA_INFO, 
     return `<div style="grid-column:${col};grid-row:${row};display:flex;flex-direction:column;gap:5px">${hdr}${kamper.map(kampHTML).join('')}</div>`;
   };
 
-  for (const nivaa of aktiveNivaaer) {
+  aktiveNivaaer.forEach((nivaa, nivaaIdx) => {
     const kamper = sl[nivaa]?.kamper ?? [];
-    if (!kamper.length) continue;
+    if (!kamper.length) return;
+
+    const erSiste = nivaaIdx === aktiveNivaaer.filter(n => sl[n]?.kamper?.length).length - 1;
 
     const info = NIVAA_INFO[nivaa];
     const sp   = startPlassForNivaa(nivaa);
@@ -1594,8 +1596,9 @@ function _slBracketSeksjon(t, lagMap, aktiveNivaaer, visNivaaPrikk, NIVAA_INFO, 
       gridHTML += `</div>`;
     }
 
-    html += `<div class="sl-nivaa">${titelHTML}${gridHTML}</div>`;
-  }
+    const skilleStil = erSiste ? '' : 'padding-right:24px;margin-right:24px;border-right:1px solid var(--border2)';
+    html += `<div class="sl-nivaa" style="${skilleStil}">${titelHTML}${gridHTML}</div>`;
+  });
 
   html += `</div></div>`;
   return html;
