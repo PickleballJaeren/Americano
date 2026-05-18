@@ -1260,9 +1260,20 @@ function renderSluttspillKampskjema(t, lagMap) {
     html += _slKortRad(rad2, lagMap, { status: 'venter', ledigeBaner: banerLedige, visNivaaPrikk, NIVAA_INFO, kampFraMap });
   }
 
-  // ── RAD 3 — vises kun når rad 1 er tom ──
+  // ── RAD 3+ — kollapsbar ──
   if (rad3.length) {
-    html += _slKortRad(rad3, lagMap, { status: 'neste', ledigeBaner: 0, visNivaaPrikk, NIVAA_INFO, kampFraMap });
+    html += `<div class="ks-kollaps-knapp" onclick="ksToggle('sl-ekstra-rader', this)">
+      <div class="ks-kollaps-tittel">Vis flere kommende kamper</div>
+      <div class="ks-kollaps-hint">Klikk for å vise</div>
+      <div class="ks-kollaps-chevron">▼</div>
+    </div>
+    <div class="ks-kollaps-innhold" id="sl-ekstra-rader">`;
+    // Vis alle gjenværende kamper i biter på antallBaner
+    const resten = etterRad1.slice(antallBaner);
+    for (let i = 0; i < resten.length; i += antallBaner) {
+      html += _slKortRad(resten.slice(i, i + antallBaner), lagMap, { status: 'neste', ledigeBaner: 0, visNivaaPrikk, NIVAA_INFO, kampFraMap });
+    }
+    html += '</div>';
   }
 
   // ── LEGEND ──
