@@ -1192,63 +1192,56 @@ function renderSluttspillKampskjema(t, lagMap) {
   const ferdigAntall = alleKamper.filter(k => k.ferdig).length;
   const progProsent  = totalt ? Math.round((ferdigAntall / totalt) * 100) : 0;
 
-  // Grupper i globale spillerunder basert på runde-navn
-  const rundeMap = {};
-  for (const k of alleKamper) {
-    const r = k.runde ?? 'Ukjent';
-    if (!rundeMap[r]) rundeMap[r] = [];
-    rundeMap[r].push(k);
-  }
-  const sorterteRunder = Object.entries(rundeMap).sort(([a],[b]) => {
-    const ia = RUNDE_REKKEFØLGE.indexOf(a), ib = RUNDE_REKKEFØLGE.indexOf(b);
-    return (ia===-1?99:ia) - (ib===-1?99:ib);
-  });
+  // ── FLAT KØ-BASERT TILNÆRMING ──
+  // Sorter alle uferdige kamper etter RUNDE_REKKEFØLGE, deretter original rekkefølge.
+  // Del inn i tre logiske grupper:
+  //   Rad 1 (grønn):  de første antallBaner spilleklare kortene
+  //   Rad 2 (gul):    neste antallBaner kortene — venter på bane/lag
+  //   Rad 3 (grå):    resten — vises kun når rad 1 er tom
 
-  // En runde er "aktiv" dersom den har minst én spilleklar kamp (begge lag kjent, ikke ferdig)
-  // eller minst én kamp som ikke er ferdig og den forrige synlige runden er ferdig
-  const erSpilleklar = (k) => !!(k.lag1Id && k.lag2Id && !k.ferdig);
-  const erFerdigRunde = (kamper) => kamper.every(k => k.ferdig);
-  // Vis en runde hvis den har minst én kamp som er ferdig, spilleklar, eller har kjente kilder
-  const harSynligeKamper = (kamper) => kamper.some(k =>
+  const harSynligKamp = (k) =>
     k.ferdig || k.lag1Id || k.lag2Id ||
     kampFraMap[k.id]?.vinnerFra.length > 0 ||
-    kampFraMap[k.id]?.taperFra.length > 0
-  );
+    kampFraMap[k.id]?.taperFra.length > 0;
 
-  // Kategoriser runder
-  const ferdigeRunder   = sorterteRunder.filter(([,ks]) => erFerdigRunde(ks));
-  const uferdigeRunder  = sorterteRunder.filter(([,ks]) => !erFerdigRunde(ks) && harSynligeKamper(ks));
+  // Sorter alle uferdige synlige kamper etter turneringsrekkefølge
+  const uferdige = alleKamper
+    .filter(k => !k.ferdig && harSynligKamp(k))
+    .sort((a, b) => {
+      const ia = RUNDE_REKKEFØLGE.indexOf(a.runde ?? '');
+      const ib = RUNDE_REKKEFØLGE.indexOf(b.runde ?? '');
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    });
 
-  // Split runder med flere kamper enn antallBaner inn i biter
-  // slik at maks antallBaner kort vises per rad
-  const splitRunder = [];
-  for (const [rundeNavn, kamper] of uferdigeRunder) {
-    if (kamper.length <= antallBaner) {
-      splitRunder.push([rundeNavn, kamper]);
-    } else {
-      for (let i = 0; i < kamper.length; i += antallBaner) {
-        splitRunder.push([rundeNavn, kamper.slice(i, i + antallBaner)]);
-      }
-    }
+  // Grupper ferdige kamper per runde-navn for ferdigspilt-seksjonen
+  const ferdigePerRunde = {};
+  for (const k of alleKamper.filter(k => k.ferdig)) {
+    const r = k.runde ?? 'Ukjent';
+    if (!ferdigePerRunde[r]) ferdigePerRunde[r] = [];
+    ferdigePerRunde[r].push(k);
   }
+  const ferdigeRunderNavn = Object.keys(ferdigePerRunde)
+    .filter(r => alleKamper.filter(k => k.runde === r).every(k => k.ferdig))
+    .sort((a, b) => {
+      const ia = RUNDE_REKKEFØLGE.indexOf(a), ib = RUNDE_REKKEFØLGE.indexOf(b);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    });
 
-  const synligeRunder = splitRunder.slice(0, 3);
-  const skjulteRunder = splitRunder.slice(3);
+  // Rad 1: første antallBaner spilleklare (begge lag kjent)
+  const spilleklare = uferdige.filter(k => k.lag1Id && k.lag2Id);
+  const rad1 = spilleklare.slice(0, antallBaner);
+  const banerLedige = Math.max(0, antallBaner - rad1.length);
 
-  // Finn aktiv runde (første med spilleklare kamper)
-  let aktivRundeNavn = null;
-  for (const [navn, kamper] of uferdigeRunder) {
-    if (kamper.some(erSpilleklar)) { aktivRundeNavn = navn; break; }
-  }
-  if (!aktivRundeNavn && uferdigeRunder.length) aktivRundeNavn = uferdigeRunder[0][0];
+  // Rad 1 er tom når alle spilleklare kamper er ferdig
+  const rad1Tom = rad1.length === 0;
 
-  // Tell baner i bruk = uferdige kamper i rad 1 av aktiv runde (begge lag kjent)
-  // Rad 1 = de første antallBaner kampene av aktiv runde
-  const alleAktiveRundekamper = alleKamper.filter(
-    k => k.runde === aktivRundeNavn && !k.ferdig && k.lag1Id && k.lag2Id
-  );
-  const banerIBrukNå = Math.min(alleAktiveRundekamper.length, antallBaner);
-  const ledigeBaner  = Math.max(0, antallBaner - banerIBrukNå);
+  // Rad 2: neste antallBaner fra køen (etter rad 1)
+  // Inkluderer resterende spilleklare + kamper med kjente kilder
+  const etterRad1 = uferdige.filter(k => !rad1.includes(k));
+  const rad2 = etterRad1.slice(0, antallBaner);
+
+  // Rad 3: vises kun når rad 1 er tom
+  const rad3 = rad1Tom ? etterRad1.slice(antallBaner, antallBaner * 2) : [];
 
   let html = `<div class="ks-wrap">
     <div class="ks-prog-rad">
@@ -1256,37 +1249,20 @@ function renderSluttspillKampskjema(t, lagMap) {
       <div class="ks-prog-tekst">${ferdigAntall} av ${totalt} kamper ferdig</div>
     </div>`;
 
-  // ── SYNLIGE RUNDER ──
-  // Første rad av aktiv runde: alltid grønn (spilles nå).
-  // Påfølgende rader av samme runde: antall ledigeBaner kort blir grønne, resten gule.
-  // Andre runder: venter på lag (grå).
-  let erFørsteRadAvAktivRunde = true;
-  synligeRunder.forEach(([rundeNavn, kamper], idx) => {
-    const erSammeRunde  = rundeNavn === aktivRundeNavn;
-    const erAktiv       = erSammeRunde && erFørsteRadAvAktivRunde;
-    const venterPåBane  = erSammeRunde && !erFørsteRadAvAktivRunde;
-    // For rad 2+: tell hvor mange som faktisk kan starte (ledige baner)
-    const antallKanStarte = venterPåBane ? ledigeBaner : 0;
-    html += _slRundeRad(rundeNavn, kamper, lagMap, {
-      erAktiv, venterPåBane, antallKanStarte, visNivaaPrikk, NIVAA_INFO, antallBaner, kampFraMap,
-    });
-    if (idx === 0) html += `<div class="ks-sveip-hint">← Sveip for å se alle kamper →</div>`;
-    if (erSammeRunde) erFørsteRadAvAktivRunde = false;
-  });
+  // ── RAD 1 — aktive/spilleklare kamper ──
+  if (rad1.length) {
+    html += _slKortRad(rad1, lagMap, { status: 'aktiv', ledigeBaner: 0, visNivaaPrikk, NIVAA_INFO, kampFraMap });
+    html += `<div class="ks-sveip-hint">← Sveip for å se alle kamper →</div>`;
+  }
 
-  // ── KOLLAPSBAR: ekstra runder ──
-  if (skjulteRunder.length) {
-    const label = skjulteRunder.map(([n]) => n).join(', ');
-    html += `<div class="ks-kollaps-knapp" onclick="ksToggle('sl-ekstra-runder', this)">
-      <div class="ks-kollaps-tittel">Vis ${esc(label)}</div>
-      <div class="ks-kollaps-hint">${skjulteRunder.length} runde${skjulteRunder.length>1?'r':''} skjult</div>
-      <div class="ks-kollaps-chevron">▼</div>
-    </div>
-    <div class="ks-kollaps-innhold" id="sl-ekstra-runder">`;
-    for (const [rundeNavn, kamper] of skjulteRunder) {
-      html += _slRundeRad(rundeNavn, kamper, lagMap, { erAktiv: false, venterPåBane: false, antallKanStarte: 0, visNivaaPrikk, NIVAA_INFO, antallBaner, kampFraMap });
-    }
-    html += '</div>';
+  // ── RAD 2 — venter på bane/lag ──
+  if (rad2.length) {
+    html += _slKortRad(rad2, lagMap, { status: 'venter', ledigeBaner: banerLedige, visNivaaPrikk, NIVAA_INFO, kampFraMap });
+  }
+
+  // ── RAD 3 — vises kun når rad 1 er tom ──
+  if (rad3.length) {
+    html += _slKortRad(rad3, lagMap, { status: 'neste', ledigeBaner: 0, visNivaaPrikk, NIVAA_INFO, kampFraMap });
   }
 
   // ── LEGEND ──
@@ -1300,11 +1276,12 @@ function renderSluttspillKampskjema(t, lagMap) {
   </div>`;
 
   // ── FERDIGSPILTE RUNDER ──
-  if (ferdigeRunder.length) {
+  if (ferdigeRunderNavn.length) {
     html += `<div class="ks-kollaps-knapp" style="cursor:default;pointer-events:none">
       <div class="ks-kollaps-tittel" style="color:var(--muted2)">Ferdigspilte runder</div>
     </div>`;
-    for (const [rundeNavn, kamper] of [...ferdigeRunder].reverse()) {
+    for (const rundeNavn of [...ferdigeRunderNavn].reverse()) {
+      const kamper = ferdigePerRunde[rundeNavn] ?? [];
       const id = `sl-rf-${rundeNavn.replace(/[^a-z0-9]/gi,'_')}`;
       html += `
         <div class="ks-rf-hdr" onclick="ksToggleRf('${id}', this)">
@@ -1315,7 +1292,7 @@ function renderSluttspillKampskjema(t, lagMap) {
         </div>
         <div class="ks-kollaps-innhold" id="${id}">
           <div class="ks-rf-baner">
-            ${kamper.map(k => _slKort(k, lagMap, { visNivaaPrikk, NIVAA_INFO, erAktiv: false, lag1Klar: false, lag2Klar: false })).join('')}
+            ${kamper.map(k => _slKort(k, lagMap, { visNivaaPrikk, NIVAA_INFO, erAktiv: false, lag1Klar: false, lag2Klar: false, kampFraMap })).join('')}
           </div>
         </div>`;
     }
@@ -1331,56 +1308,48 @@ function renderSluttspillKampskjema(t, lagMap) {
 /**
  * Rendrer én spillerunde-rad i sluttspill-kampskjema.
  */
-function _slRundeRad(rundeNavn, kamper, lagMap, opts = {}) {
-  const { erAktiv, venterPåBane, antallKanStarte = 0, visNivaaPrikk, NIVAA_INFO, kampFraMap = {} } = opts;
+/**
+ * Rendrer én rad med kampkort — ingen runde-label, ren kortrekke.
+ * status: 'aktiv' | 'venter' | 'neste'
+ * ledigeBaner: antall baner som faktisk er ledige (for venter-raden)
+ */
+function _slKortRad(kamper, lagMap, opts = {}) {
+  const { status = 'aktiv', ledigeBaner = 0, visNivaaPrikk, NIVAA_INFO, kampFraMap = {} } = opts;
 
-  let grønneIgjen = erAktiv ? kamper.length : antallKanStarte;
+  const erAktiv      = status === 'aktiv';
+  const erVenter     = status === 'venter';
+  let grønneIgjen    = erAktiv ? kamper.length : ledigeBaner;
 
   const kortHTMLer = kamper.map(k => {
     const klar = !!(k.lag1Id && k.lag2Id && !k.ferdig);
-    const kanStarteNå = klar && venterPåBane && grønneIgjen > 0;
+    const kanStarteNå = klar && erVenter && grønneIgjen > 0;
     if (kanStarteNå) grønneIgjen--;
-    const lag1Klar = klar && (erAktiv || kanStarteNå);
-    const lag2Klar = klar && (erAktiv || kanStarteNå);
     return _slKort(k, lagMap, {
-      visNivaaPrikk, NIVAA_INFO, erAktiv,
-      venterPåBane: venterPåBane && !kanStarteNå,
-      kanStarteNå, lag1Klar, lag2Klar, kampFraMap,
+      visNivaaPrikk, NIVAA_INFO,
+      erAktiv,
+      venterPåBane: erVenter && !kanStarteNå && klar,
+      kanStarteNå,
+      lag1Klar: klar && (erAktiv || kanStarteNå),
+      lag2Klar: klar && (erAktiv || kanStarteNå),
+      kampFraMap,
     });
   });
 
-  let statusTekst, statusKl, overTekst;
-  if (erAktiv)        { statusTekst = 'Spilles nå';      statusKl = 'gronn'; overTekst = ''; }
-  else if (venterPåBane) { statusTekst = 'Venter på bane'; statusKl = 'gul';   overTekst = ''; }
-  else                { statusTekst = 'Neste';           statusKl = 'graa';  overTekst = 'Kommende'; }
-
-  const labelHTML = `<div class="ks-rl">
-    ${overTekst ? `<div class="ks-rl-over">${overTekst}</div>` : ''}
-    <div class="ks-rl-nr" style="font-size:16px;letter-spacing:.5px;line-height:1.2;white-space:normal">${esc(rundeNavn)}</div>
-    <div class="ks-rl-status ${statusKl}">${statusTekst}</div>
-    ${erAktiv ? '<div class="ks-rl-info">Flyttes ned når alle er ferdige.</div>' : ''}
-  </div>`;
-
-  const n         = kamper.length;
+  const n        = kamper.length;
   const kolBredde = '154px';
-  const gridKols  = `130px repeat(${n}, ${kolBredde})`;
+  const gridKols  = `repeat(${n}, ${kolBredde})`;
 
-  // Desktop: grid (vises på ≥700px)
+  // Desktop: enkel grid uten label-kolonne
   const desktopHTML = `
-    <div class="ks-grid" style="grid-template-columns:${gridKols}">
-      ${labelHTML}
+    <div class="ks-grid" style="grid-template-columns:${gridKols};padding:10px 12px">
       ${kortHTMLer.join('')}
     </div>`;
 
-  // Mobil: låst label + horisontal scroll (vises på <700px)
-  const mobilLabelHTML = labelHTML.replace('class="ks-rl"', 'class="ks-rl ks-rl-mobil"');
+  // Mobil: horisontal scroll uten label
   const mobilHTML = `
-    <div class="ks-runde-rad-mobil">
-      ${mobilLabelHTML}
-      <div class="ks-scroll-wrap">
-        <div class="ks-scroll-innhold">
-          <div class="ks-kort-rad-mobil">${kortHTMLer.join('')}</div>
-        </div>
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none">
+      <div style="display:flex;gap:6px;padding:8px 12px 10px">
+        ${kortHTMLer.join('')}
       </div>
     </div>`;
 
