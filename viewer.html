@@ -1217,6 +1217,11 @@ function renderSluttspillKampskjema(t, lagMap) {
   }
   if (!aktivRundeNavn && uferdigeRunder.length) aktivRundeNavn = uferdigeRunder[0][0];
 
+  // Tell baner i bruk av alle uferdige kamper i aktiv runde
+  const banerIBrukNå = alleKamper.filter(
+    k => k.runde === aktivRundeNavn && !k.ferdig && k.lag1Id && k.lag2Id
+  ).length;
+
   let html = `<div class="ks-wrap">
     <div class="ks-prog-rad">
       <div class="ks-prog-bar"><div class="ks-prog-fill" style="width:${progProsent}%"></div></div>
@@ -1224,10 +1229,18 @@ function renderSluttspillKampskjema(t, lagMap) {
     </div>`;
 
   // ── SYNLIGE RUNDER ──
+  // Hold styr på hvor mange baner som er brukt opp av radene over.
+  // Rad 1 av Kvartfinale bruker f.eks. 6 baner → rad 2 har 0 ledige.
+  let banerBruktAvTidligereRader = 0;
   synligeRunder.forEach(([rundeNavn, kamper], idx) => {
-    const erAktiv = rundeNavn === aktivRundeNavn;
+    const erSammeRunde = rundeNavn === aktivRundeNavn;
+    const ledigeBanerForRad = Math.max(0, antallBaner - banerIBrukNå - banerBruktAvTidligereRader);
+    // Aktiv rad: samme rundenavn OG det er ledige baner
+    const erAktiv = erSammeRunde && ledigeBanerForRad > 0;
     html += _slRundeRad(rundeNavn, kamper, lagMap, { erAktiv, visNivaaPrikk, NIVAA_INFO, antallBaner });
     if (idx === 0) html += `<div class="ks-sveip-hint">← Sveip for å se alle kamper →</div>`;
+    // Oppdater baner brukt — denne raden bruker opp sine kamper
+    if (erSammeRunde) banerBruktAvTidligereRader += kamper.length;
   });
 
   // ── KOLLAPSBAR: ekstra runder ──
