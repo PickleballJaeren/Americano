@@ -1327,9 +1327,9 @@ function renderSluttspillKampskjema(t, lagMap) {
 function _slKortRad(kamper, lagMap, opts = {}) {
   const { status = 'aktiv', ledigeBaner = 0, visNivaaPrikk, NIVAA_INFO, kampFraMap = {} } = opts;
 
-  const erAktiv      = status === 'aktiv';
-  const erVenter     = status === 'venter';
-  let grønneIgjen    = erAktiv ? kamper.length : ledigeBaner;
+  const erAktiv  = status === 'aktiv';
+  const erVenter = status === 'venter';
+  let grønneIgjen = erAktiv ? kamper.length : ledigeBaner;
 
   const kortHTMLer = kamper.map(k => {
     const klar = !!(k.lag1Id && k.lag2Id && !k.ferdig);
@@ -1346,26 +1346,17 @@ function _slKortRad(kamper, lagMap, opts = {}) {
     });
   });
 
-  const n        = kamper.length;
-  const kolBredde = '154px';
-  const gridKols  = `repeat(${n}, ${kolBredde})`;
-
-  // Desktop: enkel grid uten label-kolonne
-  const desktopHTML = `
-    <div class="ks-grid" style="grid-template-columns:${gridKols};padding:10px 12px">
-      ${kortHTMLer.join('')}
-    </div>`;
-
-  // Mobil: horisontal scroll uten label
-  const mobilHTML = `
-    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none">
-      <div style="display:flex;gap:6px;padding:8px 12px 10px">
-        ${kortHTMLer.join('')}
+  // Bruker samme scroll-struktur som puljeskjema (mobil-stil, alltid scroll)
+  // slik at kortene alltid er riktig bredde (138px, som ks-kort i mobil-modus)
+  return `<div class="ks-runde-blokk">
+    <div class="ks-runde-rad-mobil" style="display:flex">
+      <div class="ks-scroll-wrap">
+        <div class="ks-scroll-innhold">
+          <div class="ks-kort-rad-mobil">${kortHTMLer.join('')}</div>
+        </div>
       </div>
-    </div>`;
-
-  return `<div class="ks-runde-blokk">${desktopHTML}${mobilHTML}</div>`;
-}
+    </div>
+  </div>`;\n}
 
 /**
  * Rendrer ett kampkort for sluttspill-kampskjema.
