@@ -1217,10 +1217,13 @@ function renderSluttspillKampskjema(t, lagMap) {
   }
   if (!aktivRundeNavn && uferdigeRunder.length) aktivRundeNavn = uferdigeRunder[0][0];
 
-  // Tell baner i bruk av alle uferdige kamper i aktiv runde
-  const banerIBrukNå = alleKamper.filter(
+  // Tell baner i bruk = uferdige kamper i rad 1 av aktiv runde (begge lag kjent)
+  // Rad 1 = de første antallBaner kampene av aktiv runde
+  const alleAktiveRundekamper = alleKamper.filter(
     k => k.runde === aktivRundeNavn && !k.ferdig && k.lag1Id && k.lag2Id
-  ).length;
+  );
+  const banerIBrukNå = Math.min(alleAktiveRundekamper.length, antallBaner);
+  const ledigeBaner  = Math.max(0, antallBaner - banerIBrukNå);
 
   let html = `<div class="ks-wrap">
     <div class="ks-prog-rad">
@@ -1229,18 +1232,21 @@ function renderSluttspillKampskjema(t, lagMap) {
     </div>`;
 
   // ── SYNLIGE RUNDER ──
-  // Hold styr på hvor mange baner som er brukt opp av radene over.
-  // Rad 1 av Kvartfinale bruker f.eks. 6 baner → rad 2 har 0 ledige.
-  let banerBruktAvTidligereRader = 0;
+  // Første rad av aktiv runde: alltid grønn (spilles nå).
+  // Påfølgende rader av samme runde: antall ledigeBaner kort blir grønne, resten gule.
+  // Andre runder: venter på lag (grå).
+  let erFørsteRadAvAktivRunde = true;
   synligeRunder.forEach(([rundeNavn, kamper], idx) => {
-    const erSammeRunde = rundeNavn === aktivRundeNavn;
-    const ledigeBanerForRad = Math.max(0, antallBaner - banerIBrukNå - banerBruktAvTidligereRader);
-    // Aktiv rad: samme rundenavn OG det er ledige baner
-    const erAktiv = erSammeRunde && ledigeBanerForRad > 0;
-    html += _slRundeRad(rundeNavn, kamper, lagMap, { erAktiv, visNivaaPrikk, NIVAA_INFO, antallBaner });
+    const erSammeRunde  = rundeNavn === aktivRundeNavn;
+    const erAktiv       = erSammeRunde && erFørsteRadAvAktivRunde;
+    const venterPåBane  = erSammeRunde && !erFørsteRadAvAktivRunde;
+    // For rad 2+: tell hvor mange som faktisk kan starte (ledige baner)
+    const antallKanStarte = venterPåBane ? ledigeBaner : 0;
+    html += _slRundeRad(rundeNavn, kamper, lagMap, {
+      erAktiv, venterPåBane, antallKanStarte, visNivaaPrikk, NIVAA_INFO, antallBaner,
+    });
     if (idx === 0) html += `<div class="ks-sveip-hint">← Sveip for å se alle kamper →</div>`;
-    // Oppdater baner brukt — denne raden bruker opp sine kamper
-    if (erSammeRunde) banerBruktAvTidligereRader += kamper.length;
+    if (erSammeRunde) erFørsteRadAvAktivRunde = false;
   });
 
   // ── KOLLAPSBAR: ekstra runder ──
@@ -1301,18 +1307,29 @@ function renderSluttspillKampskjema(t, lagMap) {
  * Rendrer én spillerunde-rad i sluttspill-kampskjema.
  */
 function _slRundeRad(rundeNavn, kamper, lagMap, opts = {}) {
-  const { erAktiv, visNivaaPrikk, NIVAA_INFO } = opts;
+  const { erAktiv, venterPåBane, antallKanStarte = 0, visNivaaPrikk, NIVAA_INFO } = opts;
+
+  let grønneIgjen = erAktiv ? kamper.length : antallKanStarte;
 
   const kortHTMLer = kamper.map(k => {
-    const klar    = !!(k.lag1Id && k.lag2Id && !k.ferdig);
-    const lag1Klar = klar && erAktiv;
-    const lag2Klar = klar && erAktiv;
-    return _slKort(k, lagMap, { visNivaaPrikk, NIVAA_INFO, erAktiv, lag1Klar, lag2Klar });
+    const klar = !!(k.lag1Id && k.lag2Id && !k.ferdig);
+    // I venterPåBane-rader: bare de første antallKanStarte klar-kortene er grønne
+    const kanStarteNå = klar && venterPåBane && grønneIgjen > 0;
+    if (kanStarteNå) grønneIgjen--;
+    const lag1Klar = klar && (erAktiv || kanStarteNå);
+    const lag2Klar = klar && (erAktiv || kanStarteNå);
+    return _slKort(k, lagMap, {
+      visNivaaPrikk, NIVAA_INFO, erAktiv,
+      venterPåBane: venterPåBane && !kanStarteNå,
+      kanStarteNå,
+      lag1Klar, lag2Klar,
+    });
   });
 
-  const statusTekst = erAktiv ? 'Spilles nå' : 'Neste';
-  const statusKl    = erAktiv ? 'gronn' : 'graa';
-  const overTekst   = erAktiv ? '' : 'Kommende';
+  let statusTekst, statusKl, overTekst;
+  if (erAktiv)        { statusTekst = 'Spilles nå';      statusKl = 'gronn'; overTekst = ''; }
+  else if (venterPåBane) { statusTekst = 'Venter på bane'; statusKl = 'gul';   overTekst = ''; }
+  else                { statusTekst = 'Neste';           statusKl = 'graa';  overTekst = 'Kommende'; }
 
   const labelHTML = `<div class="ks-rl">
     ${overTekst ? `<div class="ks-rl-over">${overTekst}</div>` : ''}
@@ -1352,7 +1369,7 @@ function _slRundeRad(rundeNavn, kamper, lagMap, opts = {}) {
  * Gjenbruker ks-kort-stilen, men type-merket erstatter pulje-merket.
  */
 function _slKort(kamp, lagMap, opts = {}) {
-  const { visNivaaPrikk, NIVAA_INFO, erAktiv, lag1Klar, lag2Klar } = opts;
+  const { visNivaaPrikk, NIVAA_INFO, erAktiv, venterPåBane, kanStarteNå, lag1Klar, lag2Klar } = opts;
   const nivaa  = kamp._nivaa ?? 'A';
   const farge  = kamp._farge ?? '#f5c842';
   const info   = NIVAA_INFO?.[nivaa];
@@ -1373,17 +1390,19 @@ function _slKort(kamp, lagMap, opts = {}) {
   let kantKl = '', dot1Kl = 'graa', dot2Kl = 'graa', statusHTML = '';
 
   if (kamp.ferdig) {
-    kantKl    = 'ferdig';
+    kantKl     = 'ferdig';
     statusHTML = `<div class="ks-spacer"></div><div class="ks-resultat">${kamp.lag1Poeng} – ${kamp.lag2Poeng}</div>`;
-  } else if (erAktiv && kamp.lag1Id && kamp.lag2Id) {
-    dot1Kl = 'gronn'; dot2Kl = 'gronn';
-    kantKl = 'gronn-kant';
+  } else if ((erAktiv || kanStarteNå) && kamp.lag1Id && kamp.lag2Id) {
+    dot1Kl = 'gronn'; dot2Kl = 'gronn'; kantKl = 'gronn-kant';
     statusHTML = `<div class="ks-spacer"></div><div class="ks-status gronn">Spilles nå</div>`;
   } else if (erAktiv && (kamp.lag1Id || kamp.lag2Id)) {
     kantKl = 'gul-kant';
     dot1Kl = kamp.lag1Id ? 'gul' : 'graa';
     dot2Kl = kamp.lag2Id ? 'gul' : 'graa';
     statusHTML = `<div class="ks-spacer"></div><div class="ks-status gul">Venter på motstander</div>`;
+  } else if (venterPåBane && kamp.lag1Id && kamp.lag2Id) {
+    kantKl = 'gul-kant'; dot1Kl = 'gul'; dot2Kl = 'gul';
+    statusHTML = `<div class="ks-spacer"></div><div class="ks-status gul">Venter på bane</div>`;
   } else if (lag1Klar && lag2Klar) {
     kantKl = 'gronn-kant'; dot1Kl = 'gronn'; dot2Kl = 'gronn';
     statusHTML = `<div class="ks-spacer"></div><div class="ks-status gronn">Kan spilles</div>`;
