@@ -1454,8 +1454,14 @@ function _slKort(kamp, lagMap, opts = {}) {
 
   // Type-merke: viser «Kvartfinale A» — nivå-suffix når flere nivåer
   const prikkHTML  = visNivaaPrikk ? `<span class="ks-nivaa-prikk" style="background:${farge}"></span>` : '';
+  // Map 'Semifinale' til 'Plass X–Y' for B/C-bracket
+  const rundeVisning = (rundeNavn, nivaa) => {
+    if (rundeNavn !== 'Semifinale' || nivaa === 'A') return rundeNavn;
+    const sp = nivaa === 'B' ? 9 : 17;
+    return `Plass ${sp}–${sp + 3}`;
+  };
   const nivaSuffix = visNivaaPrikk ? ` ${nivaa}` : '';
-  const typeMerke  = `<div class="ks-type-merke">${prikkHTML}${esc((kamp.runde ?? '') + nivaSuffix)}</div>`;
+  const typeMerke  = `<div class="ks-type-merke">${prikkHTML}${esc(rundeVisning(kamp.runde ?? '', nivaa) + nivaSuffix)}</div>`;
 
   return `<div class="ks-kort ${kantKl}" style="width:154px;flex-shrink:0">
     ${typeMerke}
@@ -1475,6 +1481,21 @@ function _slBracketSeksjon(t, lagMap, aktiveNivaaer, visNivaaPrikk, NIVAA_INFO, 
   const sl = t.sluttspill;
   let html = `<div class="sl-bracket-seksjon">
     <div class="sl-bracket-hdr">Live bracket</div>`;
+
+  // Bestem startPlass per nivå fra konfig, eller utled fra bracket-navnene
+  const startPlassForNivaa = (nivaa) => {
+    if (nivaa === 'A') return 1;
+    if (nivaa === 'B') return t.konfig?.startPlassB ?? 9;
+    if (nivaa === 'C') return t.konfig?.startPlassC ?? 17;
+    return 1;
+  };
+
+  // Map 'Semifinale' til 'Plass X–Y' for B/C basert på startPlass
+  const visningsNavn = (rundeNavn, nivaa) => {
+    if (rundeNavn !== 'Semifinale' || nivaa === 'A') return rundeNavn;
+    const sp = startPlassForNivaa(nivaa);
+    return `Plass ${sp}–${sp + 3}`;
+  };
 
   for (const nivaa of aktiveNivaaer) {
     const kamper = sl[nivaa]?.kamper ?? [];
@@ -1505,7 +1526,7 @@ function _slBracketSeksjon(t, lagMap, aktiveNivaaer, visNivaaPrikk, NIVAA_INFO, 
     html += `<div class="sl-scroll">`;
     for (const [rundeNavn, rKamper] of sortertRunder) {
       html += `<div class="sl-runde">
-        <div class="sl-runde-navn">${esc(rundeNavn)}</div>`;
+        <div class="sl-runde-navn">${esc(visningsNavn(rundeNavn, nivaa))}</div>`;
       for (const k of rKamper) {
         const l1  = lagMap[k.lag1Id]?.navn ?? (k.lag1Id ? '?' : null);
         const l2  = lagMap[k.lag2Id]?.navn ?? (k.lag2Id ? '?' : null);
