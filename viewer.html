@@ -1346,15 +1346,9 @@ function _slKortRad(kamper, lagMap, opts = {}) {
     });
   });
 
-  // Bruker samme scroll-struktur som puljeskjema (mobil-stil, alltid scroll)
-  // slik at kortene alltid er riktig bredde (138px, som ks-kort i mobil-modus)
-  return `<div class="ks-runde-blokk">
-    <div class="ks-runde-rad-mobil" style="display:flex">
-      <div class="ks-scroll-wrap">
-        <div class="ks-scroll-innhold">
-          <div class="ks-kort-rad-mobil">${kortHTMLer.join('')}</div>
-        </div>
-      </div>
+  return `<div class="ks-runde-blokk" style="padding:8px 12px 10px">
+    <div style="display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none">
+      ${kortHTMLer.join('')}
     </div>
   </div>`;
 }
@@ -1463,7 +1457,7 @@ function _slKort(kamp, lagMap, opts = {}) {
   const nivaSuffix = visNivaaPrikk ? ` ${nivaa}` : '';
   const typeMerke  = `<div class="ks-type-merke">${prikkHTML}${esc((kamp.runde ?? '') + nivaSuffix)}</div>`;
 
-  return `<div class="ks-kort ${kantKl}">
+  return `<div class="ks-kort ${kantKl}" style="width:154px;flex-shrink:0">
     ${typeMerke}
     <div class="ks-lag">${lagRad(kamp.lag1Id, l1Navn, dot1Kl, v1, 'lag1')}</div>
     <div class="ks-vs">VS</div>
