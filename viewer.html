@@ -1141,6 +1141,8 @@ function renderSluttspillKampskjema(t, lagMap) {
     return '<div class="tom">Sluttspill ikke startet ennå.</div>';
   }
 
+  const antallBaner = t.antallBaner ?? t.konfig?.antallBaner ?? 6;
+
   // Saml kamper fra alle bracket-nivåer med metadata
   const NIVAA_INFO = {
     A: { farge: '#f5c842', label: 'A-sluttspill' },
@@ -1153,7 +1155,7 @@ function renderSluttspillKampskjema(t, lagMap) {
     '9. plass','11. plass','13. plass','15. plass','17. plass','19. plass',
   ];
 
-  // Finn aktive bracket-nivåer (for å vite om vi skal vise prikk)
+  // Finn aktive bracket-nivåer (for å vite om vi skal vise prikk/nivå-suffix)
   const aktiveNivaaer = ['A','B','C'].filter(n => sl[n]?.kamper?.length > 0);
   const visNivaaPrikk = aktiveNivaaer.length > 1;
 
@@ -1191,8 +1193,22 @@ function renderSluttspillKampskjema(t, lagMap) {
   // Kategoriser runder
   const ferdigeRunder   = sorterteRunder.filter(([,ks]) => erFerdigRunde(ks));
   const uferdigeRunder  = sorterteRunder.filter(([,ks]) => !erFerdigRunde(ks) && harSynligeKamper(ks));
-  const synligeRunder   = uferdigeRunder.slice(0, 3);
-  const skjulteRunder   = uferdigeRunder.slice(3);
+
+  // Split runder med flere kamper enn antallBaner inn i biter
+  // slik at maks antallBaner kort vises per rad
+  const splitRunder = [];
+  for (const [rundeNavn, kamper] of uferdigeRunder) {
+    if (kamper.length <= antallBaner) {
+      splitRunder.push([rundeNavn, kamper]);
+    } else {
+      for (let i = 0; i < kamper.length; i += antallBaner) {
+        splitRunder.push([rundeNavn, kamper.slice(i, i + antallBaner)]);
+      }
+    }
+  }
+
+  const synligeRunder = splitRunder.slice(0, 3);
+  const skjulteRunder = splitRunder.slice(3);
 
   // Finn aktiv runde (første med spilleklare kamper)
   let aktivRundeNavn = null;
@@ -1210,7 +1226,7 @@ function renderSluttspillKampskjema(t, lagMap) {
   // ── SYNLIGE RUNDER ──
   synligeRunder.forEach(([rundeNavn, kamper], idx) => {
     const erAktiv = rundeNavn === aktivRundeNavn;
-    html += _slRundeRad(rundeNavn, kamper, lagMap, { erAktiv, visNivaaPrikk, NIVAA_INFO });
+    html += _slRundeRad(rundeNavn, kamper, lagMap, { erAktiv, visNivaaPrikk, NIVAA_INFO, antallBaner });
     if (idx === 0) html += `<div class="ks-sveip-hint">← Sveip for å se alle kamper →</div>`;
   });
 
@@ -1224,7 +1240,7 @@ function renderSluttspillKampskjema(t, lagMap) {
     </div>
     <div class="ks-kollaps-innhold" id="sl-ekstra-runder">`;
     for (const [rundeNavn, kamper] of skjulteRunder) {
-      html += _slRundeRad(rundeNavn, kamper, lagMap, { erAktiv: false, visNivaaPrikk, NIVAA_INFO });
+      html += _slRundeRad(rundeNavn, kamper, lagMap, { erAktiv: false, visNivaaPrikk, NIVAA_INFO, antallBaner });
     }
     html += '</div>';
   }
@@ -1381,11 +1397,12 @@ function _slKort(kamp, lagMap, opts = {}) {
     ).join('');
   };
 
-  // Type-merke: viser runde-navn + nivå-prikk hvis flere nivåer
+  // Type-merke: viser «Kvartfinale A» — nivå-suffix alltid med når flere nivåer
   const prikkHTML = visNivaaPrikk
     ? `<span class="ks-nivaa-prikk" style="background:${farge}"></span>` : '';
-  const typeNavn  = kamp.runde ?? '';
-  const typeMerke = `<div class="ks-type-merke">${prikkHTML}${esc(typeNavn)}</div>`;
+  const nivaSuffix = visNivaaPrikk ? ` ${nivaa}` : '';
+  const typeNavn   = (kamp.runde ?? '') + nivaSuffix;
+  const typeMerke  = `<div class="ks-type-merke">${prikkHTML}${esc(typeNavn)}</div>`;
 
   return `<div class="ks-kort ${kantKl}">
     ${typeMerke}
