@@ -29,6 +29,7 @@ import {
   avsluttTurnering,
   validerResultat,
   beregnBestOf3,
+  nullstillSluttspill,
 } from './turnering.js';
 import {
   getAktivTurneringId,
@@ -875,6 +876,21 @@ window.avsluttTurneringUI = function() {
       visResultat(oppdatert, rangering);
     } catch (e) {
       visMelding(e?.message ?? 'Feil ved avslutning.', 'feil');
+    }
+  });
+};
+
+window.nullstillSluttspillUI = function() {
+  krevAdminTurnering('Nullstill sluttspill', 'PIN kreves for å nullstille sluttspillet.', async () => {
+    try {
+      const id = getAktivTurneringId();
+      await nullstillSluttspill(id);
+      const oppdatert = await hentTurnering(id);
+      app.aktivTurnering = oppdatert;
+      navigerTurnering('turnering-bracket', 'turnering-oppsett');
+      visMelding('Sluttspill nullstilt — juster seeding og start på nytt.');
+    } catch (e) {
+      visMelding(e?.message ?? 'Feil ved nullstilling.', 'feil');
     }
   });
 };

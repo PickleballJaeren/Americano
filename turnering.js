@@ -632,3 +632,19 @@ export async function slettTurnering(turneringId) {
     slettet: serverTimestamp(),
   });
 }
+
+/**
+ * Nullstiller sluttspillet — sletter bracket-data og setter
+ * status tilbake til PLAYOFF_SEEDING slik at admin kan
+ * justere seeding og starte sluttspillet på nytt.
+ */
+export async function nullstillSluttspill(turneringId) {
+  const t = await hentTurnering(turneringId);
+  if (t.status !== T_STATUS.PLAYOFFS) {
+    throw new Error('Kan bare nullstille et aktivt sluttspill.');
+  }
+  await updateDoc(doc(db, TS.TURNERINGER, turneringId), {
+    sluttspill: null,
+    status:     T_STATUS.PLAYOFF_SEEDING,
+  });
+}
