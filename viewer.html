@@ -1547,19 +1547,19 @@ function _slBracketSeksjon(t, lagMap, aktiveNivaaer, visNivaaPrikk, NIVAA_INFO, 
       const nQF = qf.length;
       const nedreRad = nQF + 1;
 
-      gridHTML = `<div style="display:grid;grid-template-columns:repeat(5,154px);gap:5px 10px;min-width:max-content">`;
+      gridHTML = `<div style="display:grid;grid-template-columns:repeat(5,154px);gap:5px 10px;min-width:max-content;align-items:end">`;
       gridHTML += `<div style="grid-column:1;grid-row:1" class="sl-runde-navn">Kvartfinale</div>`;
       if (p58.length) gridHTML += `<div style="grid-column:2;grid-row:1" class="sl-runde-navn">Plass 5–8</div>`;
       if (sf.length)  gridHTML += `<div style="grid-column:3;grid-row:1" class="sl-runde-navn">Semifinale</div>`;
       if (p1.length)  gridHTML += `<div style="grid-column:4;grid-row:1" class="sl-runde-navn">1. plass</div>`;
-      qf.forEach((k, i)  => { gridHTML += celleHTML(1, i + 2, '', [k], false); });
-      p58.forEach((k, i) => { gridHTML += celleHTML(2, i + 2, '', [k], false); });
-      if (sf.length >= 1) gridHTML += celleHTML(3, 2, '', [sf[0]], false);
-      if (sf.length >= 2) gridHTML += celleHTML(3, 3, '', [sf[1]], false);
-      if (p1.length) gridHTML += celleHTML(4, 2, '', p1, false);
-      if (p5.length) gridHTML += celleHTML(3, nedreRad, '5. plass', p5, true);
-      if (p7.length) gridHTML += celleHTML(4, nedreRad, '7. plass', p7, true);
-      if (p3.length) gridHTML += celleHTML(5, nedreRad, '3. plass', p3, true);
+      qf.forEach((k, i)  => { gridHTML += celleHTML(1, i + 2, '', [k], false, i === nQF - 1); });
+      p58.forEach((k, i) => { gridHTML += celleHTML(2, i + 2, '', [k], false, i === p58.length - 1 && p58.length < nQF); });
+      if (sf.length >= 1) gridHTML += celleHTML(3, 2, '', [sf[0]]);
+      if (sf.length >= 2) gridHTML += celleHTML(3, 3, '', [sf[1]]);
+      if (p1.length) gridHTML += celleHTML(4, 2, '', p1);
+      if (p5.length) gridHTML += celleHTML(3, nedreRad, '5. plass', p5);
+      if (p7.length) gridHTML += celleHTML(4, nedreRad, '7. plass', p7);
+      if (p3.length) gridHTML += celleHTML(5, nedreRad, '3. plass', p3);
       gridHTML += `</div>`;
 
     } else {
@@ -1580,19 +1580,19 @@ function _slBracketSeksjon(t, lagMap, aktiveNivaaer, visNivaaPrikk, NIVAA_INFO, 
       const nQF  = qf.length;
       const nedreRad = nQF + 1;
 
-      gridHTML = `<div style="display:grid;grid-template-columns:repeat(5,154px);gap:5px 10px;min-width:max-content">`;
+      gridHTML = `<div style="display:grid;grid-template-columns:repeat(5,154px);gap:5px 10px;min-width:max-content;align-items:end">`;
       gridHTML += `<div style="grid-column:1;grid-row:1" class="sl-runde-navn">Kvartfinale</div>`;
       if (sf13.length) gridHTML += `<div style="grid-column:2;grid-row:1" class="sl-runde-navn">${esc(sf13navn)}</div>`;
       if (sf9.length)  gridHTML += `<div style="grid-column:3;grid-row:1" class="sl-runde-navn">${esc(sf9navn)}</div>`;
       if (p9.length)   gridHTML += `<div style="grid-column:4;grid-row:1" class="sl-runde-navn">${esc(p9navn)}</div>`;
-      qf.forEach((k, i)   => { gridHTML += celleHTML(1, i + 2, '', [k], false); });
-      sf13.forEach((k, i) => { gridHTML += celleHTML(2, i + 2, '', [k], false); });
-      if (sf9.length >= 1) gridHTML += celleHTML(3, 2, '', [sf9[0]], false);
+      qf.forEach((k, i)   => { gridHTML += celleHTML(1, i + 2, '', [k], false, i === nQF - 1); });
+      sf13.forEach((k, i) => { gridHTML += celleHTML(2, i + 2, '', [k], false, i === sf13.length - 1 && sf13.length < nQF); });
+      if (sf9.length >= 1) gridHTML += celleHTML(3, 2, '', [sf9[0]], false, sf9.length === 1);
       if (sf9.length >= 2) gridHTML += celleHTML(3, 3, '', [sf9[1]], false);
       if (p9.length)  gridHTML += celleHTML(4, 2, '', p9, false);
-      if (p11.length) gridHTML += celleHTML(3, nedreRad, p11navn, p11, true);
-      if (p13.length) gridHTML += celleHTML(4, nedreRad, p13navn, p13, true);
-      if (p15.length) gridHTML += celleHTML(5, nedreRad, p15navn, p15, true);
+      if (p11.length) gridHTML += celleHTML(3, nedreRad, p11navn, p11);
+      if (p13.length) gridHTML += celleHTML(4, nedreRad, p13navn, p13);
+      if (p15.length) gridHTML += celleHTML(5, nedreRad, p15navn, p15);
       gridHTML += `</div>`;
     }
 
