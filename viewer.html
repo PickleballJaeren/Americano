@@ -565,7 +565,7 @@ function renderBracket(t, lagMap) {
 }
 
 function grupperPerRunde(kamper) {
-  const rekkefølge = ['Åttedelsfinale','Kvartfinale','Semifinale','Plass 5–8','5. plass','7. plass','3. plass','1. plass','9. plass','11. plass','13. plass','14. plass','15. plass','16. plass','17. plass','19. plass','21. plass','23. plass'];
+  const rekkefølge = ['Åttedelsfinale','Kvartfinale','Plass 5–8','Plass 5–6','Plass 13–16','Plass 21–24','Semifinale','5. plass','7. plass','3. plass','1. plass','Finale','9. plass','11. plass','13. plass','15. plass','17. plass','19. plass','21. plass','23. plass'];
   const map = {};
   for (const k of kamper) {
     const r = k.runde ?? 'Ukjent';
@@ -1150,9 +1150,13 @@ function renderSluttspillKampskjema(t, lagMap) {
     C: { farge: '#7a90a8', label: 'C-sluttspill' },
   };
   const RUNDE_REKKEFØLGE = [
-    'Åttedelsfinale','Kvartfinale','Plass 5–8','Plass 5–6','Semifinale',
+    'Åttedelsfinale','Kvartfinale',
+    'Plass 5–8','Plass 5–6',
+    'Plass 13–16','Plass 21–24',
+    'Semifinale',
     '5. plass','7. plass','3. plass','1. plass','Finale',
-    '9. plass','11. plass','13. plass','15. plass','17. plass','19. plass',
+    '9. plass','11. plass','13. plass','15. plass',
+    '17. plass','19. plass','21. plass','23. plass',
   ];
 
   // Finn aktive bracket-nivåer (for å vite om vi skal vise prikk/nivå-suffix)
@@ -1166,6 +1170,22 @@ function renderSluttspillKampskjema(t, lagMap) {
       alleKamper.push({ ...k, _nivaa: nivaa, _farge: NIVAA_INFO[nivaa].farge });
     }
   }
+
+  // Bygg omvendt tabell: kampId → { vinnerFra: [kamp,...], taperFra: [kamp,...] }
+  // Brukes til å vise «Vinner av Kvartfinale A» / «Taper av Kvartfinale B» i kortene
+  const kampFraMap = {};
+  for (const k of alleKamper) {
+    if (k.winner_to) {
+      if (!kampFraMap[k.winner_to]) kampFraMap[k.winner_to] = { vinnerFra: [], taperFra: [] };
+      kampFraMap[k.winner_to].vinnerFra.push(k);
+    }
+    if (k.loser_to) {
+      if (!kampFraMap[k.loser_to]) kampFraMap[k.loser_to] = { vinnerFra: [], taperFra: [] };
+      kampFraMap[k.loser_to].taperFra.push(k);
+    }
+  }
+  // Slå opp kamp på ID
+  const kampById = Object.fromEntries(alleKamper.map(k => [k.id, k]));
 
   // Beregn totalprogresjon
   const totalt       = alleKamper.length;
@@ -1188,7 +1208,12 @@ function renderSluttspillKampskjema(t, lagMap) {
   // eller minst én kamp som ikke er ferdig og den forrige synlige runden er ferdig
   const erSpilleklar = (k) => !!(k.lag1Id && k.lag2Id && !k.ferdig);
   const erFerdigRunde = (kamper) => kamper.every(k => k.ferdig);
-  const harSynligeKamper = (kamper) => kamper.some(k => k.ferdig || k.lag1Id || k.lag2Id);
+  // Vis en runde hvis den har minst én kamp som er ferdig, spilleklar, eller har kjente kilder
+  const harSynligeKamper = (kamper) => kamper.some(k =>
+    k.ferdig || k.lag1Id || k.lag2Id ||
+    kampFraMap[k.id]?.vinnerFra.length > 0 ||
+    kampFraMap[k.id]?.taperFra.length > 0
+  );
 
   // Kategoriser runder
   const ferdigeRunder   = sorterteRunder.filter(([,ks]) => erFerdigRunde(ks));
@@ -1243,7 +1268,7 @@ function renderSluttspillKampskjema(t, lagMap) {
     // For rad 2+: tell hvor mange som faktisk kan starte (ledige baner)
     const antallKanStarte = venterPåBane ? ledigeBaner : 0;
     html += _slRundeRad(rundeNavn, kamper, lagMap, {
-      erAktiv, venterPåBane, antallKanStarte, visNivaaPrikk, NIVAA_INFO, antallBaner,
+      erAktiv, venterPåBane, antallKanStarte, visNivaaPrikk, NIVAA_INFO, antallBaner, kampFraMap,
     });
     if (idx === 0) html += `<div class="ks-sveip-hint">← Sveip for å se alle kamper →</div>`;
     if (erSammeRunde) erFørsteRadAvAktivRunde = false;
@@ -1259,7 +1284,7 @@ function renderSluttspillKampskjema(t, lagMap) {
     </div>
     <div class="ks-kollaps-innhold" id="sl-ekstra-runder">`;
     for (const [rundeNavn, kamper] of skjulteRunder) {
-      html += _slRundeRad(rundeNavn, kamper, lagMap, { erAktiv: false, visNivaaPrikk, NIVAA_INFO, antallBaner });
+      html += _slRundeRad(rundeNavn, kamper, lagMap, { erAktiv: false, venterPåBane: false, antallKanStarte: 0, visNivaaPrikk, NIVAA_INFO, antallBaner, kampFraMap });
     }
     html += '</div>';
   }
@@ -1307,13 +1332,12 @@ function renderSluttspillKampskjema(t, lagMap) {
  * Rendrer én spillerunde-rad i sluttspill-kampskjema.
  */
 function _slRundeRad(rundeNavn, kamper, lagMap, opts = {}) {
-  const { erAktiv, venterPåBane, antallKanStarte = 0, visNivaaPrikk, NIVAA_INFO } = opts;
+  const { erAktiv, venterPåBane, antallKanStarte = 0, visNivaaPrikk, NIVAA_INFO, kampFraMap = {} } = opts;
 
   let grønneIgjen = erAktiv ? kamper.length : antallKanStarte;
 
   const kortHTMLer = kamper.map(k => {
     const klar = !!(k.lag1Id && k.lag2Id && !k.ferdig);
-    // I venterPåBane-rader: bare de første antallKanStarte klar-kortene er grønne
     const kanStarteNå = klar && venterPåBane && grønneIgjen > 0;
     if (kanStarteNå) grønneIgjen--;
     const lag1Klar = klar && (erAktiv || kanStarteNå);
@@ -1321,8 +1345,7 @@ function _slRundeRad(rundeNavn, kamper, lagMap, opts = {}) {
     return _slKort(k, lagMap, {
       visNivaaPrikk, NIVAA_INFO, erAktiv,
       venterPåBane: venterPåBane && !kanStarteNå,
-      kanStarteNå,
-      lag1Klar, lag2Klar,
+      kanStarteNå, lag1Klar, lag2Klar, kampFraMap,
     });
   });
 
@@ -1369,23 +1392,52 @@ function _slRundeRad(rundeNavn, kamper, lagMap, opts = {}) {
  * Gjenbruker ks-kort-stilen, men type-merket erstatter pulje-merket.
  */
 function _slKort(kamp, lagMap, opts = {}) {
-  const { visNivaaPrikk, NIVAA_INFO, erAktiv, venterPåBane, kanStarteNå, lag1Klar, lag2Klar } = opts;
-  const nivaa  = kamp._nivaa ?? 'A';
-  const farge  = kamp._farge ?? '#f5c842';
-  const info   = NIVAA_INFO?.[nivaa];
+  const { visNivaaPrikk, NIVAA_INFO, erAktiv, venterPåBane, kanStarteNå, lag1Klar, lag2Klar, kampFraMap = {} } = opts;
+  const nivaa = kamp._nivaa ?? 'A';
+  const farge = kamp._farge ?? '#f5c842';
 
   const lag1 = lagMap[kamp.lag1Id];
   const lag2 = lagMap[kamp.lag2Id];
 
-  const hentNavn = (lag, fallback) => {
-    if (!lag) return fallback ?? null;
+  const hentNavn = (lag) => {
+    if (!lag) return null;
     if (lag.spiller1 && lag.spiller2) return [lag.spiller1, lag.spiller2];
     if (lag.navn?.includes(' / ')) return lag.navn.split(' / ').map(s => s.trim());
     return [lag.navn ?? '?'];
   };
 
-  const l1Navn = hentNavn(lag1, null);
-  const l2Navn = hentNavn(lag2, null);
+  const l1Navn = hentNavn(lag1);
+  const l2Navn = hentNavn(lag2);
+
+  // Lag beskrivende tekst for ukjente lag basert på winner_to/loser_to-koblinger
+  const fraInfo = kampFraMap[kamp.id] ?? { vinnerFra: [], taperFra: [] };
+  const lagLabel = (lagId, posisjon) => {
+    if (lagId) return null; // lag er kjent — bruk vanlig navn
+    // Finn kilde basert på posisjon (lag1 = første i vinnerFra/taperFra, lag2 = andre)
+    const vinnere = fraInfo.vinnerFra;
+    const tapere  = fraInfo.taperFra;
+    const idx     = posisjon === 'lag1' ? 0 : 1;
+    if (vinnere[idx]) {
+      const suffix = visNivaaPrikk ? ` ${vinnere[idx]._nivaa}` : '';
+      return `Vinner av ${vinnere[idx].runde}${suffix}`;
+    }
+    if (tapere[idx]) {
+      const suffix = visNivaaPrikk ? ` ${tapere[idx]._nivaa}` : '';
+      return `Taper av ${tapere[idx].runde}${suffix}`;
+    }
+    // Fallback: finn om det finnes én vinner og én taper
+    if (posisjon === 'lag1' && vinnere[0]) {
+      const suffix = visNivaaPrikk ? ` ${vinnere[0]._nivaa}` : '';
+      return `Vinner av ${vinnere[0].runde}${suffix}`;
+    }
+    if (posisjon === 'lag2' && (vinnere[1] || tapere[0])) {
+      const k2 = vinnere[1] ?? tapere[0];
+      const prefix = vinnere[1] ? 'Vinner' : 'Taper';
+      const suffix = visNivaaPrikk ? ` ${k2._nivaa}` : '';
+      return `${prefix} av ${k2.runde}${suffix}`;
+    }
+    return null;
+  };
 
   let kantKl = '', dot1Kl = 'graa', dot2Kl = 'graa', statusHTML = '';
 
@@ -1411,8 +1463,6 @@ function _slKort(kamp, lagMap, opts = {}) {
     dot1Kl = lag1Klar ? 'gul' : 'graa';
     dot2Kl = lag2Klar ? 'gul' : 'graa';
     statusHTML = `<div class="ks-spacer"></div><div class="ks-status gul">Venter på motstander</div>`;
-  } else if (!kamp.lag1Id && !kamp.lag2Id) {
-    statusHTML = `<div class="ks-spacer"></div><div class="ks-status graa">Venter på begge lag</div>`;
   } else {
     statusHTML = `<div class="ks-spacer"></div><div class="ks-status graa">Venter på lag</div>`;
   }
@@ -1420,27 +1470,32 @@ function _slKort(kamp, lagMap, opts = {}) {
   const v1 = kamp.ferdig && kamp.lag1Poeng > kamp.lag2Poeng;
   const v2 = kamp.ferdig && kamp.lag2Poeng > kamp.lag1Poeng;
 
-  const lagRader = (navnArr, dotKl, erVinner, erTbd) => {
-    if (erTbd) {
-      return `<div class="ks-spiller" style="color:var(--muted);font-style:italic;font-size:11px"><span class="ks-dot graa"></span>TBD</div>`;
+  // Bygg lag-rader: kjente navn, beskrivende tekst, eller grå prikk
+  const lagRad = (lagId, navnArr, dotKl, erVinner, posisjon) => {
+    if (lagId && navnArr) {
+      // Lag er kjent
+      return navnArr.map(n =>
+        `<div class="ks-spiller${erVinner?' vinner':''}"><span class="ks-dot ${kamp.ferdig?'graa':dotKl}"></span>${esc(n)}</div>`
+      ).join('');
     }
-    return (navnArr ?? ['?']).map(n =>
-      `<div class="ks-spiller${erVinner?' vinner':''}"><span class="ks-dot ${kamp.ferdig?'graa':dotKl}"></span>${esc(n)}</div>`
-    ).join('');
+    const label = lagLabel(lagId, posisjon);
+    if (label) {
+      // Kilde kjent — vis beskrivende tekst
+      return `<div class="ks-spiller" style="color:var(--muted);font-style:italic;font-size:11px"><span class="ks-dot graa"></span>${esc(label)}</div>`;
+    }
+    return `<div class="ks-spiller" style="color:var(--muted);font-style:italic;font-size:11px"><span class="ks-dot graa"></span>TBD</div>`;
   };
 
-  // Type-merke: viser «Kvartfinale A» — nivå-suffix alltid med når flere nivåer
-  const prikkHTML = visNivaaPrikk
-    ? `<span class="ks-nivaa-prikk" style="background:${farge}"></span>` : '';
+  // Type-merke: viser «Kvartfinale A» — nivå-suffix når flere nivåer
+  const prikkHTML  = visNivaaPrikk ? `<span class="ks-nivaa-prikk" style="background:${farge}"></span>` : '';
   const nivaSuffix = visNivaaPrikk ? ` ${nivaa}` : '';
-  const typeNavn   = (kamp.runde ?? '') + nivaSuffix;
-  const typeMerke  = `<div class="ks-type-merke">${prikkHTML}${esc(typeNavn)}</div>`;
+  const typeMerke  = `<div class="ks-type-merke">${prikkHTML}${esc((kamp.runde ?? '') + nivaSuffix)}</div>`;
 
   return `<div class="ks-kort ${kantKl}">
     ${typeMerke}
-    <div class="ks-lag">${lagRader(l1Navn, dot1Kl, v1, !kamp.lag1Id)}</div>
+    <div class="ks-lag">${lagRad(kamp.lag1Id, l1Navn, dot1Kl, v1, 'lag1')}</div>
     <div class="ks-vs">VS</div>
-    <div class="ks-lag">${lagRader(l2Navn, dot2Kl, v2, !kamp.lag2Id)}</div>
+    <div class="ks-lag">${lagRad(kamp.lag2Id, l2Navn, dot2Kl, v2, 'lag2')}</div>
     ${statusHTML}
   </div>`;
 }

@@ -728,7 +728,7 @@ export function genererBCBracket(lagIds, nivaa, startPlass, konfig = null) {
     kamper.push(_lagKamp(`${prefix}_FIN`, null, null, null, null, `${startPlass}. plass`));
     if (medBronse) {
       kamper.push(_lagKamp(`${prefix}_BRO`,     null, null, null, null, `${bronse}. plass`));
-      kamper.push(_lagKamp(`${prefix}_P13_SF`,  null, null, `${prefix}_P13_FIN`, null, `${startPlass + 4}. plass`));
+      kamper.push(_lagKamp(`${prefix}_P13_SF`,  null, null, `${prefix}_P13_FIN`, null, `Plass ${startPlass + 4}–${startPlass + 7}`));
       kamper.push(_lagKamp(`${prefix}_P13_FIN`, null, null, null, null, `${startPlass + 4}. plass`));
     }
     return kamper;
@@ -746,8 +746,8 @@ export function genererBCBracket(lagIds, nivaa, startPlass, konfig = null) {
   kamper.push(_lagKamp(`${prefix}_FIN`, null, null, null, null, `${startPlass}. plass`));
   if (medBronse) {
     kamper.push(_lagKamp(`${prefix}_BRO`,      null, null, null, null, `${bronse}. plass`));
-    kamper.push(_lagKamp(`${prefix}_P13_SF1`,  null, null, `${prefix}_P13_FIN`, `${prefix}_P15_FIN`, `${startPlass + 4}. plass`));
-    kamper.push(_lagKamp(`${prefix}_P13_SF2`,  null, null, `${prefix}_P13_FIN`, `${prefix}_P15_FIN`, `${startPlass + 4}. plass`));
+    kamper.push(_lagKamp(`${prefix}_P13_SF1`,  null, null, `${prefix}_P13_FIN`, `${prefix}_P15_FIN`, `Plass ${startPlass + 4}–${startPlass + 7}`));
+    kamper.push(_lagKamp(`${prefix}_P13_SF2`,  null, null, `${prefix}_P13_FIN`, `${prefix}_P15_FIN`, `Plass ${startPlass + 4}–${startPlass + 7}`));
     kamper.push(_lagKamp(`${prefix}_P13_FIN`,  null, null, null, null, `${startPlass + 4}. plass`));
     kamper.push(_lagKamp(`${prefix}_P15_FIN`,  null, null, null, null, `${startPlass + 6}. plass`));
   }

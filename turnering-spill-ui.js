@@ -613,7 +613,7 @@ export async function visBracket(turnering) {
   ];
 
   // Grupper alle kamper i globale spillerunder basert på runde-navn
-  const rundeRekkefølge = ['Åttedelsfinale', 'Kvartfinale', 'Plass 5–8', 'Plass 5–6', 'Semifinale', '5. plass', '7. plass', '3. plass', '1. plass', 'Finale', '9. plass', '11. plass', '13. plass', '15. plass', '17. plass', '19. plass'];
+  const rundeRekkefølge = ['Åttedelsfinale', 'Kvartfinale', 'Plass 5–8', 'Plass 5–6', 'Plass 13–16', 'Plass 21–24', 'Semifinale', '5. plass', '7. plass', '3. plass', '1. plass', 'Finale', '9. plass', '11. plass', '13. plass', '15. plass', '17. plass', '19. plass', '21. plass', '23. plass'];
   const rundeMap = {};
   for (const { kamp, nivaa, farge } of alleKamper) {
     const r = kamp.runde ?? 'Ukjent';
@@ -654,7 +654,7 @@ export async function visBracket(turnering) {
 // bracketNivaaHTML beholdes ikke lenger — visBracket håndterer all visning direkte.
 
 function grupperKamperIRunder(kamper) {
-  const rundeRekkefølge = ['Åttedelsfinale', 'Kvartfinale', 'Plass 5–8', 'Plass 5–6', 'Semifinale', '5. plass', '7. plass', '3. plass', '1. plass', 'Finale', '9. plass', '11. plass', '13. plass', '15. plass', '17. plass', '19. plass'];
+  const rundeRekkefølge = ['Åttedelsfinale', 'Kvartfinale', 'Plass 5–8', 'Plass 5–6', 'Plass 13–16', 'Plass 21–24', 'Semifinale', '5. plass', '7. plass', '3. plass', '1. plass', 'Finale', '9. plass', '11. plass', '13. plass', '15. plass', '17. plass', '19. plass', '21. plass', '23. plass'];
   const rundeMap = {};
   for (const k of kamper) {
     if (!rundeMap[k.runde]) rundeMap[k.runde] = [];
