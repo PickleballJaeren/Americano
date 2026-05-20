@@ -228,7 +228,7 @@
   .sl-nivaa-tittel { font-size: 11px; font-weight: 600; color: var(--muted2); display: flex; align-items: center; gap: 5px; margin-bottom: 7px; }
   .sl-scroll { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 4px; }
   .sl-scroll::-webkit-scrollbar { display: none; }
-  .sl-runde { min-width: 180px; flex-shrink: 0; }
+  .sl-runde { min-width: 150px; flex-shrink: 0; }
   .sl-runde-navn { font-size: 12px; color: var(--muted2); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 5px; }
   .sl-kamp { background: var(--navy3); border: 1px solid var(--border2); border-radius: 8px; padding: 7px 9px; margin-bottom: 5px; }
   .sl-lag { font-size: 13px; padding: 2px 0; display: flex; justify-content: space-between; gap: 4px; color: var(--muted2); white-space: nowrap; overflow: hidden; }
@@ -1501,7 +1501,7 @@ function _slBracketSeksjon(t, lagMap, aktiveNivaaer, visNivaaPrikk, NIVAA_INFO, 
       const nQF = qf.length;
       const nedreRad = nQF + 1;
 
-      gridHTML = `<div style="display:grid;grid-template-columns:repeat(5,180px);gap:5px 6px;min-width:max-content">`;
+      gridHTML = `<div style="display:grid;grid-template-columns:repeat(5,150px);gap:5px 6px;min-width:max-content">`;
       gridHTML += `<div style="grid-column:1;grid-row:1" class="sl-runde-navn">Kvartfinale</div>`;
       if (p58.length) gridHTML += `<div style="grid-column:2;grid-row:1" class="sl-runde-navn">Plass 5–8</div>`;
       if (sf.length)  gridHTML += `<div style="grid-column:3;grid-row:1" class="sl-runde-navn">Semifinale</div>`;
@@ -1534,7 +1534,7 @@ function _slBracketSeksjon(t, lagMap, aktiveNivaaer, visNivaaPrikk, NIVAA_INFO, 
       const nQF  = qf.length;
       const nedreRad = nQF + 1;
 
-      gridHTML = `<div style="display:grid;grid-template-columns:repeat(5,180px);gap:5px 6px;min-width:max-content">`;
+      gridHTML = `<div style="display:grid;grid-template-columns:repeat(5,150px);gap:5px 6px;min-width:max-content">`;
       gridHTML += `<div style="grid-column:1;grid-row:1" class="sl-runde-navn">Kvartfinale</div>`;
       if (sf13.length) gridHTML += `<div style="grid-column:2;grid-row:1" class="sl-runde-navn">${esc(sf13navn)}</div>`;
       if (sf9.length)  gridHTML += `<div style="grid-column:3;grid-row:1" class="sl-runde-navn">${esc(sf9navn)}</div>`;
