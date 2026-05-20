@@ -3,7 +3,7 @@
 // ════════════════════════════════════════════════════════
 import {
   db, SAM, STARTRATING, PARTER_6_DOBBEL, PARTER_6_SINGEL,
-  collection, doc, getDocs, getDoc, updateDoc,
+  collection, doc, addDoc, getDocs, getDoc, updateDoc,
   query, where, limit, serverTimestamp, writeBatch, runTransaction,
 } from './firebase.js';
 import { app, erMix } from './state.js';
@@ -1397,6 +1397,23 @@ export async function leggTilSpillerIOkt(spillerId) {
       navn:   spiller.navn   ?? 'Ukjent',
       rating: spiller.rating ?? STARTRATING,
     }];
+
+    // Opprett TS-dokument med riktig ratingVedStart slik at Elo-beregningen
+    // ved øktavslutning bruker spillerens faktiske rating — ikke STARTRATING-fallback.
+    if (db && app.treningId) {
+      try {
+        await addDoc(collection(db, SAM.TS), {
+          treningId:       app.treningId,
+          spillerId:       spiller.id,
+          spillerNavn:     spiller.navn     ?? 'Ukjent',
+          ratingVedStart:  spiller.rating   ?? STARTRATING,
+          sluttPlassering: null,
+          paVenteliste:    true,
+        });
+      } catch (e) {
+        console.warn('[leggTilSpillerIOkt] Kunne ikke opprette TS-dokument:', e?.message ?? e);
+      }
+    }
   }
 
   await _lagreDeltakerEndring();
