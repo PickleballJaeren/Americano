@@ -1262,16 +1262,6 @@ function renderSluttspillKampskjema(t, lagMap) {
     html += '</div>';
   }
 
-  // ── LEGEND ──
-  html += `<div class="ks-legend">
-    <div class="ks-leg-item"><span class="ks-leg-dot" style="background:var(--green2)"></span>Spiller nå / kan spilles</div>
-    <div class="ks-leg-item"><span class="ks-leg-dot" style="background:var(--yellow)"></span>Klar — venter på bane</div>
-    <div class="ks-leg-item"><span class="ks-leg-dot" style="background:var(--muted)"></span>Venter på lag</div>
-    ${visNivaaPrikk ? aktiveNivaaer.map(n =>
-      `<div class="ks-leg-item"><span class="ks-nivaa-prikk" style="background:${NIVAA_INFO[n].farge}"></span>${esc(NIVAA_INFO[n].label)}</div>`
-    ).join('') : ''}
-  </div>`;
-
   // ── LIVE BRACKET ──
   html += _slBracketSeksjon(t, lagMap, aktiveNivaaer, visNivaaPrikk, NIVAA_INFO, RUNDE_REKKEFØLGE);
 
