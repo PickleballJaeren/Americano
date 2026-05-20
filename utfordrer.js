@@ -29,7 +29,7 @@ export function utfordrerInit(deps) {
 const UTF_RATING_VINDU      = 100;
 const UTF_MIN_SINGEL_KAMPER = 3;
 const UTF_UTLOP_DAGER       = 14;
-const UTF_COOLDOWN_DAGER    = 7;
+
 const UTF_K_FAKTOR          = 32;
 const UTF_OPPRYKK_BONUS     = 1.3;
 const UTF_STATUS = {
@@ -107,26 +107,6 @@ async function _kanUtfordre(utfordrerSpiller, motstanderSpiller, klubbId) {
   }
 
   const utfordringer = await _hentUtfordringerForSpiller(utfordrerSpiller.id, klubbId);
-
-  const harAktiv = utfordringer.some(u =>
-    (u.utfordrerIds === utfordrerSpiller.id || u.motstanderId === utfordrerSpiller.id) &&
-    (u.status === UTF_STATUS.VENTER || u.status === UTF_STATUS.AKSEPTERT)
-  );
-  if (harAktiv)
-    return { ok: false, grunn: 'Du har allerede én aktiv utfordring. Fullfør eller trekk den tilbake først.' };
-
-  const sisteMotSammePerson = utfordringer
-    .filter(u =>
-      (u.status === UTF_STATUS.FERDIG || u.status === UTF_STATUS.AVVIST) &&
-      ((u.utfordrerIds === utfordrerSpiller.id && u.motstanderId === motstanderSpiller.id) ||
-       (u.motstanderId === utfordrerSpiller.id && u.utfordrerIds === motstanderSpiller.id))
-    )
-    .sort((a, b) => (b.avsluttet?.toMillis?.() ?? 0) - (a.avsluttet?.toMillis?.() ?? 0))[0];
-
-  if (sisteMotSammePerson && _dagerSiden(sisteMotSammePerson.avsluttet) < UTF_COOLDOWN_DAGER) {
-    const gjenstår = Math.ceil(UTF_COOLDOWN_DAGER - _dagerSiden(sisteMotSammePerson.avsluttet));
-    return { ok: false, grunn: `Cooldown — du kan utfordre ${motstanderSpiller.navn} igjen om ${gjenstår} dag${gjenstår === 1 ? '' : 'er'}.` };
-  }
 
   return { ok: true, grunn: null };
 }
