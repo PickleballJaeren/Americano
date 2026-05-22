@@ -82,7 +82,16 @@ export function beregnPoengForKamp(par, spillere, lag1Poeng, lag2Poeng) {
 
 /**
  * Fordeler spillere på baner med 4 eller 5 per bane.
- * Sorterer etter rating og bruker 5-spillerbaner der antallet ikke går opp i 4.
+ * Respekterer ønsket antall baner fra konfigurasjonen.
+ * Beregner automatisk hvor mange baner som trenger 5 spillere
+ * for at totalen skal gå opp.
+ *
+ * Eksempel: 24 spillere, 5 baner → 4 baner à 5 + 1 bane à 4
+ * Eksempel: 20 spillere, 5 baner → 5 baner à 4
+ * Eksempel: 21 spillere, 5 baner → 1 bane à 5 + 4 baner à 4
+ *
+ * Hvis ønsket antall baner ikke lar seg løse med 4 eller 5 spillere
+ * per bane, faller funksjonen tilbake til automatisk beregning.
  */
 export function fordelBaner(spillere, antallBaner, poengPerKamp = 17) {
   if (!spillere?.length) return [];
@@ -101,10 +110,22 @@ export function fordelBaner(spillere, antallBaner, poengPerKamp = 17) {
     ];
   }
 
-  const antall5 = n % 4;
+  // ── Beregn antall 5-spillerbaner som trengs ──
+  // Vi løser: antall5*5 + antall4*4 = n, antall5 + antall4 = antallBaner
+  // → antall5 = n - antallBaner*4
+  const ønsketBaner = antallBaner ?? 0;
+  const antall5ønsket = n - ønsketBaner * 4;
+  const kanBrukeØnsket = ønsketBaner > 0
+    && antall5ønsket >= 0
+    && antall5ønsket <= ønsketBaner;
+
+  // Hvis ønsket antall ikke lar seg løse, fall tilbake til automatisk
+  const antall5 = kanBrukeØnsket ? antall5ønsket : (n % 4);
+  const totBaner = kanBrukeØnsket ? ønsketBaner : (antall5 + Math.floor((n - antall5 * 5) / 4));
+
+  // Bygg en tilfeldig blanding av banestørrelser (5 og 4)
   const baneStorr = [];
   for (let i = 0; i < antall5; i++) baneStorr.push(5);
-  const totBaner = antall5 + Math.floor((n - antall5 * 5) / 4);
   for (let i = antall5; i < totBaner; i++) baneStorr.push(4);
   blandArray(baneStorr).forEach((v, i) => { baneStorr[i] = v; });
 
