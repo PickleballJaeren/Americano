@@ -432,6 +432,8 @@ function veksleSpiller(id) {
   if (erMixAB()) {
     if (spillerListe) spillerListe.style.display = '';
     visSpillere();
+    oppdaterSisteDeltakereInPlace();
+    const _st = _beregnSpillerStatus(); _oppdaterSpillerTellere(_st.min, _st.er6Format);
     return;
   }
   _oppdaterSpillerListeInPlace();
