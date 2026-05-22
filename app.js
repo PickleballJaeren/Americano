@@ -356,18 +356,6 @@ window.justerMixABBanerA = function(delta) {
   oppdaterMixABBaneVelger();
 };
 
-/**
- * Setter en spiller i gruppe A, B, eller fjerner fra begge (null).
- * Kalles fra spillerliste-UI i Mix A/B-modus.
- */
-window.settMixABGruppe = function(spillerId, gruppe) {
-  app.mixAbGruppeA = (app.mixAbGruppeA ?? []).filter(id => id !== spillerId);
-  app.mixAbGruppeB = (app.mixAbGruppeB ?? []).filter(id => id !== spillerId);
-  if (gruppe === 'A') app.mixAbGruppeA.push(spillerId);
-  if (gruppe === 'B') app.mixAbGruppeB.push(spillerId);
-  visSpillere();
-};
-
 // ════════════════════════════════════════════════════════
 // MIX LIVE-SKJERM — QR-kode og del-knapp
 // Åpnes fra tilskuerskjermen når spillmodus er Mix & Match.

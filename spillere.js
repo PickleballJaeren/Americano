@@ -341,16 +341,29 @@ export function visSpillere() {
   const q = (document.getElementById('sok-inndata').value ?? '').toLowerCase();
   const { min, er6Format, aktiveIds, ventendeIds } = _beregnSpillerStatus();
   const filtrerte = (app.spillere ?? []).filter(s => (s.navn ?? '').toLowerCase().includes(q));
-  document.getElementById('spiller-liste').innerHTML = filtrerte.map(s =>
+  const listEl = document.getElementById('spiller-liste');
+  listEl.innerHTML = filtrerte.map(s =>
     lagSpillerHTML(s, aktiveIds.has(s.id), ventendeIds.has(s.id))
   ).join('');
+  // Mix A/B: sørg alltid for at listen er synlig
+  if (erMixAB()) listEl.style.display = '';
   _oppdaterSpillerTellere(min, er6Format);
-  // Oppdater rotasjonsvelger for Mix 7-spillers fast modus
   if (typeof window.oppdaterMixRotasjonsVelger === 'function') {
     window.oppdaterMixRotasjonsVelger();
   }
 }
 window.visSpillere = visSpillere;
+
+window.settMixABGruppe = function(spillerId, gruppe) {
+  app.mixAbGruppeA = (app.mixAbGruppeA ?? []).filter(id => id !== spillerId);
+  app.mixAbGruppeB = (app.mixAbGruppeB ?? []).filter(id => id !== spillerId);
+  if (gruppe === 'A') app.mixAbGruppeA.push(spillerId);
+  if (gruppe === 'B') app.mixAbGruppeB.push(spillerId);
+  visSpillere();
+  oppdaterSisteDeltakereInPlace();
+  const _st = _beregnSpillerStatus();
+  _oppdaterSpillerTellere(_st.min, _st.er6Format);
+};
 
 // In-place oppdatering ved toggle — ingen innerHTML, ingen scroll-hopp
 function _oppdaterSpillerListeInPlace() {
