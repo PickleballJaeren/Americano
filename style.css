@@ -158,7 +158,7 @@ html,body{height:100%;background:var(--navy);color:var(--white);font-family:'DM 
 
 /* ── NIVÅ-FARGEKODING ── */
 /* Terskel: <950 = lav (rød), 950–1050 = middels (gul), >1050 = høy (grønn) */
-.nivaa-lav  { --nivaa-farge:var(--red2);  --nivaa-bg:rgba(220,38,38,0.07);  --nivaa-kant:var(--red2);  }
+.nivaa-lav  { --nivaa-farge:var(--yellow);--nivaa-bg:rgba(234,179,8,0.06); --nivaa-kant:var(--yellow); }
 .nivaa-mid  { --nivaa-farge:var(--yellow);--nivaa-bg:rgba(234,179,8,0.06); --nivaa-kant:var(--yellow); }
 .nivaa-hoey { --nivaa-farge:var(--green2);--nivaa-bg:rgba(34,197,94,0.07); --nivaa-kant:var(--green2);}
 
@@ -187,7 +187,7 @@ html,body{height:100%;background:var(--navy);color:var(--white);font-family:'DM 
 .spiller-element.nivaa-mid,
 .spiller-element.nivaa-hoey { background:var(--nivaa-bg); }
 
-.spiller-element.nivaa-lav  { border-left:3px solid var(--red2);   }
+.spiller-element.nivaa-lav  { border-left:3px solid var(--yellow);  }
 .spiller-element.nivaa-mid  { border-left:3px solid var(--yellow);  }
 .spiller-element.nivaa-hoey { border-left:3px solid var(--green2);  }
 
@@ -196,12 +196,12 @@ html,body{height:100%;background:var(--navy);color:var(--white);font-family:'DM 
 .spiller-element.ventende{ background:rgba(234,88,12,0.07)   !important; border-left-color:var(--orange) !important; }
 
 /* Rang-rad */
-.rang-rad.nivaa-lav  { border-left:3px solid var(--red2);   background:var(--nivaa-bg); }
+.rang-rad.nivaa-lav  { border-left:3px solid var(--yellow);  background:var(--nivaa-bg); }
 .rang-rad.nivaa-mid  { border-left:3px solid var(--yellow);  background:var(--nivaa-bg); }
 .rang-rad.nivaa-hoey { border-left:3px solid var(--green2);  background:var(--nivaa-bg); }
 
 /* Ledertavle-rad */
-.lb-rad.nivaa-lav  { border-left:3px solid var(--red2);   background:var(--nivaa-bg); }
+.lb-rad.nivaa-lav  { border-left:3px solid var(--yellow);  background:var(--nivaa-bg); }
 .lb-rad.nivaa-mid  { border-left:3px solid var(--yellow);  background:var(--nivaa-bg); }
 .lb-rad.nivaa-hoey { border-left:3px solid var(--green2);  background:var(--nivaa-bg); }
 

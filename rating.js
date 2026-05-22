@@ -19,8 +19,8 @@ export function getNivaaKlasse(rating) {
 export function getNivaaLabel(rating) {
   const kl  = getNivaaKlasse(rating);
   const map = {
-    'nivaa-lav':  { ikon: '🔴', tekst: 'I startfasen' },
-    'nivaa-mid':  { ikon: '🟡', tekst: 'På vei opp'   },
+    'nivaa-lav':  { ikon: '🟡', tekst: 'Bygger form'  },
+    'nivaa-mid':  { ikon: '🟡', tekst: 'Bygger form'  },
     'nivaa-hoey': { ikon: '🟢', tekst: 'I form'        },
   };
   return { ...map[kl], kl };
