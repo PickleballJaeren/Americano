@@ -8,6 +8,7 @@
   --white:#f1f5f9;--muted:#64748b;--muted2:#94a3b8;
   --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
   --safe-bottom:env(safe-area-inset-bottom,0px);
+  --safe-top:env(safe-area-inset-top,0px);
 }
 html,body{height:100%;background:var(--navy);color:var(--white);font-family:'DM Sans',sans-serif;overflow-x:hidden;-webkit-tap-highlight-color:transparent}
 .screen{display:none;min-height:100vh;flex-direction:column;animation:fadeUp .28s ease both}
@@ -17,7 +18,7 @@ html,body{height:100%;background:var(--navy);color:var(--white);font-family:'DM 
 @keyframes slideInnFraVenstre{from{opacity:0;transform:translateX(-40px)}to{opacity:1;transform:translateX(0)}}
 .screen.sveip-hoyre{animation:slideInnFraVenstre .25s ease both}
 .screen.sveip-venstre{animation:slideInnFraHoyre .25s ease both}
-.app-header{background:linear-gradient(180deg,var(--navy2) 0%,transparent 100%);padding:16px 20px 12px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.app-header{background:linear-gradient(180deg,var(--navy2) 0%,transparent 100%);padding:calc(16px + env(safe-area-inset-top, 0px)) 20px 12px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
 .app-logo{width:42px;height:42px;background:var(--accent);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:'Bebas Neue',cursive;font-size:22px;letter-spacing:1px;color:#fff;box-shadow:0 4px 16px rgba(37,99,235,0.4)}
 .app-name{font-family:'Bebas Neue',cursive;font-size:26px;letter-spacing:2px;line-height:1}
 .app-sub{font-size:15px;color:var(--muted2);letter-spacing:1.5px;text-transform:uppercase;margin-top:2px}
