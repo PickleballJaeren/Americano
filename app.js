@@ -366,7 +366,6 @@ window.settMixABGruppe = function(spillerId, gruppe) {
   if (gruppe === 'A') app.mixAbGruppeA.push(spillerId);
   if (gruppe === 'B') app.mixAbGruppeB.push(spillerId);
   visSpillere();
-  _oppdaterStartKnapp();
 };
 
 // ════════════════════════════════════════════════════════

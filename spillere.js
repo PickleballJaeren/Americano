@@ -43,12 +43,12 @@ function lagSpillerHTML(s, erAktiv, erVente) {
   if (erMixAB() && app.valgtIds.has(s.id)) {
     const erA   = (app.mixAbGruppeA ?? []).includes(s.id);
     const erB   = (app.mixAbGruppeB ?? []).includes(s.id);
-    return `<div class="${escHtml(kl)}" data-id="${escHtml(s.id)}" onclick="veksleSpiller('${escHtml(s.id)}')">
-      <div class="spiller-avatar">${escHtml(ini)}</div>
-      <div class="lb-navn" style="font-size:18px;font-weight:500">${escHtml(navn)}</div>
-      <div class="ks-spiller-rad-knapper" onclick="event.stopPropagation()">
-        <button class="ks-ab-knapp knapp-a${erA ? ' aktiv-a' : ''}" onclick="settMixABGruppe('${escHtml(s.id)}','A')">A</button>
-        <button class="ks-ab-knapp knapp-b${erB ? ' aktiv-a' : ''}" onclick="settMixABGruppe('${escHtml(s.id)}','B')">B</button>
+    return `<div class="${escHtml(kl)}" data-id="${escHtml(s.id)}">
+      <div class="spiller-avatar" onclick="veksleSpiller('${escHtml(s.id)}')">${escHtml(ini)}</div>
+      <div class="lb-navn" style="font-size:18px;font-weight:500;flex:1" onclick="veksleSpiller('${escHtml(s.id)}')">${escHtml(navn)}</div>
+      <div class="ks-spiller-rad-knapper">
+        <button class="ks-ab-knapp knapp-a${erA ? ' aktiv-a' : ''}" onclick="event.stopPropagation();settMixABGruppe('${escHtml(s.id)}','A')">A</button>
+        <button class="ks-ab-knapp knapp-b${erB ? ' aktiv-a' : ''}" onclick="event.stopPropagation();settMixABGruppe('${escHtml(s.id)}','B')">B</button>
       </div>
     </div>`;
   }
