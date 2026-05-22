@@ -441,10 +441,122 @@ function _lagMixLiveBanner(sammenlagt, runde) {
   return `🎲 ${escHtml(sammenlagt[0].navn)} leder med ${sammenlagt[0].poeng} poeng etter kamp ${runde}`;
 }
 
+// ────────────────────────────────────────────────────────
+// KONKURRANSE — FORELØPIG LIVE-TABELL (pågående økt)
+// Vises i Resultater-fanen mens konkurranse-økt er aktiv.
+// Henter ferdigspilte kamper for gjeldende runde og viser
+// foreløpig rangering per bane. Ingen forflytningsmerker.
+// ────────────────────────────────────────────────────────
+async function visKonkurranseLiveTabell() {
+  // Sett header
+  const sluttNavn = document.getElementById('slutt-hdr-navn');
+  const sluttSub  = document.getElementById('slutt-hdr-sub');
+  if (sluttNavn) sluttNavn.textContent = `Runde ${app.runde}`;
+  if (sluttSub)  sluttSub.textContent  = 'Foreløpige resultater';
+
+  // Vis live-indikator, skjul slutt-seksjonene
+  const indikator      = document.getElementById('mix-live-indikator');
+  const indikatorTekst = document.getElementById('mix-live-indikator-tekst');
+  const liveSeksjon    = document.getElementById('mix-live-tabell-seksjon');
+  const mixBanner      = document.getElementById('mix-slutt-banner');
+  const ledLabel       = document.getElementById('slutt-ledertavle-label');
+  const ledertavleKort = document.getElementById('ledertavle')?.closest('.kort');
+  const ratingKort     = document.getElementById('rating-endringer')?.closest('.kort');
+  const ratingSection  = [...document.querySelectorAll('.seksjon-etikett')]
+    .find(el => el.textContent.includes('Ratingendringer'));
+
+  if (indikator)      { indikator.style.display = 'flex'; }
+  if (indikatorTekst) { indikatorTekst.textContent = `Runde ${app.runde} pågår`; }
+  if (liveSeksjon)    { liveSeksjon.style.display = 'block'; }
+  if (mixBanner)      { mixBanner.style.display = 'none'; }
+  if (ledLabel)       { ledLabel.style.display = 'none'; }
+  if (ledertavleKort) { ledertavleKort.style.display = 'none'; }
+  if (ratingKort)     { ratingKort.style.display = 'none'; }
+  if (ratingSection)  { ratingSection.style.display = 'none'; }
+
+  const innhold = document.getElementById('mix-live-tabell-innhold');
+  if (!innhold) return;
+  innhold.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted2)">Laster…</div>';
+
+  try {
+    // Hent kamper for gjeldende runde
+    let kamper = Object.values(getKampStatusCache());
+    if (db && app.treningId) {
+      const snap = await getDocs(
+        query(collection(db, SAM.KAMPER),
+          where('treningId', '==', app.treningId),
+          where('rundeNr',   '==', app.runde))
+      );
+      if (!snap.empty) kamper = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    }
+
+    if (!app.baneOversikt?.length) {
+      innhold.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted2);font-size:15px">Ingen baner er satt opp ennå.</div>';
+      return;
+    }
+
+    const html = (app.baneOversikt ?? []).map(bane => {
+      const baneKamper   = kamper.filter(k => k?.baneNr === `bane${bane.baneNr}`);
+      const antallFerdig = baneKamper.filter(k => k?.ferdig).length;
+      const antallTotalt = baneKamper.length || 3; // fallback 3 kamper
+      const stats        = beregnSpillerstatistikk(bane.spillere ?? [], baneKamper);
+      const rangert      = sorterRangering(stats);
+
+      if (!rangert.length) return '';
+
+      const erForst = bane.baneNr === 1;
+      const erSistB = bane.baneNr === app.antallBaner;
+      const baneIkon = erForst ? '🏆' : erSistB && !app.er6SpillerFormat ? '🔻' : '';
+
+      const fremgang = antallFerdig === 0
+        ? `<span style="color:var(--muted2)">Ikke startet</span>`
+        : antallFerdig === antallTotalt
+          ? `<span style="color:var(--green2)">✓ Ferdig</span>`
+          : `<span style="color:var(--yellow)">${antallFerdig} av ${antallTotalt} kamper ferdig</span>`;
+
+      const rader = rangert.map((s, ri) => {
+        const spillerData   = (bane.spillere ?? []).find(sp => sp.id === s.spillerId);
+        const spillerRating = spillerData?.rating ?? STARTRATING;
+        const nivaaKlRang   = getNivaaKlasse(spillerRating);
+        const rkl           = ['rn-1','rn-2','rn-3','rn-4','rn-4'][ri] ?? '';
+        return `<div class="rang-rad ${nivaaKlRang}">
+          <div class="rang-nummer ${rkl}">${ri + 1}</div>
+          <div class="rang-navn">${escHtml(s.navn ?? 'Ukjent')}</div>
+          <div class="rang-statistikk">${s.seire}S +${s.for}−${s.imot}</div>
+        </div>`;
+      }).join('');
+
+      return `<div class="kort" style="margin-bottom:10px">
+        <div class="kort-hode">
+          <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+            <span style="font-family:'Bebas Neue',cursive;font-size:39px;color:var(--accent);line-height:1">${bane.baneNr}</span>
+            <span style="font-size:14px;text-transform:uppercase;color:var(--muted2);letter-spacing:1.5px">Bane ${baneIkon}</span>
+          </div>
+          <div style="font-size:13px;margin-top:2px">${fremgang}</div>
+        </div>
+        <div class="kort-innhold">${rader}</div>
+      </div>`;
+    }).join('');
+
+    innhold.innerHTML = html ||
+      '<div style="padding:24px;text-align:center;color:var(--muted2);font-size:15px">Ingen resultater ennå.</div>';
+
+  } catch (e) {
+    if (innhold) innhold.innerHTML =
+      `<div style="padding:16px;color:var(--red2);font-size:14px">Feil ved lasting: ${escHtml(e?.message ?? String(e))}</div>`;
+  }
+}
+
 export async function visSluttresultat() {
   // ── Mix-økt er aktiv — vis live sammenlagtabell ──────────
   if (erMix() && app.treningId && app._oektAktiv) {
     await visMixLiveTabell();
+    return;
+  }
+
+  // ── Konkurranse-økt er aktiv — vis foreløpig banestatus ──
+  if (!erMix() && app.treningId && app._oektAktiv) {
+    await visKonkurranseLiveTabell();
     return;
   }
 
