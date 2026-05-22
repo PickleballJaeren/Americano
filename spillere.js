@@ -416,6 +416,9 @@ function veksleSpiller(id) {
   if (!id) return;
   if (app.valgtIds.has(id)) {
     app.valgtIds.delete(id);
+    // Fjern også fra A/B-grupper ved fjerning
+    app.mixAbGruppeA = (app.mixAbGruppeA ?? []).filter(x => x !== id);
+    app.mixAbGruppeB = (app.mixAbGruppeB ?? []).filter(x => x !== id);
   } else {
     app.valgtIds.add(id);
   }
@@ -425,6 +428,12 @@ function veksleSpiller(id) {
   if (sok) sok.value = '';
   const spillerListe = document.getElementById('spiller-liste');
   if (spillerListe) spillerListe.style.display = 'none';
+  // Mix A/B: full rebuild slik at A/B-knapper vises/skjules korrekt
+  if (erMixAB()) {
+    if (spillerListe) spillerListe.style.display = '';
+    visSpillere();
+    return;
+  }
   _oppdaterSpillerListeInPlace();
   oppdaterSisteDeltakereInPlace();
   const _st = _beregnSpillerStatus(); _oppdaterSpillerTellere(_st.min, _st.er6Format);
