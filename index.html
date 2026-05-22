@@ -46,6 +46,10 @@
           <span class="modus-ikon">🎲</span>
           <span class="modus-tekst">Mix &amp; Match</span>
         </button>
+        <button id="modus-knapp-mix-ab" class="modus-knapp" onclick="settSpillModus('mix-ab')" style="border-color:rgba(96,165,250,.3);color:var(--accent2)">
+          <span class="modus-ikon">🎯</span>
+          <span class="modus-tekst">Mix A/B</span>
+        </button>
         <button class="modus-knapp" onclick="naviger('turnering')" style="border-color:rgba(234,179,8,.3);color:var(--yellow)">
           <span class="modus-ikon">⭐</span>
           <span class="modus-tekst">Turnering</span>
@@ -61,7 +65,37 @@
         <div class="mix-info-rad" style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(34,197,94,.15);font-size:13px;color:var(--muted2)">Ingen rating · Ingen opprykk · Ingen nedrykk</div>
       </div>
 
-      <!-- Rotasjonsmodus — kun synlig i Mix-modus med 7 spillere og 1 bane -->
+      <div id="modus-info-mix-ab" class="modus-info modus-info-mix" style="display:none">
+        <div class="mix-info-rad">🎯 <span>Spillerne deles i <strong>gruppe A og B</strong> etter nivå</span></div>
+        <div class="mix-info-rad">🏆 <span>Hver gruppe kjører sin <strong>egen Mix & Match</strong></span></div>
+        <div class="mix-info-rad">🤝 <span>Ny partner hver runde — <strong>innen samme nivå</strong></span></div>
+        <div class="mix-info-rad" style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(96,165,250,.15);font-size:13px;color:var(--muted2)">Ingen rating · Ingen opprykk · Ingen nedrykk</div>
+      </div>
+
+      <!-- Mix A/B bane-velger — kun synlig i Mix A/B-modus -->
+      <div id="mix-ab-bane-velger" style="display:none;margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
+        <div class="config-etikett" style="margin-bottom:8px">Baner per gruppe</div>
+        <div style="display:flex;align-items:center;gap:16px;justify-content:center">
+          <div style="text-align:center">
+            <div style="font-size:13px;color:var(--green2);font-weight:600;margin-bottom:4px">Gruppe A</div>
+            <div class="trinn">
+              <button class="trinn-knapp" onclick="justerMixABBanerA(-1)">−</button>
+              <div class="trinn-verdi" id="mix-ab-baner-a-verdi">1</div>
+              <button class="trinn-knapp" onclick="justerMixABBanerA(1)">+</button>
+            </div>
+          </div>
+          <div style="font-size:20px;color:var(--muted2)">·</div>
+          <div style="text-align:center">
+            <div style="font-size:13px;color:var(--red2);font-weight:600;margin-bottom:4px">Gruppe B</div>
+            <div class="trinn">
+              <div class="trinn-verdi" id="mix-ab-baner-b-verdi">1</div>
+            </div>
+          </div>
+        </div>
+        <div style="font-size:13px;color:var(--muted2);margin-top:8px;text-align:center">
+          Tildel spillere til gruppe A eller B i spillerlisten nedenfor.
+        </div>
+      </div>
       <div id="mix-rotasjon-velger" style="display:none;margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
         <div class="config-etikett" style="margin-bottom:8px">Rotasjon</div>
         <div class="modus-velger" style="gap:8px">

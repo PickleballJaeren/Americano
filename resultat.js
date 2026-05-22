@@ -6,7 +6,7 @@ import {
   collection, doc, updateDoc,
   query, where, getDocs,
 } from './firebase.js';
-import { app, erMix } from './state.js';
+import { app, erMix, erMixAB } from './state.js';
 import { getParter } from './rotasjon.js';
 import { getNivaaKlasse } from './rating.js';
 import { escHtml } from './ui.js';
@@ -547,7 +547,131 @@ async function visKonkurranseLiveTabell() {
   }
 }
 
+// ────────────────────────────────────────────────────────
+// MIX A/B — LIVE TABELLER (pågående økt)
+// Viser én tabell per gruppe basert på ferdigspilte kamper.
+// ────────────────────────────────────────────────────────
+async function visMixABLiveTabell() {
+  const sluttNavn = document.getElementById('slutt-hdr-navn');
+  const sluttSub  = document.getElementById('slutt-hdr-sub');
+  if (sluttNavn) sluttNavn.textContent = 'Mix A/B';
+  if (sluttSub)  sluttSub.textContent  = 'Foreløpige resultater';
+
+  const indikator      = document.getElementById('mix-live-indikator');
+  const indikatorTekst = document.getElementById('mix-live-indikator-tekst');
+  const liveSeksjon    = document.getElementById('mix-live-tabell-seksjon');
+  const mixBanner      = document.getElementById('mix-slutt-banner');
+  const ledLabel       = document.getElementById('slutt-ledertavle-label');
+  const ledertavleKort = document.getElementById('ledertavle')?.closest('.kort');
+  const ratingKort     = document.getElementById('rating-endringer')?.closest('.kort');
+  const ratingSection  = [...document.querySelectorAll('.seksjon-etikett')]
+    .find(el => el.textContent.includes('Ratingendringer'));
+
+  if (indikator)      { indikator.style.display = 'flex'; }
+  if (indikatorTekst) { indikatorTekst.textContent = `Kamp ${app.runde ?? 1} pågår`; }
+  if (liveSeksjon)    { liveSeksjon.style.display = 'block'; }
+  if (mixBanner)      { mixBanner.style.display = 'none'; }
+  if (ledLabel)       { ledLabel.style.display = 'none'; }
+  if (ledertavleKort) { ledertavleKort.style.display = 'none'; }
+  if (ratingKort)     { ratingKort.style.display = 'none'; }
+  if (ratingSection)  { ratingSection.style.display = 'none'; }
+
+  const innhold = document.getElementById('mix-live-tabell-innhold');
+  if (!innhold) return;
+  innhold.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted2)">Laster…</div>';
+
+  try {
+    const snap = await getDocs(
+      query(collection(db, SAM.KAMPER), where('treningId', '==', app.treningId))
+    );
+    const alleKamper = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    const gruppeAIds = new Set(app.mixAbGruppeA ?? []);
+    const gruppeBIds = new Set(app.mixAbGruppeB ?? []);
+    const banerA     = app.mixAbBanerA ?? 1;
+
+    // Fordel kamper på gruppe basert på baneNr
+    const kamperA = alleKamper.filter(k => {
+      const nr = parseInt((k.baneNr ?? '').replace('bane', ''), 10);
+      return nr >= 1 && nr <= banerA;
+    });
+    const kamperB = alleKamper.filter(k => {
+      const nr = parseInt((k.baneNr ?? '').replace('bane', ''), 10);
+      return nr > banerA;
+    });
+
+    const _lagGruppeSeksjon = (gruppeLabel, farge, kamper, gruppeIds) => {
+      const totaler = {};
+      kamper
+        .filter(k => k.ferdig && k.lag1Poeng != null && k.lag2Poeng != null)
+        .forEach(k => {
+          const lag1Vant = k.lag1Poeng > k.lag2Poeng;
+          const lag2Vant = k.lag2Poeng > k.lag1Poeng;
+          const leggTil = (id, navn, mine, vant) => {
+            if (!id || !gruppeIds.has(id)) return;
+            if (!totaler[id]) totaler[id] = { navn: navn ?? 'Ukjent', poeng: 0, seire: 0, kamper: 0 };
+            totaler[id].poeng  += mine;
+            totaler[id].kamper += 1;
+            if (vant) totaler[id].seire += 1;
+          };
+          leggTil(k.lag1_s1, k.lag1_s1_navn, k.lag1Poeng, lag1Vant);
+          leggTil(k.lag1_s2, k.lag1_s2_navn, k.lag1Poeng, lag1Vant);
+          leggTil(k.lag2_s1, k.lag2_s1_navn, k.lag2Poeng, lag2Vant);
+          leggTil(k.lag2_s2, k.lag2_s2_navn, k.lag2Poeng, lag2Vant);
+        });
+
+      const sortert = Object.values(totaler).sort((a, b) => b.poeng - a.poeng || b.seire - a.seire);
+      if (!sortert.length) return `<div class="kort" style="margin-bottom:10px">
+        <div class="kort-hode"><span style="font-family:'Bebas Neue',cursive;font-size:26px;color:${farge}">Gruppe ${gruppeLabel}</span></div>
+        <div class="kort-innhold"><div style="padding:12px;text-align:center;color:var(--muted2)">Ingen kamper ferdig ennå.</div></div>
+      </div>`;
+
+      const plasseringSymbol = p => p === 1 ? '🥇' : p === 2 ? '🥈' : p === 3 ? '🥉' : `${p}.`;
+      const rader = sortert.map((s, i) => {
+        const plass   = i + 1;
+        const erLeder = plass === 1;
+        return `<div class="rang-rad${erLeder ? ' mix-rang-leder' : ''}">
+          <div style="font-family:'Bebas Neue',cursive;font-size:${plass <= 3 ? '22' : '18'}px;min-width:32px;line-height:1">${plasseringSymbol(plass)}</div>
+          <div class="rang-navn" style="flex:1">${escHtml(s.navn)}</div>
+          <div style="font-family:'DM Mono',monospace;font-size:20px;font-weight:600;color:${erLeder ? 'var(--yellow)' : 'var(--white)'};min-width:36px;text-align:right">${s.poeng}</div>
+          <div style="font-family:'DM Mono',monospace;font-size:14px;color:var(--green2);min-width:28px;text-align:right">${s.seire}S</div>
+          <div style="font-family:'DM Mono',monospace;font-size:14px;color:var(--muted2);min-width:28px;text-align:right">${s.kamper}K</div>
+        </div>`;
+      }).join('');
+
+      return `<div class="kort" style="margin-bottom:10px">
+        <div class="kort-hode">
+          <span style="font-family:'Bebas Neue',cursive;font-size:26px;color:${farge}">Gruppe ${gruppeLabel}</span>
+        </div>
+        <div class="kort-innhold" style="padding:0">
+          <div style="display:grid;grid-template-columns:32px 1fr 36px 28px 28px;gap:0;padding:8px 14px;border-bottom:1px solid var(--border2);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:600">
+            <span>#</span><span>Navn</span>
+            <span style="text-align:right">Poeng</span>
+            <span style="text-align:right">S</span>
+            <span style="text-align:right">K</span>
+          </div>
+          ${rader}
+        </div>
+      </div>`;
+    };
+
+    innhold.innerHTML =
+      _lagGruppeSeksjon('A', 'var(--green2)', kamperA, gruppeAIds) +
+      _lagGruppeSeksjon('B', 'var(--red2)',   kamperB, gruppeBIds);
+
+  } catch (e) {
+    if (innhold) innhold.innerHTML =
+      `<div style="padding:16px;color:var(--red2);font-size:14px">Feil ved lasting: ${escHtml(e?.message ?? String(e))}</div>`;
+  }
+}
+
 export async function visSluttresultat() {
+  // ── Mix A/B-økt er aktiv — vis live tabeller per gruppe ──
+  if (erMixAB() && app.treningId && app._oektAktiv) {
+    await visMixABLiveTabell();
+    return;
+  }
+
   // ── Mix-økt er aktiv — vis live sammenlagtabell ──────────
   if (erMix() && app.treningId && app._oektAktiv) {
     await visMixLiveTabell();

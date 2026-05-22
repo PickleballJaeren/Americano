@@ -4,7 +4,7 @@ import {
   query, where, orderBy, limit, serverTimestamp, writeBatch, runTransaction,
 } from './firebase.js';
 import { MIX_ROTASJON_FAST } from './konstanter.js';
-import { app, erMix } from './state.js';
+import { app, erMix, erMixAB } from './state.js';
 import {
   getParter, blandArray, beregnPoengForKamp,
   fordelBaner, fordelBanerMix,
@@ -238,33 +238,44 @@ function oppdaterKlubbUI() {
 /**
  * Bytter spillmodus basert på brukervalg i oppsett-skjermen.
  * Oppdaterer app.spillModus og justerer UI-elementer deretter.
- * @param {'konkurranse'|'mix'} modus
+ * @param {'konkurranse'|'mix'|'mix-ab'} modus
  */
 function settSpillModus(modus) {
   app.spillModus = modus;
 
-  // Mix: scoringsformat ikke relevant — tilbakestill til americano
-  if (modus === 'mix') settScoringFormat('americano');
+  // Mix / Mix A/B: scoringsformat ikke relevant — tilbakestill til americano
+  if (modus === 'mix' || modus === 'mix-ab') settScoringFormat('americano');
 
   // Oppdater knappestiler
-  const btnKonk = document.getElementById('modus-knapp-konkurranse');
-  const btnMix  = document.getElementById('modus-knapp-mix');
-  if (btnKonk) btnKonk.classList.toggle('modus-aktiv', modus === 'konkurranse');
-  if (btnMix)  btnMix.classList.toggle('modus-aktiv',  modus === 'mix');
+  const btnKonk  = document.getElementById('modus-knapp-konkurranse');
+  const btnMix   = document.getElementById('modus-knapp-mix');
+  const btnMixAB = document.getElementById('modus-knapp-mix-ab');
+  if (btnKonk)  btnKonk.classList.toggle('modus-aktiv',  modus === 'konkurranse');
+  if (btnMix)   btnMix.classList.toggle('modus-aktiv',   modus === 'mix');
+  if (btnMixAB) btnMixAB.classList.toggle('modus-aktiv', modus === 'mix-ab');
 
   // Vis/skjul info-boks for valgt modus
-  const infoKonk = document.getElementById('modus-info-konkurranse');
-  const infoMix  = document.getElementById('modus-info-mix');
-  if (infoKonk) infoKonk.style.display = modus === 'konkurranse' ? 'block' : 'none';
-  if (infoMix)  infoMix.style.display  = modus === 'mix'         ? 'block' : 'none';
+  const infoKonk  = document.getElementById('modus-info-konkurranse');
+  const infoMix   = document.getElementById('modus-info-mix');
+  const infoMixAB = document.getElementById('modus-info-mix-ab');
+  if (infoKonk)  infoKonk.style.display  = modus === 'konkurranse' ? 'block' : 'none';
+  if (infoMix)   infoMix.style.display   = modus === 'mix'         ? 'block' : 'none';
+  if (infoMixAB) infoMixAB.style.display = modus === 'mix-ab'      ? 'block' : 'none';
 
   // Vis/skjul scoringsformat-velger (kun relevant for konkurranse)
   const scoringVelger = document.getElementById('scoring-format-velger');
   if (scoringVelger) scoringVelger.style.display = modus === 'konkurranse' ? 'block' : 'none';
 
-  // Oppdater spillerliste — viser/skjuler rating basert på modus
+  // Mix A/B: nullstill gruppefordeling ved modusbytte
+  if (modus !== 'mix-ab') {
+    app.mixAbGruppeA = [];
+    app.mixAbGruppeB = [];
+  }
+
+  // Oppdater spillerliste — viser/skjuler rating og A/B-knapper basert på modus
   visSpillere();
   oppdaterMixRotasjonsVelger();
+  oppdaterMixABBaneVelger();
 }
 window.settSpillModus = settSpillModus;
 
@@ -316,6 +327,47 @@ export function oppdaterMixRotasjonsVelger() {
   if (!kan7 && app.mixRotasjonsModus === MIX_ROTASJON_FAST) settMixRotasjon('dynamisk');
 }
 window.oppdaterMixRotasjonsVelger = oppdaterMixRotasjonsVelger;
+
+/**
+ * Oppdaterer bane-velgeren for Mix A/B — viser/skjuler panelet og
+ * oppdaterer fordeling (A: X baner / B: Y baner) basert på antallBaner.
+ */
+export function oppdaterMixABBaneVelger() {
+  const panel = document.getElementById('mix-ab-bane-velger');
+  if (!panel) return;
+  panel.style.display = app.spillModus === 'mix-ab' ? 'block' : 'none';
+  if (app.spillModus !== 'mix-ab') return;
+
+  const totalt = app.antallBaner ?? 2;
+  // Klem inn mixAbBanerA i gyldig område [1, totalt-1]
+  app.mixAbBanerA = Math.min(Math.max(app.mixAbBanerA ?? 1, 1), totalt - 1);
+  const banerB = totalt - app.mixAbBanerA;
+
+  const visA = document.getElementById('mix-ab-baner-a-verdi');
+  const visB = document.getElementById('mix-ab-baner-b-verdi');
+  if (visA) visA.textContent = app.mixAbBanerA;
+  if (visB) visB.textContent = banerB;
+}
+window.oppdaterMixABBaneVelger = oppdaterMixABBaneVelger;
+
+window.justerMixABBanerA = function(delta) {
+  const totalt = app.antallBaner ?? 2;
+  app.mixAbBanerA = Math.min(Math.max((app.mixAbBanerA ?? 1) + delta, 1), totalt - 1);
+  oppdaterMixABBaneVelger();
+};
+
+/**
+ * Setter en spiller i gruppe A, B, eller fjerner fra begge (null).
+ * Kalles fra spillerliste-UI i Mix A/B-modus.
+ */
+window.settMixABGruppe = function(spillerId, gruppe) {
+  app.mixAbGruppeA = (app.mixAbGruppeA ?? []).filter(id => id !== spillerId);
+  app.mixAbGruppeB = (app.mixAbGruppeB ?? []).filter(id => id !== spillerId);
+  if (gruppe === 'A') app.mixAbGruppeA.push(spillerId);
+  if (gruppe === 'B') app.mixAbGruppeB.push(spillerId);
+  visSpillere();
+  _oppdaterStartKnapp();
+};
 
 // ════════════════════════════════════════════════════════
 // MIX LIVE-SKJERM — QR-kode og del-knapp
@@ -550,6 +602,7 @@ const _origJuster = window.juster;
 window.juster = function(type, delta) {
   _origJuster(type, delta);
   oppdaterMixRotasjonsVelger();
+  oppdaterMixABBaneVelger();
 };
 
 // ════════════════════════════════════════════════════════

@@ -127,7 +127,8 @@ async function beregnSesongsKaaring(spillereListe) {
       ));
       gyldigeTreningIds = new Set(
         treningSnap.docs
-          .filter(d => (d.data().spillModus ?? 'konkurranse') !== 'mix')
+          .filter(d => (d.data().spillModus ?? 'konkurranse') !== 'mix'
+                    && (d.data().spillModus ?? 'konkurranse') !== 'mix-ab')
           .map(d => d.id)
       );
     }

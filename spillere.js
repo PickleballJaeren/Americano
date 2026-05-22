@@ -7,7 +7,7 @@ import {
   query, where, orderBy, limit, serverTimestamp, writeBatch,
 } from './firebase.js';
 import { lagBatchHjelper } from './batch-helpers.js';
-import { app, erMix } from './state.js';
+import { app, erMix, erMixAB } from './state.js';
 import { getNivaaKlasse, getNivaaRatingHTML } from './rating.js';
 import { visMelding, visFBFeil, escHtml } from './ui.js';
 
@@ -38,6 +38,20 @@ function lagSpillerHTML(s, erAktiv, erVente) {
   const ratingLinje = erMix()
     ? ''
     : `<div class="spiller-rating-linje">⭐ ${getNivaaRatingHTML(rating)}</div>`;
+
+  // Mix A/B: vis A/B-velgerknapper i stedet for vanlig hakeliste
+  if (erMixAB() && app.valgtIds.has(s.id)) {
+    const erA   = (app.mixAbGruppeA ?? []).includes(s.id);
+    const erB   = (app.mixAbGruppeB ?? []).includes(s.id);
+    return `<div class="${escHtml(kl)}" data-id="${escHtml(s.id)}" onclick="veksleSpiller('${escHtml(s.id)}')">
+      <div class="spiller-avatar">${escHtml(ini)}</div>
+      <div class="lb-navn" style="font-size:18px;font-weight:500">${escHtml(navn)}</div>
+      <div class="ks-spiller-rad-knapper" onclick="event.stopPropagation()">
+        <button class="ks-ab-knapp knapp-a${erA ? ' aktiv-a' : ''}" onclick="settMixABGruppe('${escHtml(s.id)}','A')">A</button>
+        <button class="ks-ab-knapp knapp-b${erB ? ' aktiv-a' : ''}" onclick="settMixABGruppe('${escHtml(s.id)}','B')">B</button>
+      </div>
+    </div>`;
+  }
 
   return `<div class="${escHtml(kl)}" data-id="${escHtml(s.id)}" onclick="veksleSpiller('${escHtml(s.id)}')">
     <div class="spiller-avatar">${escHtml(ini)}</div>
@@ -71,12 +85,29 @@ function _oppdaterSpillerTellere(min, er6Format) {
   document.getElementById('valgt-antall').textContent  = n;
   document.getElementById('aktive-antall').textContent = Math.min(n, min);
   document.getElementById('vl-antall').textContent     = Math.max(0, n - min);
-  document.getElementById('start-knapp').disabled      = n < (er6Format ? 6 : min);
+
+  // Mix A/B: krev at alle valgte spillere er tildelt gruppe A eller B,
+  // og at hver gruppe har minst 4 spillere
+  let startDisabled = n < (er6Format ? 6 : min);
+  if (!startDisabled && erMixAB()) {
+    const antallA = (app.mixAbGruppeA ?? []).filter(id => app.valgtIds.has(id)).length;
+    const antallB = (app.mixAbGruppeB ?? []).filter(id => app.valgtIds.has(id)).length;
+    const antallTildelt = antallA + antallB;
+    startDisabled = antallTildelt < n || antallA < 4 || antallB < 4;
+  }
+  document.getElementById('start-knapp').disabled = startDisabled;
+
   const spillerInfoEl = document.getElementById('spiller-info');
   if (spillerInfoEl) {
-    spillerInfoEl.innerHTML = er6Format
-      ? `Nøyaktig <span id="min-antall" class="spiller-info-antall">6</span> spillere <span class="spiller-info-muted">— 4 dobbel + 2 singel format aktivert</span>`
-      : `Minst <span id="min-antall" class="spiller-info-antall">${min}</span> spillere <span class="spiller-info-muted">— ekstra settes på venteliste</span>`;
+    if (erMixAB()) {
+      const antallA = (app.mixAbGruppeA ?? []).filter(id => app.valgtIds.has(id)).length;
+      const antallB = (app.mixAbGruppeB ?? []).filter(id => app.valgtIds.has(id)).length;
+      spillerInfoEl.innerHTML = `Gruppe A: <span style="color:var(--green2);font-weight:700">${antallA}</span> spillere · Gruppe B: <span style="color:var(--red2);font-weight:700">${antallB}</span> spillere`;
+    } else {
+      spillerInfoEl.innerHTML = er6Format
+        ? `Nøyaktig <span id="min-antall" class="spiller-info-antall">6</span> spillere <span class="spiller-info-muted">— 4 dobbel + 2 singel format aktivert</span>`
+        : `Minst <span id="min-antall" class="spiller-info-antall">${min}</span> spillere <span class="spiller-info-muted">— ekstra settes på venteliste</span>`;
+    }
   }
 }
 

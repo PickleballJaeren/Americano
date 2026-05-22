@@ -653,3 +653,95 @@ function _parSingelMedVinnere(spiller1, spiller2, singelSpillere, playedWith) {
   const velgA = kostA <= kostB + Math.random() * MIX_TIEBREAKER_STØY;
   return velgA ? [sA, sB] : [sB, sA];
 }
+
+// ════════════════════════════════════════════════════════
+// MIX A/B — NIVÅDELT KAMPOPPSETT
+//
+// Kjører to uavhengige Mix-matchmakinger parallelt:
+// Gruppe A (sterkere) og gruppe B (svakere).
+// Hver gruppe får egne baner og egne historikk-objekter.
+// Banene nummereres fortløpende: A får bane 1..antallBanerA,
+// B får bane (antallBanerA+1)..(antallBanerA+antallBanerB).
+// ════════════════════════════════════════════════════════
+
+/**
+ * Lager kampoppsett for én runde av Mix A/B.
+ * Kaller lagMixKampoppsett() for hver gruppe separat.
+ *
+ * @param {object[]} spillereA       — gruppe A-spillere (med id, navn, rating)
+ * @param {object[]} spillereB       — gruppe B-spillere
+ * @param {object}   statistikkA     — { playedWith, playedAgainst, gamesPlayed, sitOutCount, lastSitOutRunde }
+ * @param {object}   statistikkB     — samme for gruppe B
+ * @param {number}   antallBanerA    — antall baner gruppe A bruker
+ * @param {number}   antallBanerB    — antall baner gruppe B bruker
+ * @param {number}   runde           — gjeldende rundenummer
+ * @param {number}   [mp=15]         — maks poeng per kamp
+ * @returns {{ baneOversikt: object[], hvilerA: object[], hvilerB: object[] }}
+ */
+export function lagMixABKampoppsett(
+  spillereA, spillereB,
+  statistikkA, statistikkB,
+  antallBanerA, antallBanerB,
+  runde, mp = 15,
+) {
+  // Gruppe A — bane 1..antallBanerA
+  const resA = lagMixKampoppsett(
+    spillereA,
+    statistikkA.playedWith      ?? {},
+    statistikkA.playedAgainst   ?? {},
+    statistikkA.gamesPlayed     ?? {},
+    statistikkA.sitOutCount     ?? {},
+    statistikkA.lastSitOutRunde ?? {},
+    antallBanerA,
+    runde,
+    mp,
+  );
+
+  // Gruppe B — bane (antallBanerA+1)..(antallBanerA+antallBanerB)
+  const resB = lagMixKampoppsett(
+    spillereB,
+    statistikkB.playedWith      ?? {},
+    statistikkB.playedAgainst   ?? {},
+    statistikkB.gamesPlayed     ?? {},
+    statistikkB.sitOutCount     ?? {},
+    statistikkB.lastSitOutRunde ?? {},
+    antallBanerB,
+    runde,
+    mp,
+  );
+
+  // Renummer B-banene slik at de fortsetter etter A-banene
+  const bBaner = (resB.baneOversikt ?? []).map((b, i) => ({
+    ...b,
+    baneNr: antallBanerA + i + 1,
+  }));
+
+  return {
+    baneOversikt: [...(resA.baneOversikt ?? []), ...bBaner],
+    hvilerA:      resA.hviler ?? [],
+    hvilerB:      resB.hviler ?? [],
+  };
+}
+
+/**
+ * Henter Mix A/B statistikk fra Firestore-treningsdokument.
+ * Returnerer separate statistikk-objekter for gruppe A og B.
+ */
+export function hentMixABStatistikk(treningData) {
+  return {
+    statistikkA: {
+      playedWith:      treningData?.mixAbPlayedWithA      ?? {},
+      playedAgainst:   treningData?.mixAbPlayedAgainstA   ?? {},
+      gamesPlayed:     treningData?.mixAbGamesPlayedA     ?? {},
+      sitOutCount:     treningData?.mixAbSitOutCountA     ?? {},
+      lastSitOutRunde: treningData?.mixAbLastSitOutRundeA ?? {},
+    },
+    statistikkB: {
+      playedWith:      treningData?.mixAbPlayedWithB      ?? {},
+      playedAgainst:   treningData?.mixAbPlayedAgainstB   ?? {},
+      gamesPlayed:     treningData?.mixAbGamesPlayedB     ?? {},
+      sitOutCount:     treningData?.mixAbSitOutCountB     ?? {},
+      lastSitOutRunde: treningData?.mixAbLastSitOutRundeB ?? {},
+    },
+  };
+}

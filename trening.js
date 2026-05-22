@@ -3,14 +3,15 @@
 // ════════════════════════════════════════════════════════
 import {
   db, SAM, STARTRATING, PARTER_6_DOBBEL, PARTER_6_SINGEL,
-  collection, doc, addDoc, getDocs, getDoc, updateDoc,
+  collection, doc, getDocs, getDoc, updateDoc,
   query, where, limit, serverTimestamp, writeBatch, runTransaction,
 } from './firebase.js';
-import { app, erMix } from './state.js';
+import { app, erMix, erMixAB } from './state.js';
 import {
   getParter, blandArray, lagSpillerMiniobjekt,
   fordelBaner, fordelBanerMix,
   lagMixKampoppsett, oppdaterMixStatistikk, hentMixStatistikk,
+  lagMixABKampoppsett, hentMixABStatistikk,
   lagFastMix7Oppsett,
   neste6SpillerRunde, oppdater6SpillerStreak, hent6SpillerStreak,
 } from './rotasjon.js';
@@ -128,8 +129,30 @@ export async function startTrening() {
   // KONKURRANSE : rating-sortert fordeling (beste øverst)
   // MIX         : smart matchmaking — minimerer partner/motstander-gjentakelse
   // 6-spiller/2-baner: alltid dobbel (4 spl) + singel (2 spl) uansett modus
-  let baneOversikt, mixHviler = [];
-  if (erMix()) {
+  let baneOversikt, mixHviler = [], mixAbHvilerA = [], mixAbHvilerB = [];
+  if (erMixAB()) {
+    // ── MIX A/B: fordel gruppe A og B på separate baner ──────────────────
+    const banerA  = app.mixAbBanerA ?? 1;
+    const banerB  = Math.max(1, (app.antallBaner ?? 2) - banerA);
+    const gruppeA = valgte.filter(s => (app.mixAbGruppeA ?? []).includes(s.id));
+    const gruppeB = valgte.filter(s => (app.mixAbGruppeB ?? []).includes(s.id));
+
+    if (gruppeA.length < 4 || gruppeB.length < 4) {
+      visMelding('Hver gruppe må ha minst 4 spillere.', 'advarsel');
+      return;
+    }
+
+    const res = lagMixABKampoppsett(
+      gruppeA.map(lagSpillerMiniobjekt),
+      gruppeB.map(lagSpillerMiniobjekt),
+      {}, {},   // tom statistikk ved runde 1
+      banerA, banerB,
+      1, app.poengPerKamp ?? 15,
+    );
+    baneOversikt  = res.baneOversikt;
+    mixAbHvilerA  = res.hvilerA ?? [];
+    mixAbHvilerB  = res.hvilerB ?? [];
+  } else if (erMix()) {
     if (er6SpillerFormat) {
       // 6-spiller mix: tilfeldig fordeling til dobbel + singel
       const blandede = blandArray([...valgte]);
@@ -170,7 +193,12 @@ export async function startTrening() {
   }
 
   // Spillere som ikke fikk plass: i mix brukes hviler fra algoritmen, ellers beregnes det
-  const venteliste = erMix()
+  const venteliste = erMixAB()
+    ? [
+        ...(mixAbHvilerA.map(s => ({ ...s, mixAbGruppe: 'A' }))),
+        ...(mixAbHvilerB.map(s => ({ ...s, mixAbGruppe: 'B' }))),
+      ]
+    : erMix()
     ? mixHviler.map(s => ({ id: s.id, navn: s.navn ?? 'Ukjent', rating: s.rating ?? STARTRATING }))
     : valgte
         .filter(s => !new Set(baneOversikt.flatMap(b => b.spillere.map(x => x.id))).has(s.id))
@@ -186,7 +214,21 @@ export async function startTrening() {
     // ── Mix & Match: initialiser statistikk-felter i Firestore ──────────────
     // Tomme ved runde 1 — oppdateres etter hver runde i bekreftNesteRunde.
     // Konkurranse-modus berøres ikke av disse feltene.
-    const mixFelter = erMix() ? {
+    const mixFelter = erMixAB() ? {
+      mixAbPlayedWithA:      {},
+      mixAbPlayedAgainstA:   {},
+      mixAbGamesPlayedA:     {},
+      mixAbSitOutCountA:     {},
+      mixAbLastSitOutRundeA: {},
+      mixAbPlayedWithB:      {},
+      mixAbPlayedAgainstB:   {},
+      mixAbGamesPlayedB:     {},
+      mixAbSitOutCountB:     {},
+      mixAbLastSitOutRundeB: {},
+      mixAbGruppeA:          app.mixAbGruppeA ?? [],
+      mixAbGruppeB:          app.mixAbGruppeB ?? [],
+      mixAbBanerA:           app.mixAbBanerA  ?? 1,
+    } : erMix() ? {
       mixPlayedWith:       {},
       mixPlayedAgainst:    {},
       mixGamesPlayed:      {},
@@ -410,6 +452,91 @@ export async function bekreftNesteRunde() {
 
 
     const nyRunde = app.runde + 1;
+
+    // ══════════════════════════════════════════
+    // MIX A/B — separat matchmaking per gruppe
+    // ══════════════════════════════════════════
+    if (erMixAB()) {
+      const { data: treningData } = await hentTrening();
+      const { statistikkA, statistikkB } = hentMixABStatistikk(treningData);
+
+      const banerA     = treningData?.mixAbBanerA ?? app.mixAbBanerA ?? 1;
+      const banerB     = Math.max(1, (app.baneOversikt ?? []).length - banerA);
+      const gruppeAIds = new Set(treningData?.mixAbGruppeA ?? []);
+      const gruppeBIds = new Set(treningData?.mixAbGruppeB ?? []);
+
+      // Hent alle spillere i rotasjonen (baner + venteliste)
+      const alleSpillere = [
+        ...(app.baneOversikt ?? []).flatMap(b => b.spillere ?? []),
+        ...(app.venteliste   ?? []),
+      ];
+      const spillereA = alleSpillere.filter(s => gruppeAIds.has(s.id));
+      const spillereB = alleSpillere.filter(s => gruppeBIds.has(s.id));
+
+      // Oppdater statistikk for kamper som nettopp ble spilt
+      const gjeldBaneOversikt = app.baneOversikt ?? [];
+      const forrigeHvilere    = app.venteliste   ?? [];
+      const baneOversiktA = gjeldBaneOversikt.filter((_, i) => i < banerA);
+      const baneOversiktB = gjeldBaneOversikt.filter((_, i) => i >= banerA);
+      const hvilerA = forrigeHvilere.filter(s => gruppeAIds.has(s.id));
+      const hvilerB = forrigeHvilere.filter(s => gruppeBIds.has(s.id));
+
+      oppdaterMixStatistikk(
+        baneOversiktA, hvilerA,
+        statistikkA.playedWith, statistikkA.playedAgainst,
+        statistikkA.gamesPlayed, statistikkA.sitOutCount,
+        statistikkA.lastSitOutRunde, app.runde,
+      );
+      oppdaterMixStatistikk(
+        baneOversiktB, hvilerB,
+        statistikkB.playedWith, statistikkB.playedAgainst,
+        statistikkB.gamesPlayed, statistikkB.sitOutCount,
+        statistikkB.lastSitOutRunde, app.runde,
+      );
+
+      const res = lagMixABKampoppsett(
+        spillereA, spillereB,
+        statistikkA, statistikkB,
+        banerA, banerB,
+        nyRunde, app.poengPerKamp ?? 15,
+      );
+
+      const nyBaneOversikt = res.baneOversikt;
+      const nyVenteliste   = [
+        ...(res.hvilerA ?? []).map(s => ({ ...s, mixAbGruppe: 'A' })),
+        ...(res.hvilerB ?? []).map(s => ({ ...s, mixAbGruppe: 'B' })),
+      ];
+
+      const batch = writeBatch(db);
+      batch.update(doc(db, SAM.TRENINGER, app.treningId), {
+        gjeldendRunde:         nyRunde,
+        baneOversikt:          nyBaneOversikt,
+        venteliste:            nyVenteliste,
+        laast:                 false,
+        mixAbPlayedWithA:      statistikkA.playedWith,
+        mixAbPlayedAgainstA:   statistikkA.playedAgainst,
+        mixAbGamesPlayedA:     statistikkA.gamesPlayed,
+        mixAbSitOutCountA:     statistikkA.sitOutCount,
+        mixAbLastSitOutRundeA: statistikkA.lastSitOutRunde,
+        mixAbPlayedWithB:      statistikkB.playedWith,
+        mixAbPlayedAgainstB:   statistikkB.playedAgainst,
+        mixAbGamesPlayedB:     statistikkB.gamesPlayed,
+        mixAbSitOutCountB:     statistikkB.sitOutCount,
+        mixAbLastSitOutRundeB: statistikkB.lastSitOutRunde,
+      });
+      skrivMixKamper(batch, app.treningId, nyRunde, nyBaneOversikt);
+      await batch.commit();
+
+      app.runde        = nyRunde;
+      app.baneOversikt = nyBaneOversikt;
+      app.venteliste   = nyVenteliste;
+      _setKampStatusCache({});
+      _oppdaterRundeUI();
+      _startKampLytter();
+      _naviger('baner');
+      visMelding('Kamp ' + nyRunde + ' startet — nye lag!');
+      return;
+    }
 
     // ══════════════════════════════════════════
     // MIX & MATCH — smart ny lagfordeling
@@ -1180,6 +1307,12 @@ export async function gjenopprettTrening(treningId) {
   app.spillModus        = data.spillModus       ?? 'konkurranse';
   app.scoringsFormat    = data.scoringsFormat   ?? 'americano';
   app.ekskluderteIds    = new Set(data.ekskluderteIds ?? []);
+  // Mix A/B — gjenopprett gruppefordeling og bane-split
+  if (app.spillModus === 'mix-ab') {
+    app.mixAbGruppeA = data.mixAbGruppeA ?? [];
+    app.mixAbGruppeB = data.mixAbGruppeB ?? [];
+    app.mixAbBanerA  = data.mixAbBanerA  ?? 1;
+  }
   sessionStorage.setItem('aktivTreningId',      treningId);
   sessionStorage.setItem('aktivTreningKlubbId', data.klubbId ?? _getAktivKlubbId());
   localStorage.setItem('aktivTreningId',        treningId);
@@ -1397,23 +1530,6 @@ export async function leggTilSpillerIOkt(spillerId) {
       navn:   spiller.navn   ?? 'Ukjent',
       rating: spiller.rating ?? STARTRATING,
     }];
-
-    // Opprett TS-dokument med riktig ratingVedStart slik at Elo-beregningen
-    // ved øktavslutning bruker spillerens faktiske rating — ikke STARTRATING-fallback.
-    if (db && app.treningId) {
-      try {
-        await addDoc(collection(db, SAM.TS), {
-          treningId:       app.treningId,
-          spillerId:       spiller.id,
-          spillerNavn:     spiller.navn     ?? 'Ukjent',
-          ratingVedStart:  spiller.rating   ?? STARTRATING,
-          sluttPlassering: null,
-          paVenteliste:    true,
-        });
-      } catch (e) {
-        console.warn('[leggTilSpillerIOkt] Kunne ikke opprette TS-dokument:', e?.message ?? e);
-      }
-    }
   }
 
   await _lagreDeltakerEndring();

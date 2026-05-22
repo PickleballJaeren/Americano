@@ -23,7 +23,7 @@ export const app = {
   scoringsFormat:    'americano',
   // true når økt er aktiv og baner vises
   _oektAktiv:        false,
-  // 'konkurranse' | 'mix'
+  // 'konkurranse' | 'mix' | 'mix-ab'
   spillModus:        'konkurranse',
   // Aktiv turnering — settes av turnering-ui.js
   aktivTurnering:    null,
@@ -35,7 +35,14 @@ export const app = {
   // Tilfeldig tildelt spillerrekkefølge for fast rotasjon [id, id, id, id, id, id, id]
   // Posisjon 0 = A, 1 = B, ... 6 = G i rotasjonstabellen
   mixRotasjonSpillere: [],
+  // Mix A/B — spillerfordeling per gruppe (arrays av spillerId-strenger)
+  mixAbGruppeA:      [],
+  mixAbGruppeB:      [],
+  // Mix A/B — antall baner per gruppe (settes i oppsett)
+  mixAbBanerA:       1,
 };
 
-/** Returnerer true når gjeldende økt kjøres i Mix & Match-modus. */
-export const erMix = () => app.spillModus === 'mix';
+/** Returnerer true når gjeldende økt kjøres i Mix & Match-modus (inkl. Mix A/B). */
+export const erMix   = () => app.spillModus === 'mix' || app.spillModus === 'mix-ab';
+/** Returnerer true kun for Mix A/B-modus. */
+export const erMixAB = () => app.spillModus === 'mix-ab';
