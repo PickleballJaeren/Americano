@@ -1733,10 +1733,11 @@ export async function triggerSluttfase(ekstraSpillerGruppe = 'topp') {
 
     const toppSpillere = [...toppFraA, ...toppFraB];
     const bunnSpillere = [...bunnFraA, ...bunnFraB];
-    const mp    = app.poengPerKamp ?? 15;
-    const nyRunde = app.runde + 1;
-    const banerA = Math.max(1, Math.round((app.baneOversikt ?? []).length * toppSpillere.length / totalt));
-    const banerB = Math.max(1, (app.baneOversikt ?? []).length - banerA);
+    const totalt   = toppSpillere.length + bunnSpillere.length;
+    const mp       = app.poengPerKamp ?? 15;
+    const nyRunde  = app.runde + 1;
+    const banerA   = Math.max(1, Math.round((app.baneOversikt ?? []).length * toppSpillere.length / totalt));
+    const banerB   = Math.max(1, (app.baneOversikt ?? []).length - banerA);
     const res = lagMixABKampoppsett(
       toppSpillere.map(lagSpillerMiniobjekt), bunnSpillere.map(lagSpillerMiniobjekt),
       {}, {}, banerA, banerB, nyRunde, mp,
