@@ -1704,22 +1704,35 @@ export async function triggerSluttfase(ekstraSpillerGruppe = 'topp') {
       ...(app.venteliste   ?? []),
     ].filter(s => !ekskl.has(s.id));
     const unik = [...new Map(alle.map(s => [s.id, s])).values()];
-    unik.sort((a, b) => {
+
+    // Sorter per gruppe basert på poeng — ikke på tvers
+    const { data: treningData } = await hentTrening();
+    const gruppeAIds = new Set(treningData?.kvalGruppeA ?? []);
+    const gruppeBIds = new Set(treningData?.kvalGruppeB ?? []);
+
+    const sorter = liste => [...liste].sort((a, b) => {
       const pA = poengMap[a.id] ?? 0; const pB = poengMap[b.id] ?? 0;
       if (pB !== pA) return pB - pA;
       return (kampTeller[b.id] ?? 0) - (kampTeller[a.id] ?? 0);
     });
-    const totalt = unik.length;
-    const erOdde = totalt % 2 !== 0;
-    const halvA  = Math.floor(totalt / 2);
-    let toppSpillere, bunnSpillere;
-    if (erOdde) {
-      const midt = Math.floor(totalt / 2);
-      if (ekstraSpillerGruppe === 'topp') { toppSpillere = unik.slice(0, midt + 1); bunnSpillere = unik.slice(midt + 1); }
-      else { toppSpillere = unik.slice(0, midt); bunnSpillere = unik.slice(midt); }
-    } else {
-      toppSpillere = unik.slice(0, halvA); bunnSpillere = unik.slice(halvA);
-    }
+
+    const sortertA = sorter(unik.filter(s => gruppeAIds.has(s.id)));
+    const sortertB = sorter(unik.filter(s => gruppeBIds.has(s.id)));
+
+    // Ta øverste halvdel fra hver gruppe
+    // Ved oddetall i én gruppe: admin bestemmer om den midterste går til topp eller bunn
+    const halvA = Math.floor(sortertA.length / 2);
+    const halvB = Math.floor(sortertB.length / 2);
+    const oddeA = sortertA.length % 2 !== 0;
+    const oddeB = sortertB.length % 2 !== 0;
+
+    const toppFraA = sortertA.slice(0, halvA + (oddeA && ekstraSpillerGruppe === 'topp' ? 1 : 0));
+    const bunnFraA = sortertA.slice(toppFraA.length);
+    const toppFraB = sortertB.slice(0, halvB + (oddeB && ekstraSpillerGruppe === 'topp' ? 1 : 0));
+    const bunnFraB = sortertB.slice(toppFraB.length);
+
+    const toppSpillere = [...toppFraA, ...toppFraB];
+    const bunnSpillere = [...bunnFraA, ...bunnFraB];
     const mp    = app.poengPerKamp ?? 15;
     const nyRunde = app.runde + 1;
     const banerA = Math.max(1, Math.round((app.baneOversikt ?? []).length * toppSpillere.length / totalt));

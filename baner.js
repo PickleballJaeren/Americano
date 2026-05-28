@@ -2168,32 +2168,54 @@ export async function visSluttfaseModal() {
     ].filter(s => !ekskl.has(s.id));
     const unik = [...new Map(alle.map(s => [s.id, s])).values()];
 
-    unik.sort((a, b) => {
-      const pA = poengMap[a.id] ?? 0;
-      const pB = poengMap[b.id] ?? 0;
+    // Per-gruppe sortering
+    const gruppeAIds = new Set(app.kvalGruppeA ?? []);
+    const gruppeBIds = new Set(app.kvalGruppeB ?? []);
+
+    const sorter = liste => [...liste].sort((a, b) => {
+      const pA = poengMap[a.id] ?? 0; const pB = poengMap[b.id] ?? 0;
       if (pB !== pA) return pB - pA;
       return (kampTeller[b.id] ?? 0) - (kampTeller[a.id] ?? 0);
     });
 
-    const totalt = unik.length;
-    const erOdde = totalt % 2 !== 0;
-    const halvA  = Math.floor(totalt / 2);
+    const sortertA = sorter(unik.filter(s => gruppeAIds.has(s.id)));
+    const sortertB = sorter(unik.filter(s => gruppeBIds.has(s.id)));
+
+    const halvA  = Math.floor(sortertA.length / 2);
+    const halvB  = Math.floor(sortertB.length / 2);
+    const oddeA  = sortertA.length % 2 !== 0;
+    const oddeB  = sortertB.length % 2 !== 0;
+    const erOdde = oddeA || oddeB;
 
     if (oddetallValg) oddetallValg.style.display = erOdde ? 'block' : 'none';
 
     const oppdaterVisning = () => {
-      const ekstraTopp = erOdde && _sluttfaseEkstra === 'topp';
-      forhandsvis.innerHTML = unik.map((s, i) => {
-        const erTopp = i < halvA + (ekstraTopp ? 1 : 0);
-        const merke  = erTopp ? '🏅' : '🤝';
-        const poeng  = poengMap[s.id] ?? 0;
-        return `<div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid var(--border);font-size:14px">
-          <div style="font-family:'DM Mono',monospace;color:var(--muted);width:20px;text-align:center">${i + 1}</div>
-          <div style="flex:1;color:var(--white)">${escHtml(s.navn ?? '?')}</div>
-          <div style="font-family:'DM Mono',monospace;color:var(--yellow);min-width:32px;text-align:right">${poeng}</div>
-          <div style="font-size:16px">${merke}</div>
-        </div>`;
-      }).join('') + `<div style="margin-top:8px;font-size:12px;color:var(--muted2)">🏅 Toppgruppe · 🤝 Bunngruppe</div>`;
+      const ekstra = _sluttfaseEkstra === 'topp';
+      const toppA  = sortertA.slice(0, halvA + (oddeA && ekstra ? 1 : 0));
+      const bunnA  = sortertA.slice(toppA.length);
+      const toppB  = sortertB.slice(0, halvB + (oddeB && ekstra ? 1 : 0));
+      const bunnB  = sortertB.slice(toppB.length);
+
+      const lagSeksjon = (tittel, farge, liste, gruppe) =>
+        `<div style="font-size:12px;font-weight:600;color:${farge};margin:8px 0 4px;text-transform:uppercase;letter-spacing:1px">${tittel}</div>` +
+        liste.map((s, i) => {
+          const erTopp = gruppe === 'topp';
+          const merke  = erTopp ? '🏅' : '🤝';
+          const poeng  = poengMap[s.id] ?? 0;
+          return `<div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid var(--border);font-size:14px">
+            <div style="font-family:'DM Mono',monospace;color:var(--muted);width:20px;text-align:center">${i + 1}</div>
+            <div style="flex:1;color:var(--white)">${escHtml(s.navn ?? '?')}</div>
+            <div style="font-family:'DM Mono',monospace;color:var(--yellow);min-width:32px;text-align:right">${poeng}</div>
+            <div style="font-size:16px">${merke}</div>
+          </div>`;
+        }).join('');
+
+      forhandsvis.innerHTML =
+        lagSeksjon('Gruppe A', 'var(--green2)', toppA, 'topp') +
+        lagSeksjon('Gruppe A', 'var(--muted2)', bunnA, 'bunn') +
+        lagSeksjon('Gruppe B', 'var(--accent2)', toppB, 'topp') +
+        lagSeksjon('Gruppe B', 'var(--muted2)', bunnB, 'bunn') +
+        `<div style="margin-top:8px;font-size:12px;color:var(--muted2)">🏅 Toppgruppe · 🤝 Bunngruppe</div>`;
     };
 
     oppdaterVisning();
