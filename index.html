@@ -50,6 +50,10 @@
           <span class="modus-ikon">🎯</span>
           <span class="modus-tekst">Mix A/B</span>
         </button>
+        <button id="modus-knapp-kval" class="modus-knapp" onclick="settSpillModus('kvalifisering')" style="border-color:rgba(168,85,247,.3);color:#a855f7">
+          <span class="modus-ikon">🏅</span>
+          <span class="modus-tekst">Kveld</span>
+        </button>
         <button class="modus-knapp" onclick="naviger('turnering')" style="border-color:rgba(234,179,8,.3);color:var(--yellow)">
           <span class="modus-ikon">⭐</span>
           <span class="modus-tekst">Turnering</span>
@@ -70,6 +74,13 @@
         <div class="mix-info-rad">🏆 <span>Hver gruppe kjører sin <strong>egen Mix & Match</strong></span></div>
         <div class="mix-info-rad">🤝 <span>Ny partner hver runde — <strong>innen samme nivå</strong></span></div>
         <div class="mix-info-rad" style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(96,165,250,.15);font-size:13px;color:var(--muted2)">Ingen rating · Ingen opprykk · Ingen nedrykk</div>
+      </div>
+
+      <div id="modus-info-kval" class="modus-info modus-info-mix" style="display:none">
+        <div class="mix-info-rad">🤝 <span><strong>Innledning:</strong> sterke og svake møtes — bli kjent</span></div>
+        <div class="mix-info-rad">📊 <span>Omgruppering basert på <strong>tabell etter x runder</strong></span></div>
+        <div class="mix-info-rad">🏅 <span><strong>Sluttfase:</strong> jevne kamper — heder og ære</span></div>
+        <div class="mix-info-rad" style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(168,85,247,.15);font-size:13px;color:var(--muted2)">Ingen rating · Admin trigger omgruppering når han er klar</div>
       </div>
 
       <!-- Mix A/B bane-velger — kun synlig i Mix A/B-modus -->
@@ -1743,6 +1754,14 @@
         <div style="font-size:13px;color:var(--muted2);margin-top:1px">Korriger poengscorer fra tidligere kamper</div>
       </div>
     </button>
+    <button id="admin-meny-sluttfase" onclick="lukkAdminMeny();visSluttfaseModal()"
+      style="display:none;width:100%;text-align:left;background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.3);border-radius:12px;padding:14px 16px;margin-bottom:10px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:16px;color:#a855f7;align-items:center;gap:12px">
+      <span style="font-size:20px">🏅</span>
+      <div>
+        <div style="font-weight:600">Gå til sluttfase</div>
+        <div style="font-size:13px;color:rgba(168,85,247,.7);margin-top:1px">Omgruppper basert på innledningstabell</div>
+      </div>
+    </button>
     <button onclick="lukkAdminMeny();visDeltakerModal()"
       style="width:100%;text-align:left;background:var(--navy3);border:1px solid var(--border2);border-radius:12px;padding:14px 16px;margin-bottom:10px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:16px;color:var(--white);display:flex;align-items:center;gap:12px">
       <span style="font-size:20px">👥</span>
@@ -1759,6 +1778,29 @@
         <div style="font-size:13px;color:rgba(239,68,68,.7);margin-top:1px">Avslutter hele økten for alle</div>
       </div>
     </button>
+  </div>
+</div>
+
+<!-- Modal: Gå til sluttfase (kveldsturnering) -->
+<div class="modal-bakgrunn" id="modal-sluttfase" style="display:none"
+  onclick="if(event.target===this)lukkSluttfaseModal()">
+  <div class="modal">
+    <div class="modal-tittel">🏅 Gå til sluttfase?</div>
+    <div class="modal-tekst" style="margin-bottom:16px">
+      Spillerne omgrupperes basert på tabellen. Poeng nullstilles. Denne handlingen kan ikke angres.
+    </div>
+    <div id="sluttfase-tabell-forhandsvisning" style="background:var(--navy3);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:14px;color:var(--muted2);min-height:48px">
+      Laster forhåndsvisning…
+    </div>
+    <div id="sluttfase-oddetall-valg" style="display:none;margin-bottom:16px">
+      <div style="font-size:14px;color:var(--muted2);margin-bottom:8px">Oddetall spillere — hvem får ekstra spiller?</div>
+      <div style="display:flex;gap:10px">
+        <button id="sluttfase-ekstra-topp" class="modus-knapp modus-aktiv" onclick="settSluttfaseEkstra('topp')" style="flex:1">🏅 Toppgruppe</button>
+        <button id="sluttfase-ekstra-bunn" class="modus-knapp" onclick="settSluttfaseEkstra('bunn')" style="flex:1">🤝 Bunngruppe</button>
+      </div>
+    </div>
+    <button class="knapp knapp-gronn" style="margin-bottom:10px" onclick="bekreftSluttfase()">START SLUTTFASE →</button>
+    <button class="knapp knapp-omriss" onclick="lukkSluttfaseModal()">Avbryt</button>
   </div>
 </div>
 

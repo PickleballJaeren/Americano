@@ -4,7 +4,7 @@ import {
   query, where, orderBy, limit, serverTimestamp, writeBatch, runTransaction,
 } from './firebase.js';
 import { MIX_ROTASJON_FAST } from './konstanter.js';
-import { app, erMix, erMixAB } from './state.js';
+import { app, erMix, erMixAB, erKval } from './state.js';
 import {
   getParter, blandArray, beregnPoengForKamp,
   fordelBaner, fordelBanerMix,
@@ -51,7 +51,7 @@ import {
   gjenopprettTrening, autoAvsluttGamleTreninger,
   oppdaterAvbrytKnapp, visAvbrytOktModal, utforAvbrytOkt,
   seedDemoDataOmNødvendig,
-  leggTilSpillerIOkt, fjernSpillerFraOkt,
+  leggTilSpillerIOkt, fjernSpillerFraOkt, triggerSluttfase,
 } from './trening.js';
 import {
   banerInit,
@@ -250,17 +250,21 @@ function settSpillModus(modus) {
   const btnKonk  = document.getElementById('modus-knapp-konkurranse');
   const btnMix   = document.getElementById('modus-knapp-mix');
   const btnMixAB = document.getElementById('modus-knapp-mix-ab');
+  const btnKval  = document.getElementById('modus-knapp-kval');
   if (btnKonk)  btnKonk.classList.toggle('modus-aktiv',  modus === 'konkurranse');
   if (btnMix)   btnMix.classList.toggle('modus-aktiv',   modus === 'mix');
   if (btnMixAB) btnMixAB.classList.toggle('modus-aktiv', modus === 'mix-ab');
+  if (btnKval)  btnKval.classList.toggle('modus-aktiv',  modus === 'kvalifisering');
 
   // Vis/skjul info-boks for valgt modus
   const infoKonk  = document.getElementById('modus-info-konkurranse');
   const infoMix   = document.getElementById('modus-info-mix');
   const infoMixAB = document.getElementById('modus-info-mix-ab');
-  if (infoKonk)  infoKonk.style.display  = modus === 'konkurranse' ? 'block' : 'none';
-  if (infoMix)   infoMix.style.display   = modus === 'mix'         ? 'block' : 'none';
-  if (infoMixAB) infoMixAB.style.display = modus === 'mix-ab'      ? 'block' : 'none';
+  const infoKval  = document.getElementById('modus-info-kval');
+  if (infoKonk)  infoKonk.style.display  = modus === 'konkurranse'   ? 'block' : 'none';
+  if (infoMix)   infoMix.style.display   = modus === 'mix'           ? 'block' : 'none';
+  if (infoMixAB) infoMixAB.style.display = modus === 'mix-ab'        ? 'block' : 'none';
+  if (infoKval)  infoKval.style.display  = modus === 'kvalifisering' ? 'block' : 'none';
 
   // Vis/skjul scoringsformat-velger (kun relevant for konkurranse)
   const scoringVelger = document.getElementById('scoring-format-velger');
@@ -270,6 +274,14 @@ function settSpillModus(modus) {
   if (modus !== 'mix-ab') {
     app.mixAbGruppeA = [];
     app.mixAbGruppeB = [];
+  }
+  // Kveldsturnering: nullstill ved modusbytte
+  if (modus !== 'kvalifisering') {
+    app.kvalGruppeA    = [];
+    app.kvalGruppeB    = [];
+    app.kvalFase       = 'innledning';
+    app.kvalToppgruppe = [];
+    app.kvalBunngruppe = [];
   }
 
   // Oppdater spillerliste — viser/skjuler rating og A/B-knapper basert på modus
@@ -485,9 +497,13 @@ function apneAdminMeny() {
   const redigerOppsett = document.getElementById('admin-meny-rediger-oppsett');
   const redigerKamper  = document.getElementById('admin-meny-rediger-kamper');
   const erMixAdmin     = erMix() && app.treningId && getErAdmin();
-  if (redigerBaner)   redigerBaner.style.display   = !erMixAdmin ? 'flex' : 'none';
-  if (redigerOppsett) redigerOppsett.style.display  =  erMixAdmin ? 'flex' : 'none';
-  if (redigerKamper)  redigerKamper.style.display   =  erMixAdmin ? 'flex' : 'none';
+  const erKvalAdmin   = erKval() && app.treningId && getErAdmin();
+  if (redigerBaner)   redigerBaner.style.display   = (!erMixAdmin && !erKvalAdmin) ? 'flex' : 'none';
+  if (redigerOppsett) redigerOppsett.style.display  = (erMixAdmin || erKvalAdmin)  ? 'flex' : 'none';
+  if (redigerKamper)  redigerKamper.style.display   = (erMixAdmin || erKvalAdmin)  ? 'flex' : 'none';
+  const sluttfaseKnapp = document.getElementById('admin-meny-sluttfase');
+  if (sluttfaseKnapp) sluttfaseKnapp.style.display =
+    (erKvalAdmin && app.kvalFase === 'innledning') ? 'flex' : 'none';
   const modal = document.getElementById('modal-admin-meny');
   if (modal) modal.style.display = 'flex';
 }
@@ -781,6 +797,7 @@ async function init() {
   window.getErAdmin = getErAdmin;
   window.leggTilSpillerIOkt = leggTilSpillerIOkt;
   window.fjernSpillerFraOkt = fjernSpillerFraOkt;
+  window.triggerSluttfase   = triggerSluttfase;
   window.visDeltakerModal   = visDeltakerModal;
 
   if (!db) {

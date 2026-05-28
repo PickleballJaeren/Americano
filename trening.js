@@ -6,7 +6,7 @@ import {
   collection, doc, getDocs, getDoc, updateDoc,
   query, where, limit, serverTimestamp, writeBatch, runTransaction,
 } from './firebase.js';
-import { app, erMix, erMixAB } from './state.js';
+import { app, erMix, erMixAB, erKval } from './state.js';
 import {
   getParter, blandArray, lagSpillerMiniobjekt,
   fordelBaner, fordelBanerMix,
@@ -14,6 +14,7 @@ import {
   lagMixABKampoppsett, hentMixABStatistikk,
   lagFastMix7Oppsett,
   neste6SpillerRunde, oppdater6SpillerStreak, hent6SpillerStreak,
+  snakeDraft,
 } from './rotasjon.js';
 import { MIX_ROTASJON_FAST } from './konstanter.js';
 import { beregnEloForOkt } from './rating.js';
@@ -130,7 +131,32 @@ export async function startTrening() {
   // MIX         : smart matchmaking — minimerer partner/motstander-gjentakelse
   // 6-spiller/2-baner: alltid dobbel (4 spl) + singel (2 spl) uansett modus
   let baneOversikt, mixHviler = [], mixAbHvilerA = [], mixAbHvilerB = [];
-  if (erMixAB()) {
+  if (erKval()) {
+    // ── KVELDSTURNERING: snake-draft fordeling, begge grupper spiller Mix ──
+    const { gruppeA, gruppeB } = snakeDraft(valgte);
+    app.kvalGruppeA = gruppeA.map(s => s.id);
+    app.kvalGruppeB = gruppeB.map(s => s.id);
+    app.kvalFase    = 'innledning';
+
+    const banerA = Math.ceil((app.antallBaner ?? 2) / 2);
+    const banerB = (app.antallBaner ?? 2) - banerA;
+
+    if (gruppeA.length < 4 || gruppeB.length < 4) {
+      visMelding('Trenger minst 8 spillere for kveldsturnering (4 per gruppe).', 'advarsel');
+      return;
+    }
+
+    const res = lagMixABKampoppsett(
+      gruppeA.map(lagSpillerMiniobjekt),
+      gruppeB.map(lagSpillerMiniobjekt),
+      {}, {},
+      banerA, banerB,
+      1, app.poengPerKamp ?? 15,
+    );
+    baneOversikt  = res.baneOversikt;
+    mixAbHvilerA  = res.hvilerA ?? [];
+    mixAbHvilerB  = res.hvilerB ?? [];
+  } else if (erMixAB()) {
     // ── MIX A/B: fordel gruppe A og B på separate baner ──────────────────
     const banerA  = app.mixAbBanerA ?? 1;
     const banerB  = Math.max(1, (app.antallBaner ?? 2) - banerA);
@@ -198,6 +224,11 @@ export async function startTrening() {
         ...(mixAbHvilerA.map(s => ({ ...s, mixAbGruppe: 'A' }))),
         ...(mixAbHvilerB.map(s => ({ ...s, mixAbGruppe: 'B' }))),
       ]
+    : erKval()
+    ? [
+        ...(mixAbHvilerA.map(s => ({ ...s, kvalGruppe: 'A' }))),
+        ...(mixAbHvilerB.map(s => ({ ...s, kvalGruppe: 'B' }))),
+      ]
     : erMix()
     ? mixHviler.map(s => ({ id: s.id, navn: s.navn ?? 'Ukjent', rating: s.rating ?? STARTRATING }))
     : valgte
@@ -228,6 +259,23 @@ export async function startTrening() {
       mixAbGruppeA:          app.mixAbGruppeA ?? [],
       mixAbGruppeB:          app.mixAbGruppeB ?? [],
       mixAbBanerA:           app.mixAbBanerA  ?? 1,
+    } : erKval() ? {
+      kvalPlayedWithA:      {},
+      kvalPlayedAgainstA:   {},
+      kvalGamesPlayedA:     {},
+      kvalSitOutCountA:     {},
+      kvalLastSitOutRundeA: {},
+      kvalPlayedWithB:      {},
+      kvalPlayedAgainstB:   {},
+      kvalGamesPlayedB:     {},
+      kvalSitOutCountB:     {},
+      kvalLastSitOutRundeB: {},
+      kvalGruppeA:          app.kvalGruppeA ?? [],
+      kvalGruppeB:          app.kvalGruppeB ?? [],
+      kvalBanerA:           Math.ceil((app.antallBaner ?? 2) / 2),
+      kvalFase:             'innledning',
+      kvalToppgruppe:       [],
+      kvalBunngruppe:       [],
     } : erMix() ? {
       mixPlayedWith:       {},
       mixPlayedAgainst:    {},
@@ -674,6 +722,197 @@ export async function bekreftNesteRunde() {
       _startKampLytter();
       _naviger('baner');
       visMelding('Runde ' + nyRunde + ' startet — nye lag!');
+      return;
+    }
+
+    // ══════════════════════════════════════════
+    // KVELDSTURNERING — innledningsfase
+    // ══════════════════════════════════════════
+    if (erKval() && app.kvalFase === 'innledning') {
+      const { data: treningData } = await hentTrening();
+
+      const statistikkA = {
+        playedWith:      treningData?.kvalPlayedWithA      ?? {},
+        playedAgainst:   treningData?.kvalPlayedAgainstA   ?? {},
+        gamesPlayed:     treningData?.kvalGamesPlayedA     ?? {},
+        sitOutCount:     treningData?.kvalSitOutCountA     ?? {},
+        lastSitOutRunde: treningData?.kvalLastSitOutRundeA ?? {},
+      };
+      const statistikkB = {
+        playedWith:      treningData?.kvalPlayedWithB      ?? {},
+        playedAgainst:   treningData?.kvalPlayedAgainstB   ?? {},
+        gamesPlayed:     treningData?.kvalGamesPlayedB     ?? {},
+        sitOutCount:     treningData?.kvalSitOutCountB     ?? {},
+        lastSitOutRunde: treningData?.kvalLastSitOutRundeB ?? {},
+      };
+
+      const banerA     = treningData?.kvalBanerA ?? Math.ceil((app.baneOversikt ?? []).length / 2);
+      const banerB     = Math.max(1, (app.baneOversikt ?? []).length - banerA);
+      const gruppeAIds = new Set(treningData?.kvalGruppeA ?? []);
+      const gruppeBIds = new Set(treningData?.kvalGruppeB ?? []);
+
+      const alleSpillere = [
+        ...(app.baneOversikt ?? []).flatMap(b => b.spillere ?? []),
+        ...(app.venteliste   ?? []),
+      ];
+      const spillereA = alleSpillere.filter(s => gruppeAIds.has(s.id));
+      const spillereB = alleSpillere.filter(s => gruppeBIds.has(s.id));
+
+      const baneOversiktA = (app.baneOversikt ?? []).filter((_, i) => i < banerA);
+      const baneOversiktB = (app.baneOversikt ?? []).filter((_, i) => i >= banerA);
+      const hvilerA = (app.venteliste ?? []).filter(s => gruppeAIds.has(s.id));
+      const hvilerB = (app.venteliste ?? []).filter(s => gruppeBIds.has(s.id));
+
+      oppdaterMixStatistikk(
+        baneOversiktA, hvilerA,
+        statistikkA.playedWith, statistikkA.playedAgainst,
+        statistikkA.gamesPlayed, statistikkA.sitOutCount,
+        statistikkA.lastSitOutRunde, app.runde,
+      );
+      oppdaterMixStatistikk(
+        baneOversiktB, hvilerB,
+        statistikkB.playedWith, statistikkB.playedAgainst,
+        statistikkB.gamesPlayed, statistikkB.sitOutCount,
+        statistikkB.lastSitOutRunde, app.runde,
+      );
+
+      const res = lagMixABKampoppsett(
+        spillereA, spillereB,
+        statistikkA, statistikkB,
+        banerA, banerB,
+        nyRunde, app.poengPerKamp ?? 15,
+      );
+
+      const nyBaneOversikt = res.baneOversikt;
+      const nyVenteliste   = [
+        ...(res.hvilerA ?? []).map(s => ({ ...s, kvalGruppe: 'A' })),
+        ...(res.hvilerB ?? []).map(s => ({ ...s, kvalGruppe: 'B' })),
+      ];
+
+      const batch = writeBatch(db);
+      batch.update(doc(db, SAM.TRENINGER, app.treningId), {
+        gjeldendRunde:        nyRunde,
+        baneOversikt:         nyBaneOversikt,
+        venteliste:           nyVenteliste,
+        laast:                false,
+        kvalPlayedWithA:      statistikkA.playedWith,
+        kvalPlayedAgainstA:   statistikkA.playedAgainst,
+        kvalGamesPlayedA:     statistikkA.gamesPlayed,
+        kvalSitOutCountA:     statistikkA.sitOutCount,
+        kvalLastSitOutRundeA: statistikkA.lastSitOutRunde,
+        kvalPlayedWithB:      statistikkB.playedWith,
+        kvalPlayedAgainstB:   statistikkB.playedAgainst,
+        kvalGamesPlayedB:     statistikkB.gamesPlayed,
+        kvalSitOutCountB:     statistikkB.sitOutCount,
+        kvalLastSitOutRundeB: statistikkB.lastSitOutRunde,
+      });
+      skrivMixKamper(batch, app.treningId, nyRunde, nyBaneOversikt);
+      await batch.commit();
+
+      app.runde        = nyRunde;
+      app.baneOversikt = nyBaneOversikt;
+      app.venteliste   = nyVenteliste;
+      _setKampStatusCache({});
+      _oppdaterRundeUI();
+      _startKampLytter();
+      _naviger('baner');
+      visMelding('Runde ' + nyRunde + ' startet — nye lag!');
+      return;
+    }
+
+    // ══════════════════════════════════════════
+    // KVELDSTURNERING — sluttfase (neste runde innad i sluttfasen)
+    // ══════════════════════════════════════════
+    if (erKval() && app.kvalFase === 'sluttfase') {
+      const { data: treningData } = await hentTrening();
+
+      const toppIds = new Set(treningData?.kvalToppgruppe ?? []);
+      const bunnIds = new Set(treningData?.kvalBunngruppe ?? []);
+
+      const statistikkA = {
+        playedWith:      treningData?.kvalPlayedWithA      ?? {},
+        playedAgainst:   treningData?.kvalPlayedAgainstA   ?? {},
+        gamesPlayed:     treningData?.kvalGamesPlayedA     ?? {},
+        sitOutCount:     treningData?.kvalSitOutCountA     ?? {},
+        lastSitOutRunde: treningData?.kvalLastSitOutRundeA ?? {},
+      };
+      const statistikkB = {
+        playedWith:      treningData?.kvalPlayedWithB      ?? {},
+        playedAgainst:   treningData?.kvalPlayedAgainstB   ?? {},
+        gamesPlayed:     treningData?.kvalGamesPlayedB     ?? {},
+        sitOutCount:     treningData?.kvalSitOutCountB     ?? {},
+        lastSitOutRunde: treningData?.kvalLastSitOutRundeB ?? {},
+      };
+
+      const alleSpillere = [
+        ...(app.baneOversikt ?? []).flatMap(b => b.spillere ?? []),
+        ...(app.venteliste   ?? []),
+      ];
+      const spillereTopp = alleSpillere.filter(s => toppIds.has(s.id));
+      const spillereBunn = alleSpillere.filter(s => bunnIds.has(s.id));
+
+      const banerA = Math.max(1, Math.floor((app.baneOversikt ?? []).length * spillereTopp.length / (spillereTopp.length + spillereBunn.length)));
+      const banerB = Math.max(1, (app.baneOversikt ?? []).length - banerA);
+
+      const baneOversiktA = (app.baneOversikt ?? []).filter((_, i) => i < banerA);
+      const baneOversiktB = (app.baneOversikt ?? []).filter((_, i) => i >= banerA);
+      const hvilerA = (app.venteliste ?? []).filter(s => toppIds.has(s.id));
+      const hvilerB = (app.venteliste ?? []).filter(s => bunnIds.has(s.id));
+
+      oppdaterMixStatistikk(
+        baneOversiktA, hvilerA,
+        statistikkA.playedWith, statistikkA.playedAgainst,
+        statistikkA.gamesPlayed, statistikkA.sitOutCount,
+        statistikkA.lastSitOutRunde, app.runde,
+      );
+      oppdaterMixStatistikk(
+        baneOversiktB, hvilerB,
+        statistikkB.playedWith, statistikkB.playedAgainst,
+        statistikkB.gamesPlayed, statistikkB.sitOutCount,
+        statistikkB.lastSitOutRunde, app.runde,
+      );
+
+      const res = lagMixABKampoppsett(
+        spillereTopp, spillereBunn,
+        statistikkA, statistikkB,
+        banerA, banerB,
+        nyRunde, app.poengPerKamp ?? 15,
+      );
+
+      const nyBaneOversikt = res.baneOversikt;
+      const nyVenteliste   = [
+        ...(res.hvilerA ?? []).map(s => ({ ...s, kvalSluttGruppe: 'topp' })),
+        ...(res.hvilerB ?? []).map(s => ({ ...s, kvalSluttGruppe: 'bunn' })),
+      ];
+
+      const batch = writeBatch(db);
+      batch.update(doc(db, SAM.TRENINGER, app.treningId), {
+        gjeldendRunde:        nyRunde,
+        baneOversikt:         nyBaneOversikt,
+        venteliste:           nyVenteliste,
+        laast:                false,
+        kvalPlayedWithA:      statistikkA.playedWith,
+        kvalPlayedAgainstA:   statistikkA.playedAgainst,
+        kvalGamesPlayedA:     statistikkA.gamesPlayed,
+        kvalSitOutCountA:     statistikkA.sitOutCount,
+        kvalLastSitOutRundeA: statistikkA.lastSitOutRunde,
+        kvalPlayedWithB:      statistikkB.playedWith,
+        kvalPlayedAgainstB:   statistikkB.playedAgainst,
+        kvalGamesPlayedB:     statistikkB.gamesPlayed,
+        kvalSitOutCountB:     statistikkB.sitOutCount,
+        kvalLastSitOutRundeB: statistikkB.lastSitOutRunde,
+      });
+      skrivMixKamper(batch, app.treningId, nyRunde, nyBaneOversikt);
+      await batch.commit();
+
+      app.runde        = nyRunde;
+      app.baneOversikt = nyBaneOversikt;
+      app.venteliste   = nyVenteliste;
+      _setKampStatusCache({});
+      _oppdaterRundeUI();
+      _startKampLytter();
+      _naviger('baner');
+      visMelding('Runde ' + nyRunde + ' — sluttfase!');
       return;
     }
 
@@ -1313,6 +1552,14 @@ export async function gjenopprettTrening(treningId) {
     app.mixAbGruppeB = data.mixAbGruppeB ?? [];
     app.mixAbBanerA  = data.mixAbBanerA  ?? 1;
   }
+  // Kveldsturnering — gjenopprett fase og gruppefordeling
+  if (app.spillModus === 'kvalifisering') {
+    app.kvalFase       = data.kvalFase       ?? 'innledning';
+    app.kvalGruppeA    = data.kvalGruppeA    ?? [];
+    app.kvalGruppeB    = data.kvalGruppeB    ?? [];
+    app.kvalToppgruppe = data.kvalToppgruppe ?? [];
+    app.kvalBunngruppe = data.kvalBunngruppe ?? [];
+  }
   sessionStorage.setItem('aktivTreningId',      treningId);
   sessionStorage.setItem('aktivTreningKlubbId', data.klubbId ?? _getAktivKlubbId());
   localStorage.setItem('aktivTreningId',        treningId);
@@ -1506,6 +1753,154 @@ async function _lagreDeltakerEndring() {
     venteliste:     app.venteliste ?? [],
   });
 }
+
+// ════════════════════════════════════════════════════════
+// KVELDSTURNERING — TRIGGER SLUTTFASE
+// Beregner toppgruppe og bunngruppe basert på poeng i
+// innledningsfasen, nullstiller statistikk og starter
+// ny runde med de omgrupperte spillerne.
+//
+// @param {string|null} ekstraSpillerGruppe — 'topp' | 'bunn' | null
+//   Ved oddetall spillere totalt avgjør admin hvilken gruppe
+//   som får én ekstra spiller (den midterste i tabellen).
+// ════════════════════════════════════════════════════════
+export async function triggerSluttfase(ekstraSpillerGruppe = 'topp') {
+  if (!db || !app.treningId) { visMelding('Ingen aktiv økt.', 'feil'); return; }
+  if (!erKval()) { visMelding('Ikke i kveldsturnering-modus.', 'feil'); return; }
+
+  lasUI('Forbereder sluttfase…');
+  startFailSafe(async () => {
+    await updateDoc(doc(db, SAM.TRENINGER, app.treningId), { laast: false });
+  });
+
+  try {
+    // Hent alle kamper fra innledningsfasen
+    const kampSnap = await getDocs(
+      query(collection(db, SAM.KAMPER), where('treningId', '==', app.treningId))
+    );
+    const alleKamper = kampSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    // Beregn poeng per spiller på tvers av begge grupper
+    const poengMap = {};
+    const kampTeller = {};
+    alleKamper.filter(k => k.ferdig && k.lag1Poeng != null).forEach(k => {
+      const leggTil = (id, poeng) => {
+        poengMap[id]  = (poengMap[id]  ?? 0) + poeng;
+        kampTeller[id] = (kampTeller[id] ?? 0) + 1;
+      };
+      if (k.lag1_s1) leggTil(k.lag1_s1, k.lag1Poeng);
+      if (k.lag1_s2) leggTil(k.lag1_s2, k.lag1Poeng);
+      if (k.lag2_s1) leggTil(k.lag2_s1, k.lag2Poeng);
+      if (k.lag2_s2) leggTil(k.lag2_s2, k.lag2Poeng);
+    });
+
+    // Alle aktive spillere (baner + venteliste, ikke ekskluderte)
+    const ekskl = app.ekskluderteIds ?? new Set();
+    const alleAktive = [
+      ...(app.baneOversikt ?? []).flatMap(b => b.spillere ?? []),
+      ...(app.venteliste   ?? []),
+    ].filter(s => !ekskl.has(s.id));
+
+    // Dedupliser på id
+    const unikAktive = [...new Map(alleAktive.map(s => [s.id, s])).values()];
+
+    // Sorter etter poeng (høyest øverst), deretter antall kamper som tiebreak
+    unikAktive.sort((a, b) => {
+      const pA = poengMap[a.id] ?? 0;
+      const pB = poengMap[b.id] ?? 0;
+      if (pB !== pA) return pB - pA;
+      return (kampTeller[b.id] ?? 0) - (kampTeller[a.id] ?? 0);
+    });
+
+    const totalt = unikAktive.length;
+    const halvA  = Math.floor(totalt / 2);
+    const halvB  = totalt - halvA;
+    const erOdde = totalt % 2 !== 0;
+
+    // Ved oddetall: midterste spiller tildeles den gruppen admin valgte
+    let toppSpillere, bunnSpillere;
+    if (erOdde) {
+      const midt = Math.floor(totalt / 2);
+      if (ekstraSpillerGruppe === 'topp') {
+        toppSpillere = unikAktive.slice(0, midt + 1);
+        bunnSpillere = unikAktive.slice(midt + 1);
+      } else {
+        toppSpillere = unikAktive.slice(0, midt);
+        bunnSpillere = unikAktive.slice(midt);
+      }
+    } else {
+      toppSpillere = unikAktive.slice(0, halvA);
+      bunnSpillere = unikAktive.slice(halvA);
+    }
+
+    // Ny banefordeling for sluttfasen — Mix-stil i hver gruppe
+    const mp      = app.poengPerKamp ?? 15;
+    const nyRunde = app.runde + 1;
+    const banerA  = Math.max(1, Math.floor((app.baneOversikt ?? []).length * toppSpillere.length / totalt));
+    const banerB  = Math.max(1, (app.baneOversikt ?? []).length - banerA);
+
+    const resT = lagMixABKampoppsett(
+      toppSpillere.map(lagSpillerMiniobjekt),
+      bunnSpillere.map(lagSpillerMiniobjekt),
+      {}, {},  // nullstill statistikk for sluttfasen
+      banerA, banerB,
+      nyRunde, mp,
+    );
+
+    const nyBaneOversikt = resT.baneOversikt;
+    const nyVenteliste   = [
+      ...(resT.hvilerA ?? []).map(s => ({ ...s, kvalSluttGruppe: 'topp' })),
+      ...(resT.hvilerB ?? []).map(s => ({ ...s, kvalSluttGruppe: 'bunn' })),
+    ];
+
+    const batch = writeBatch(db);
+    batch.update(doc(db, SAM.TRENINGER, app.treningId), {
+      gjeldendRunde:   nyRunde,
+      baneOversikt:    nyBaneOversikt,
+      venteliste:      nyVenteliste,
+      laast:           false,
+      kvalFase:        'sluttfase',
+      kvalToppgruppe:  toppSpillere.map(s => s.id),
+      kvalBunngruppe:  bunnSpillere.map(s => s.id),
+      // Nullstill statistikk for sluttfasen
+      kvalPlayedWithA:      {},
+      kvalPlayedAgainstA:   {},
+      kvalGamesPlayedA:     {},
+      kvalSitOutCountA:     {},
+      kvalLastSitOutRundeA: {},
+      kvalPlayedWithB:      {},
+      kvalPlayedAgainstB:   {},
+      kvalGamesPlayedB:     {},
+      kvalSitOutCountB:     {},
+      kvalLastSitOutRundeB: {},
+    });
+    skrivMixKamper(batch, app.treningId, nyRunde, nyBaneOversikt);
+    await batch.commit();
+
+    app.runde        = nyRunde;
+    app.baneOversikt = nyBaneOversikt;
+    app.venteliste   = nyVenteliste;
+    app.kvalFase     = 'sluttfase';
+    app.kvalToppgruppe = toppSpillere.map(s => s.id);
+    app.kvalBunngruppe = bunnSpillere.map(s => s.id);
+
+    _setKampStatusCache({});
+    _oppdaterRundeUI();
+    _startKampLytter();
+    _naviger('baner');
+    visMelding('🏆 Sluttfase startet — spillere omgruppert!');
+
+    stoppFailSafe();
+    frigiUI();
+  } catch (e) {
+    console.error('[triggerSluttfase]', e);
+    visMelding('Feil ved omgruppering: ' + (e?.message ?? e), 'feil');
+    await updateDoc(doc(db, SAM.TRENINGER, app.treningId), { laast: false }).catch(() => {});
+    stoppFailSafe();
+    frigiUI();
+  }
+}
+window.triggerSluttfase = triggerSluttfase;
 
 /**
  * Legger en spiller til ventelisten for inneværende økt.

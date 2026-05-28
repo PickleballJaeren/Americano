@@ -40,9 +40,20 @@ export const app = {
   mixAbGruppeB:      [],
   // Mix A/B — antall baner per gruppe (settes i oppsett)
   mixAbBanerA:       1,
+  // Kveldsturnering — to-fase format
+  // 'innledning' | 'sluttfase'
+  kvalFase:          'innledning',
+  // Snake-draft gruppefordeling (arrays av spillerId-strenger)
+  kvalGruppeA:       [],
+  kvalGruppeB:       [],
+  // Sluttfase-grupper (settes ved omgruppering)
+  kvalToppgruppe:    [],
+  kvalBunngruppe:    [],
 };
 
 /** Returnerer true når gjeldende økt kjøres i Mix & Match-modus (inkl. Mix A/B). */
 export const erMix   = () => app.spillModus === 'mix' || app.spillModus === 'mix-ab';
 /** Returnerer true kun for Mix A/B-modus. */
 export const erMixAB = () => app.spillModus === 'mix-ab';
+/** Returnerer true for kveldsturnerings-modus. */
+export const erKval  = () => app.spillModus === 'kvalifisering';

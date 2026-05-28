@@ -19,7 +19,7 @@ import {
   collection, doc, addDoc, updateDoc,
   query, where, getDocs, writeBatch, serverTimestamp,
 } from './firebase.js';
-import { app, erMix } from './state.js';
+import { app, erMix, erKval } from './state.js';
 import { getParter, erSingelBane, hentParter } from './rotasjon.js';
 import { visMelding, visFBFeil, escHtml } from './ui.js';
 
@@ -2119,3 +2119,112 @@ function lagNavnFraKamp(kamp, lag) {
   const s2 = kamp.lag2_s2_navn ? ` + ${kamp.lag2_s2_navn}` : '';
   return s1 + s2;
 }
+
+// ════════════════════════════════════════════════════════
+// KVELDSTURNERING — SLUTTFASE MODAL
+// Viser forhåndsvisning av tabell og omgruppering.
+// Admin kan velge hvem som får ekstra spiller ved oddetall.
+// ════════════════════════════════════════════════════════
+
+let _sluttfaseEkstra = 'topp'; // 'topp' | 'bunn'
+
+export async function visSluttfaseModal() {
+  if (!db || !app.treningId) return;
+  _sluttfaseEkstra = 'topp';
+
+  const modal = document.getElementById('modal-sluttfase');
+  const forhandsvis = document.getElementById('sluttfase-tabell-forhandsvisning');
+  const oddetallValg = document.getElementById('sluttfase-oddetall-valg');
+  if (!modal || !forhandsvis) return;
+
+  forhandsvis.innerHTML = '<div style="color:var(--muted2);font-size:14px">Laster tabell…</div>';
+  if (oddetallValg) oddetallValg.style.display = 'none';
+  modal.style.display = 'flex';
+
+  try {
+    // Hent alle kamper fra innledningsfasen
+    const snap = await getDocs(
+      query(collection(db, SAM.KAMPER), where('treningId', '==', app.treningId))
+    );
+    const kamper = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    // Beregn poeng per spiller
+    const poengMap = {};
+    const kampTeller = {};
+    kamper.filter(k => k.ferdig && k.lag1Poeng != null).forEach(k => {
+      const leggTil = (id, p) => {
+        poengMap[id]   = (poengMap[id]   ?? 0) + p;
+        kampTeller[id] = (kampTeller[id] ?? 0) + 1;
+      };
+      if (k.lag1_s1) leggTil(k.lag1_s1, k.lag1Poeng);
+      if (k.lag1_s2) leggTil(k.lag1_s2, k.lag1Poeng);
+      if (k.lag2_s1) leggTil(k.lag2_s1, k.lag2Poeng);
+      if (k.lag2_s2) leggTil(k.lag2_s2, k.lag2Poeng);
+    });
+
+    // Alle aktive spillere
+    const ekskl = app.ekskluderteIds ?? new Set();
+    const alle = [
+      ...(app.baneOversikt ?? []).flatMap(b => b.spillere ?? []),
+      ...(app.venteliste   ?? []),
+    ].filter(s => !ekskl.has(s.id));
+    const unik = [...new Map(alle.map(s => [s.id, s])).values()];
+
+    unik.sort((a, b) => {
+      const pA = poengMap[a.id] ?? 0;
+      const pB = poengMap[b.id] ?? 0;
+      if (pB !== pA) return pB - pA;
+      return (kampTeller[b.id] ?? 0) - (kampTeller[a.id] ?? 0);
+    });
+
+    const totalt = unik.length;
+    const erOdde = totalt % 2 !== 0;
+    const halvA  = Math.floor(totalt / 2);
+
+    if (oddetallValg) oddetallValg.style.display = erOdde ? 'block' : 'none';
+
+    // Bygg tabell-HTML
+    forhandsvis.innerHTML = unik.map((s, i) => {
+      const erTopp = i < halvA + (erOdde && _sluttfaseEkstra === 'topp' ? 1 : 0);
+      const plass = i + 1;
+      const poeng = poengMap[s.id] ?? 0;
+      const farge = erTopp ? 'var(--green2)' : 'var(--muted2)';
+      const merke = erTopp ? '🏅' : '🤝';
+      return `<div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid var(--border);font-size:14px">
+        <div style="font-family:'DM Mono',monospace;color:var(--muted);width:20px;text-align:center">${plass}</div>
+        <div style="flex:1;color:var(--white)">${escHtml(s.navn ?? '?')}</div>
+        <div style="font-family:'DM Mono',monospace;color:var(--yellow);min-width:32px;text-align:right">${poeng}</div>
+        <div style="font-size:16px">${merke}</div>
+      </div>`;
+    }).join('') + `<div style="margin-top:8px;font-size:12px;color:var(--muted2)">
+      🏅 = Toppgruppe · 🤝 = Bunngruppe
+    </div>`;
+
+  } catch (e) {
+    forhandsvis.innerHTML = `<div style="color:var(--red2);font-size:14px">Feil: ${escHtml(e?.message ?? String(e))}</div>`;
+  }
+}
+window.visSluttfaseModal = visSluttfaseModal;
+
+export function lukkSluttfaseModal() {
+  const modal = document.getElementById('modal-sluttfase');
+  if (modal) modal.style.display = 'none';
+}
+window.lukkSluttfaseModal = lukkSluttfaseModal;
+
+export function settSluttfaseEkstra(val) {
+  _sluttfaseEkstra = val;
+  document.getElementById('sluttfase-ekstra-topp')?.classList.toggle('modus-aktiv', val === 'topp');
+  document.getElementById('sluttfase-ekstra-bunn')?.classList.toggle('modus-aktiv', val === 'bunn');
+  // Oppdater forhåndsvisningen
+  visSluttfaseModal();
+}
+window.settSluttfaseEkstra = settSluttfaseEkstra;
+
+export async function bekreftSluttfase() {
+  lukkSluttfaseModal();
+  if (typeof window.triggerSluttfase === 'function') {
+    await window.triggerSluttfase(_sluttfaseEkstra);
+  }
+}
+window.bekreftSluttfase = bekreftSluttfase;

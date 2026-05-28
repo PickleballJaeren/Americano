@@ -745,3 +745,34 @@ export function hentMixABStatistikk(treningData) {
     },
   };
 }
+
+// ════════════════════════════════════════════════════════
+// KVELDSTURNERING — SNAKE DRAFT
+// Fordeler spillere (sortert på rating høy→lav) annenhver
+// mellom gruppe A og B slik at begge grupper er like sterke
+// i snitt, men med intern spredning (sterke + svake samlet).
+//
+// Eksempel (8 spl, rating 1→8):
+//   A: #1, #4, #5, #8   B: #2, #3, #6, #7
+//
+// @param {Array} spillere  — [{ id, navn, rating, ... }]
+// @returns {{ gruppeA: [], gruppeB: [] }}
+// ════════════════════════════════════════════════════════
+export function snakeDraft(spillere) {
+  const sorterte = [...spillere].sort(
+    (a, b) => (b.rating ?? 1000) - (a.rating ?? 1000)
+  );
+  const gruppeA = [];
+  const gruppeB = [];
+  sorterte.forEach((s, i) => {
+    // Slange: 0→A, 1→B, 2→B, 3→A, 4→A, 5→B, ...
+    const blokk = Math.floor(i / 2);
+    const posIBlokk = i % 2;
+    if (blokk % 2 === 0) {
+      (posIBlokk === 0 ? gruppeA : gruppeB).push(s);
+    } else {
+      (posIBlokk === 0 ? gruppeB : gruppeA).push(s);
+    }
+  });
+  return { gruppeA, gruppeB };
+}
