@@ -425,31 +425,87 @@ export async function apneTreningsdetalj(treningId) {
 
     // ── Sluttrangering og ratingendringer ────────────────
     if (resultater.length > 0) {
-      document.getElementById('detalj-rangering').innerHTML = resultater.map(r => {
-        const ini = lagInitialer(r.spillerNavn);
-        return `<div class="lb-rad" style="cursor:default">
-          <div class="lb-plass${r.sluttPlassering <= 3 ? ' topp3' : ''}">${r.sluttPlassering}</div>
-          <div class="lb-avatar">${ini}</div>
-          <div class="lb-navn">${escHtml(r.spillerNavn ?? 'Ukjent')}</div>
-          <div style="text-align:right">
-            <div style="font-family:'DM Mono',monospace;font-size:15px;color:var(--muted2)">${r.ratingEtter ?? '—'}</div>
+      const modus = resultater[0]?.spillModus ?? t.spillModus ?? 'konkurranse';
+      const erMixArkiv  = modus === 'mix' || modus === 'mix-ab';
+      const erKvalArkiv = modus === 'kvalifisering';
+
+      // Skjul rating-seksjonen for mix og opprykk
+      const ratingSeksjonEl = document.getElementById('detalj-rating-seksjon');
+      const ratingKortEl    = document.getElementById('detalj-rating')?.closest?.('.kort');
+      if (erMixArkiv || erKvalArkiv) {
+        if (ratingSeksjonEl) ratingSeksjonEl.style.display = 'none';
+        if (ratingKortEl)    ratingKortEl.style.display    = 'none';
+      } else {
+        if (ratingSeksjonEl) ratingSeksjonEl.style.display = '';
+        if (ratingKortEl)    ratingKortEl.style.display    = '';
+      }
+
+      if (erKvalArkiv) {
+        // Opprykk: to separate grupper
+        const plasseringSymbol = p => p === 1 ? '🥇' : p === 2 ? '🥈' : p === 3 ? '🥉' : `${p}.`;
+        const toppData = resultater.filter(r => r.kvalGruppe === 'topp');
+        const bunnData = resultater.filter(r => r.kvalGruppe === 'bunn');
+
+        const lagGruppeHTML = (tittel, farge, liste) => {
+          if (!liste.length) return '';
+          const rader = liste.map((r, i) => {
+            const ini = lagInitialer(r.spillerNavn);
+            return `<div class="lb-rad" style="cursor:default">
+              <div class="lb-plass">${plasseringSymbol(i + 1)}</div>
+              <div class="lb-avatar">${ini}</div>
+              <div class="lb-navn">${escHtml(r.spillerNavn ?? 'Ukjent')}</div>
+              <div style="text-align:right;font-family:'DM Mono',monospace;font-size:15px;color:var(--yellow)">${r.totalPoeng ?? 0}</div>
+            </div>`;
+          }).join('');
+          return `<div style="font-size:12px;font-weight:600;color:${farge};margin:10px 0 4px;text-transform:uppercase;letter-spacing:1px">${tittel}</div>${rader}`;
+        };
+
+        document.getElementById('detalj-rangering').innerHTML =
+          lagGruppeHTML('🏅 Opprykksgruppe', 'var(--green2)', toppData) +
+          lagGruppeHTML('🤝 Nedrykkgruppe',  'var(--accent2)', bunnData);
+
+      } else if (erMixArkiv) {
+        // Mix: poeng-tabell
+        const plasseringSymbol = p => p === 1 ? '🥇' : p === 2 ? '🥈' : p === 3 ? '🥉' : `${p}.`;
+        const sortert = [...resultater].sort((a, b) => (a.sluttPlassering ?? 999) - (b.sluttPlassering ?? 999));
+        document.getElementById('detalj-rangering').innerHTML = sortert.map((r, i) => {
+          const ini = lagInitialer(r.spillerNavn);
+          return `<div class="lb-rad" style="cursor:default">
+            <div class="lb-plass">${plasseringSymbol(i + 1)}</div>
+            <div class="lb-avatar">${ini}</div>
+            <div class="lb-navn">${escHtml(r.spillerNavn ?? 'Ukjent')}</div>
+            <div style="text-align:right;font-family:'DM Mono',monospace;font-size:15px;color:var(--yellow)">${r.totalPoeng ?? 0}</div>
+          </div>`;
+        }).join('');
+
+      } else {
+        // Konkurranse: rating-layout
+        document.getElementById('detalj-rangering').innerHTML = resultater.map(r => {
+          const ini = lagInitialer(r.spillerNavn);
+          return `<div class="lb-rad" style="cursor:default">
+            <div class="lb-plass${r.sluttPlassering <= 3 ? ' topp3' : ''}">${r.sluttPlassering}</div>
+            <div class="lb-avatar">${ini}</div>
+            <div class="lb-navn">${escHtml(r.spillerNavn ?? 'Ukjent')}</div>
+            <div style="text-align:right">
+              <div style="font-family:'DM Mono',monospace;font-size:15px;color:var(--muted2)">${r.ratingEtter ?? '—'}</div>
+              <div class="lb-endring ${(r.ratingEndring ?? 0) >= 0 ? 'pos' : 'neg'}">
+                ${(r.ratingEndring ?? 0) >= 0 ? '+' : ''}${r.ratingEndring ?? 0}
+              </div>
+            </div>
+          </div>`;
+        }).join('');
+
+        document.getElementById('detalj-rating').innerHTML = resultater.map(r => `
+          <div class="lb-rad" style="cursor:default">
+            <div style="flex:1;font-size:17px">${escHtml(r.spillerNavn ?? 'Ukjent')}</div>
+            <div style="font-family:'DM Mono',monospace;font-size:15px;color:var(--muted2);margin-right:10px">
+              ${r.ratingFor ?? STARTRATING} → ${r.ratingEtter ?? STARTRATING}
+            </div>
             <div class="lb-endring ${(r.ratingEndring ?? 0) >= 0 ? 'pos' : 'neg'}">
               ${(r.ratingEndring ?? 0) >= 0 ? '+' : ''}${r.ratingEndring ?? 0}
             </div>
-          </div>
-        </div>`;
-      }).join('');
-
-      document.getElementById('detalj-rating').innerHTML = resultater.map(r => `
-        <div class="lb-rad" style="cursor:default">
-          <div style="flex:1;font-size:17px">${escHtml(r.spillerNavn ?? 'Ukjent')}</div>
-          <div style="font-family:'DM Mono',monospace;font-size:15px;color:var(--muted2);margin-right:10px">
-            ${r.ratingFor ?? STARTRATING} → ${r.ratingEtter ?? STARTRATING}
-          </div>
-          <div class="lb-endring ${(r.ratingEndring ?? 0) >= 0 ? 'pos' : 'neg'}">
-            ${(r.ratingEndring ?? 0) >= 0 ? '+' : ''}${r.ratingEndring ?? 0}
-          </div>
-        </div>`).join('');
+          </div>`).join('');
+      }
 
     } else if (erAktiv) {
       // Pågående økt — vis deltakere
