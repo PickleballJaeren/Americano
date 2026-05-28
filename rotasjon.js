@@ -747,7 +747,68 @@ export function hentMixABStatistikk(treningData) {
 }
 
 // ════════════════════════════════════════════════════════
-// KVELDSTURNERING — SNAKE DRAFT
+// KVELDSTURNERING — KAMPOPPSETT
+// Kjører lagMixKampoppsett separat per gruppe slik at
+// spillerne i hver gruppe rullerer fritt på tvers av
+// alle banene i sin gruppe (ikke låst til én bane).
+//
+// Eksempel: 16 spillere, 4 baner
+//   Gruppe A (8 spl) → bane 1 og 2, fri rotasjon
+//   Gruppe B (8 spl) → bane 3 og 4, fri rotasjon
+//
+// @param {Array}  spillereA    — [{id, navn, rating}]
+// @param {Array}  spillereB    — [{id, navn, rating}]
+// @param {Object} statistikkA  — { playedWith, playedAgainst, gamesPlayed, sitOutCount, lastSitOutRunde }
+// @param {Object} statistikkB  — samme for gruppe B
+// @param {number} antallBanerA — antall baner til gruppe A
+// @param {number} antallBanerB — antall baner til gruppe B
+// @param {number} runde
+// @param {number} [mp=15]
+// @returns {{ baneOversikt, hvilerA, hvilerB }}
+// ════════════════════════════════════════════════════════
+export function lagKvalKampoppsett(
+  spillereA, spillereB,
+  statistikkA, statistikkB,
+  antallBanerA, antallBanerB,
+  runde, mp = 15,
+) {
+  const resA = lagMixKampoppsett(
+    spillereA,
+    statistikkA.playedWith      ?? {},
+    statistikkA.playedAgainst   ?? {},
+    statistikkA.gamesPlayed     ?? {},
+    statistikkA.sitOutCount     ?? {},
+    statistikkA.lastSitOutRunde ?? {},
+    antallBanerA,
+    runde,
+    mp,
+  );
+
+  const resB = lagMixKampoppsett(
+    spillereB,
+    statistikkB.playedWith      ?? {},
+    statistikkB.playedAgainst   ?? {},
+    statistikkB.gamesPlayed     ?? {},
+    statistikkB.sitOutCount     ?? {},
+    statistikkB.lastSitOutRunde ?? {},
+    antallBanerB,
+    runde,
+    mp,
+  );
+
+  // Renummer B-banene slik at de fortsetter etter A-banene
+  const bBaner = (resB.baneOversikt ?? []).map((b, i) => ({
+    ...b,
+    baneNr: antallBanerA + i + 1,
+  }));
+
+  return {
+    baneOversikt: [...(resA.baneOversikt ?? []), ...bBaner],
+    hvilerA:      resA.hviler ?? [],
+    hvilerB:      resB.hviler ?? [],
+  };
+}
+
 // Fordeler spillere (sortert på rating høy→lav) annenhver
 // mellom gruppe A og B slik at begge grupper er like sterke
 // i snitt, men med intern spredning (sterke + svake samlet).

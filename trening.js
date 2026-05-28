@@ -12,6 +12,7 @@ import {
   fordelBaner, fordelBanerMix,
   lagMixKampoppsett, oppdaterMixStatistikk, hentMixStatistikk,
   lagMixABKampoppsett, hentMixABStatistikk,
+  lagKvalKampoppsett,
   lagFastMix7Oppsett,
   neste6SpillerRunde, oppdater6SpillerStreak, hent6SpillerStreak,
   snakeDraft,
@@ -146,7 +147,7 @@ export async function startTrening() {
       return;
     }
 
-    const res = lagMixABKampoppsett(
+    const res = lagKvalKampoppsett(
       gruppeA.map(lagSpillerMiniobjekt),
       gruppeB.map(lagSpillerMiniobjekt),
       {}, {},
@@ -776,7 +777,7 @@ export async function bekreftNesteRunde() {
         statistikkB.lastSitOutRunde, app.runde,
       );
 
-      const res = lagMixABKampoppsett(
+      const res = lagKvalKampoppsett(
         spillereA, spillereB,
         statistikkA, statistikkB,
         banerA, banerB,
@@ -872,7 +873,7 @@ export async function bekreftNesteRunde() {
         statistikkB.lastSitOutRunde, app.runde,
       );
 
-      const res = lagMixABKampoppsett(
+      const res = lagKvalKampoppsett(
         spillereTopp, spillereBunn,
         statistikkA, statistikkB,
         banerA, banerB,
@@ -1839,7 +1840,7 @@ export async function triggerSluttfase(ekstraSpillerGruppe = 'topp') {
     const banerA  = Math.max(1, Math.floor((app.baneOversikt ?? []).length * toppSpillere.length / totalt));
     const banerB  = Math.max(1, (app.baneOversikt ?? []).length - banerA);
 
-    const resT = lagMixABKampoppsett(
+    const resT = lagKvalKampoppsett(
       toppSpillere.map(lagSpillerMiniobjekt),
       bunnSpillere.map(lagSpillerMiniobjekt),
       {}, {},  // nullstill statistikk for sluttfasen
