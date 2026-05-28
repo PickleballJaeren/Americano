@@ -11,7 +11,7 @@
 //   at brukeren må gjøre noe.
 // ════════════════════════════════════════════════════════
 
-const CACHE_NAVN = 'pb-jaeren-v3';
+const CACHE_NAVN = 'pb-jaeren-v4';
 
 const SHELL_STATISK = [
   './logo.svg',
