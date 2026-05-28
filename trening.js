@@ -1147,17 +1147,11 @@ export async function avsluttTreningUI() {
       const toppIds = new Set(app.kvalToppgruppe ?? []);
       const bunnIds = new Set(app.kvalBunngruppe ?? []);
 
-      // Kun poeng fra sluttfasen — finn første sluttfase-runde
-      // (runden etter omgrupperingen)
-      const innledningKamper = alleKamper.filter(k =>
-        !(toppIds.has(k.lag1_s1) || toppIds.has(k.lag2_s1) ||
-          bunnIds.has(k.lag1_s1) || bunnIds.has(k.lag2_s1))
+      // Kun kamper fra sluttfasen — bruk kvalSluttfaseStartRunde som grense
+      const startRunde = app.kvalSluttfaseStartRunde ?? null;
+      const sluttfaseKamper = alleKamper.filter(k =>
+        harPoeng(k) && startRunde !== null && k.rundeNr >= startRunde
       );
-      // Sluttfase-kamper: alle kamper der begge lag tilhører enten topp eller bunn
-      const sluttfaseKamper = alleKamper.filter(k => harPoeng(k) && (
-        toppIds.has(k.lag1_s1) || toppIds.has(k.lag2_s1) ||
-        bunnIds.has(k.lag1_s1) || bunnIds.has(k.lag2_s1)
-      ));
 
       const sluttTotaler = {};
       sluttfaseKamper.forEach(kamp => {
@@ -1546,11 +1540,12 @@ export async function gjenopprettTrening(treningId) {
   }
   // Kveldsturnering — gjenopprett fase og gruppefordeling
   if (app.spillModus === 'kvalifisering') {
-    app.kvalFase       = data.kvalFase       ?? 'innledning';
-    app.kvalGruppeA    = data.kvalGruppeA    ?? [];
-    app.kvalGruppeB    = data.kvalGruppeB    ?? [];
-    app.kvalToppgruppe = data.kvalToppgruppe ?? [];
-    app.kvalBunngruppe = data.kvalBunngruppe ?? [];
+    app.kvalFase              = data.kvalFase              ?? 'innledning';
+    app.kvalGruppeA           = data.kvalGruppeA           ?? [];
+    app.kvalGruppeB           = data.kvalGruppeB           ?? [];
+    app.kvalToppgruppe        = data.kvalToppgruppe        ?? [];
+    app.kvalBunngruppe        = data.kvalBunngruppe        ?? [];
+    app.kvalSluttfaseStartRunde = data.kvalSluttfaseStartRunde ?? null;
   }
   sessionStorage.setItem('aktivTreningId',      treningId);
   sessionStorage.setItem('aktivTreningKlubbId', data.klubbId ?? _getAktivKlubbId());
@@ -1822,6 +1817,7 @@ export async function triggerSluttfase(ekstraSpillerGruppe = 'topp') {
     batch.update(doc(db, SAM.TRENINGER, app.treningId), {
       gjeldendRunde: nyRunde, baneOversikt: nyBaneOversikt, venteliste: nyVenteliste, laast: false,
       kvalFase: 'sluttfase',
+      kvalSluttfaseStartRunde: nyRunde,
       kvalToppgruppe: toppSpillere.map(s => s.id),
       kvalBunngruppe: bunnSpillere.map(s => s.id),
       kvalPlayedWithA: {}, kvalPlayedAgainstA: {}, kvalGamesPlayedA: {}, kvalSitOutCountA: {}, kvalLastSitOutRundeA: {},
@@ -1831,6 +1827,7 @@ export async function triggerSluttfase(ekstraSpillerGruppe = 'topp') {
     await batch.commit();
     app.runde = nyRunde; app.baneOversikt = nyBaneOversikt; app.venteliste = nyVenteliste;
     app.kvalFase = 'sluttfase';
+    app.kvalSluttfaseStartRunde = nyRunde;
     app.kvalToppgruppe = toppSpillere.map(s => s.id);
     app.kvalBunngruppe = bunnSpillere.map(s => s.id);
     _setKampStatusCache({}); _oppdaterRundeUI(); _startKampLytter(); _naviger('baner');

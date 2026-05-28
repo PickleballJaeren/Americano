@@ -45,6 +45,7 @@ export const app = {
   kvalGruppeB:       [],
   kvalToppgruppe:    [],
   kvalBunngruppe:    [],
+  kvalSluttfaseStartRunde: null,
 };
 
 /** Returnerer true når gjeldende økt kjøres i Mix & Match-modus (inkl. Mix A/B). */

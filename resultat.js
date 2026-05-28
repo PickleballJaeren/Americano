@@ -113,23 +113,14 @@ export async function visRundeResultat() {
       kamperFraDB = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     }
 
-    // Kval: filtrer bort innledningskamper i sluttfasen
-    // Sluttfasespillere er kjent fra app.kvalToppgruppe / kvalBunngruppe
-    // En kamp tilhører sluttfasen dersom minst én spiller er i topp- eller bunngruppen
+    // Kval sluttfase: vis kun kamper fra og med runden omgrupperingen skjedde.
+    // app.kvalSluttfaseStartRunde settes av triggerSluttfase() — alternativt
+    // hentes det fra Firestore-dokumentet via kvalSluttfaseStartRunde-feltet.
     if (erKval() && app.kvalFase === 'sluttfase') {
-      const sluttIds = new Set([
-        ...(app.kvalToppgruppe ?? []),
-        ...(app.kvalBunngruppe ?? []),
-      ]);
-      // En innledningskamp har lag1_s1 som tilhører gruppe A eller B men ikke sluttgruppene
-      // Enkleste filter: behold kun kamper der minst én spiller er i sluttgruppene
-      // OG forkast kamper der motstanderne er fra innledningsgruppene
-      // Robust løsning: finn første sluttfaserunde (laveste rundeNr der sluttspillere spiller)
-      const sluttRunder = kamperFraDB
-        .filter(k => sluttIds.has(k.lag1_s1) || sluttIds.has(k.lag2_s1))
-        .map(k => k.rundeNr);
-      const forsteSluttRunde = sluttRunder.length ? Math.min(...sluttRunder) : Infinity;
-      kamperFraDB = kamperFraDB.filter(k => k.rundeNr >= forsteSluttRunde);
+      const startRunde = app.kvalSluttfaseStartRunde ?? null;
+      if (startRunde) {
+        kamperFraDB = kamperFraDB.filter(k => k.rundeNr >= startRunde);
+      }
     }
   } catch (e) {
     console.warn('[visRundeResultat] Feil ved henting/oppdatering:', e?.message ?? e);
