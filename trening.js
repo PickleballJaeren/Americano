@@ -1344,12 +1344,12 @@ export async function avsluttTreningUI() {
       rating: tsMap[s.spillerId]?.ratingVedStart ?? STARTRATING,
     }));
 
-    const eloResultat = erMix() ? {} : beregnEloForOkt(alleKamper, spillereListe);
+    const eloResultat = (erMix() || erKval()) ? {} : beregnEloForOkt(alleKamper, spillereListe);
 
     app.ratingEndringer = sluttrangering.map(s => {
-      if (erMix()) {
+      if (erMix() || erKval()) {
         const startRating  = tsMap[s.spillerId]?.ratingVedStart ?? STARTRATING;
-        const antallKamper = s.kamper ?? 0;   // talt direkte fra kampdata
+        const antallKamper = s.kamper ?? 0;
         return { ...s, ratingVedStart: startRating, endring: 0, nyRating: startRating, antallKamper };
       }
       const elo = eloResultat[s.spillerId] ?? { startRating: STARTRATING, nyRating: STARTRATING, endring: 0 };
@@ -1364,7 +1364,7 @@ export async function avsluttTreningUI() {
       if (!r.spillerId) return;
 
       // Konkurranse: oppdater spillerens rating i databasen
-      if (!erMix()) {
+      if (!erMix() && !erKval()) {
         batch.update(doc(db, SAM.SPILLERE, r.spillerId), { rating: r.nyRating });
       }
 
@@ -1387,7 +1387,7 @@ export async function avsluttTreningUI() {
       });
 
       // Konkurranse: lagre i ratinghistorikk (brukes i profilgraf)
-      if (!erMix()) {
+      if (!erMix() && !erKval()) {
         batch.set(doc(collection(db, SAM.HISTORIKK)), {
           spillerId:   r.spillerId,
           treningId:   app.treningId,
