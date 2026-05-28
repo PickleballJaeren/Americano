@@ -23,6 +23,8 @@ import { app, erMix, erKval } from './state.js';
 import { getParter, erSingelBane, hentParter } from './rotasjon.js';
 import { visMelding, visFBFeil, escHtml } from './ui.js';
 
+const erMixEllerKval = () => erMix() || erKval();
+
 // ── Avhengigheter injisert fra app.js via banerInit() ────────────────────────
 let _naviger            = () => {};
 let _oppdaterAvbrytKnapp = () => {};
@@ -53,7 +55,7 @@ export function erAlleBanerFerdig() {
   return baner.every(bane => {
     const n = bane?.spillere?.length ?? 0;
     if (n < 2) return false;
-    if (erMix()) return kampStatusCache[`bane${bane.baneNr}_1`]?.ferdig === true;
+    if (erMixEllerKval()) return kampStatusCache[`bane${bane.baneNr}_1`]?.ferdig === true;
     if (erSingelBane(bane)) return kampStatusCache[`bane${bane.baneNr}_1`]?.ferdig === true;
     const parter = hentParter(bane, false, app.er6SpillerFormat);
     return parter.every(par => {
@@ -66,7 +68,7 @@ export function erAlleBanerFerdig() {
 export function oppdaterRundeUI() {
   // 99 er intern "ingen fast grense"-verdi — skal ikke vises til bruker
   const visMaks = app.maksRunder < 99;
-  const rundeLabel = erMix() ? 'Kamp' : 'Runde';
+  const rundeLabel = erMixEllerKval() ? 'Kamp' : 'Runde';
 
   const rundeHdr = document.getElementById('runde-hdr');
   const maksHdr  = document.getElementById('maks-runder-hdr');
@@ -75,11 +77,11 @@ export function oppdaterRundeUI() {
 
   // Mix: annen sub-header i bane-headeren
   const banerSub = document.getElementById('baner-hdr-sub');
-  if (banerSub) banerSub.textContent = erMix() ? 'Mix & Match' : 'Baneoversikt';
+  if (banerSub) banerSub.textContent = erMixEllerKval() ? 'Mix & Match' : 'Baneoversikt';
 
   // Mix-merke — kun synlig i Mix & Match-modus
   const mixMerkeEl = document.getElementById('mix-modus-merke');
-  if (mixMerkeEl) mixMerkeEl.style.display = erMix() ? 'inline-flex' : 'none';
+  if (mixMerkeEl) mixMerkeEl.style.display = erMixEllerKval() ? 'inline-flex' : 'none';
 
   // Header-tittel og indikator-tekst
   const appName = document.querySelector('#skjerm-baner .app-name');
@@ -91,14 +93,14 @@ export function oppdaterRundeUI() {
 
   const indEl = document.getElementById('runde-indikator-tekst');
   if (indEl) {
-    indEl.textContent = erMix()
+    indEl.textContent = erMixEllerKval()
       ? `Kamp ${app.runde} — trykk på en bane for å registrere poeng 🎲`
       : `Runde ${app.runde} pågår — trykk på en bane for å registrere poeng`;
   }
 
   // Sett tekst på neste-kamp/neste-runde-knappen
   const nesteKnapp = document.getElementById('neste-runde-knapp');
-  if (nesteKnapp) nesteKnapp.textContent = erMix() ? 'NESTE KAMP →' : 'NESTE RUNDE →';
+  if (nesteKnapp) nesteKnapp.textContent = erMixEllerKval() ? 'NESTE KAMP →' : 'NESTE RUNDE →';
 
   // Fremgangsprikker — vis kun når maks er kjent
   const wrap = document.getElementById('fremgang-beholder');
@@ -177,7 +179,7 @@ export function visBaner() {
     if (antallSpillere < 2) return '';
 
     // ── Mix & Match ──────────────────────────────────────────────────────────
-    if (erMix()) {
+    if (erMixEllerKval()) {
       const k        = kampStatusCache[`bane${bane.baneNr}_1`];
       const ferdig   = k?.ferdig === true;
       const baneMaksPoeng = bane.maksPoeng ?? app.poengPerKamp ?? 15;
@@ -400,7 +402,7 @@ export function apnePoenginput(baneNr) {
   }
   app.aktivBane = baneNr;
 
-  if (app.scoringsFormat === 'best_of_3' && !erMix()) {
+  if (app.scoringsFormat === 'best_of_3' && !erMixEllerKval()) {
     _apneBestAv3Modal(bane, null);
     return;
   }
@@ -413,7 +415,7 @@ export function apnePoenginput(baneNr) {
   const doneBtn = document.getElementById('done-knapp');
   if (doneBtn) doneBtn.style.display = 'none';
 
-  const parter = hentParter(bane, erMix(), app.er6SpillerFormat);
+  const parter = hentParter(bane, erMixEllerKval(), app.er6SpillerFormat);
 
   const eksisterende = {};
   parter.forEach(par => {
@@ -422,7 +424,7 @@ export function apnePoenginput(baneNr) {
   });
 
   // Mix: hent spillernavn fra kampdata (K1) i stedet for bane.spillere
-  const mixKamp = erMix() ? (kampStatusCache[`bane${baneNr}_1`] ?? null) : null;
+  const mixKamp = erMixEllerKval() ? (kampStatusCache[`bane${baneNr}_1`] ?? null) : null;
 
   document.getElementById('poeng-kamper').innerHTML = parter.map((par, i) => {
     const e   = eksisterende[par.nr];
@@ -518,7 +520,7 @@ export function apneEnkeltKamp(baneNr, kampNr) {
   app.aktivBane = baneNr;
 
   // Best av 3 — åpne dedikert modal med riktig par
-  if (app.scoringsFormat === 'best_of_3' && !erMix()) {
+  if (app.scoringsFormat === 'best_of_3' && !erMixEllerKval()) {
     const parter = getParter(bane.spillere.length);
     const par    = parter.find(p => p.nr === kampNr);
     if (par) { _apneBestAv3Modal(bane, par); return; }
@@ -531,7 +533,7 @@ export function apneEnkeltKamp(baneNr, kampNr) {
   const doneBtn = document.getElementById('done-knapp');
   if (doneBtn) doneBtn.style.display = 'none';
 
-  const alleParter = hentParter(bane, erMix(), app.er6SpillerFormat);
+  const alleParter = hentParter(bane, erMixEllerKval(), app.er6SpillerFormat);
 
   // Finn riktig par basert på kampNr
   const par = alleParter.find(p => p.nr === kampNr);
@@ -2125,8 +2127,7 @@ function lagNavnFraKamp(kamp, lag) {
 // Viser forhåndsvisning av tabell og omgruppering.
 // Admin kan velge hvem som får ekstra spiller ved oddetall.
 // ════════════════════════════════════════════════════════
-
-let _sluttfaseEkstra = 'topp'; // 'topp' | 'bunn'
+let _sluttfaseEkstra = 'topp';
 
 export async function visSluttfaseModal() {
   if (!db || !app.treningId) return;
@@ -2142,13 +2143,11 @@ export async function visSluttfaseModal() {
   modal.style.display = 'flex';
 
   try {
-    // Hent alle kamper fra innledningsfasen
     const snap = await getDocs(
       query(collection(db, SAM.KAMPER), where('treningId', '==', app.treningId))
     );
     const kamper = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-    // Beregn poeng per spiller
     const poengMap = {};
     const kampTeller = {};
     kamper.filter(k => k.ferdig && k.lag1Poeng != null).forEach(k => {
@@ -2162,7 +2161,6 @@ export async function visSluttfaseModal() {
       if (k.lag2_s2) leggTil(k.lag2_s2, k.lag2Poeng);
     });
 
-    // Alle aktive spillere
     const ekskl = app.ekskluderteIds ?? new Set();
     const alle = [
       ...(app.baneOversikt ?? []).flatMap(b => b.spillere ?? []),
@@ -2183,23 +2181,23 @@ export async function visSluttfaseModal() {
 
     if (oddetallValg) oddetallValg.style.display = erOdde ? 'block' : 'none';
 
-    // Bygg tabell-HTML
-    forhandsvis.innerHTML = unik.map((s, i) => {
-      const erTopp = i < halvA + (erOdde && _sluttfaseEkstra === 'topp' ? 1 : 0);
-      const plass = i + 1;
-      const poeng = poengMap[s.id] ?? 0;
-      const farge = erTopp ? 'var(--green2)' : 'var(--muted2)';
-      const merke = erTopp ? '🏅' : '🤝';
-      return `<div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid var(--border);font-size:14px">
-        <div style="font-family:'DM Mono',monospace;color:var(--muted);width:20px;text-align:center">${plass}</div>
-        <div style="flex:1;color:var(--white)">${escHtml(s.navn ?? '?')}</div>
-        <div style="font-family:'DM Mono',monospace;color:var(--yellow);min-width:32px;text-align:right">${poeng}</div>
-        <div style="font-size:16px">${merke}</div>
-      </div>`;
-    }).join('') + `<div style="margin-top:8px;font-size:12px;color:var(--muted2)">
-      🏅 = Toppgruppe · 🤝 = Bunngruppe
-    </div>`;
+    const oppdaterVisning = () => {
+      const ekstraTopp = erOdde && _sluttfaseEkstra === 'topp';
+      forhandsvis.innerHTML = unik.map((s, i) => {
+        const erTopp = i < halvA + (ekstraTopp ? 1 : 0);
+        const merke  = erTopp ? '🏅' : '🤝';
+        const poeng  = poengMap[s.id] ?? 0;
+        return `<div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid var(--border);font-size:14px">
+          <div style="font-family:'DM Mono',monospace;color:var(--muted);width:20px;text-align:center">${i + 1}</div>
+          <div style="flex:1;color:var(--white)">${escHtml(s.navn ?? '?')}</div>
+          <div style="font-family:'DM Mono',monospace;color:var(--yellow);min-width:32px;text-align:right">${poeng}</div>
+          <div style="font-size:16px">${merke}</div>
+        </div>`;
+      }).join('') + `<div style="margin-top:8px;font-size:12px;color:var(--muted2)">🏅 Toppgruppe · 🤝 Bunngruppe</div>`;
+    };
 
+    oppdaterVisning();
+    window._sluttfaseOppdaterVisning = oppdaterVisning;
   } catch (e) {
     forhandsvis.innerHTML = `<div style="color:var(--red2);font-size:14px">Feil: ${escHtml(e?.message ?? String(e))}</div>`;
   }
@@ -2216,8 +2214,7 @@ export function settSluttfaseEkstra(val) {
   _sluttfaseEkstra = val;
   document.getElementById('sluttfase-ekstra-topp')?.classList.toggle('modus-aktiv', val === 'topp');
   document.getElementById('sluttfase-ekstra-bunn')?.classList.toggle('modus-aktiv', val === 'bunn');
-  // Oppdater forhåndsvisningen
-  visSluttfaseModal();
+  if (typeof window._sluttfaseOppdaterVisning === 'function') window._sluttfaseOppdaterVisning();
 }
 window.settSluttfaseEkstra = settSluttfaseEkstra;
 
