@@ -52,7 +52,7 @@
         </button>
         <button id="modus-knapp-kval" class="modus-knapp" onclick="settSpillModus('kvalifisering')" style="border-color:rgba(168,85,247,.3);color:#a855f7">
           <span class="modus-ikon">🏅</span>
-          <span class="modus-tekst">Kveld</span>
+          <span class="modus-tekst">Opprykk</span>
         </button>
         <button class="modus-knapp" onclick="naviger('turnering')" style="border-color:rgba(234,179,8,.3);color:var(--yellow)">
           <span class="modus-ikon">⭐</span>
@@ -78,9 +78,9 @@
 
       <div id="modus-info-kval" class="modus-info modus-info-mix" style="display:none">
         <div class="mix-info-rad">🤝 <span><strong>Innledning:</strong> sterke og svake møtes på tvers</span></div>
-        <div class="mix-info-rad">📊 <span>Omgruppering når admin er klar — basert på tabell</span></div>
-        <div class="mix-info-rad">🏅 <span><strong>Sluttfase:</strong> jevne kamper — heder og ære</span></div>
-        <div class="mix-info-rad" style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(168,85,247,.15);font-size:13px;color:var(--muted2)">Ingen rating · Admin trigger omgruppering</div>
+        <div class="mix-info-rad">📊 <span>Admin trigger omgruppering basert på tabell</span></div>
+        <div class="mix-info-rad">🏅 <span><strong>Sluttfase:</strong> jevne kamper — opprykk og nedrykk</span></div>
+        <div class="mix-info-rad" style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(168,85,247,.15);font-size:13px;color:var(--muted2)">Ingen rating · To grupper · Øverste halvdel rykker opp</div>
       </div>
 
       <!-- Mix A/B bane-velger — kun synlig i Mix A/B-modus -->
@@ -1758,8 +1758,8 @@
       style="display:none;width:100%;text-align:left;background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.3);border-radius:12px;padding:14px 16px;margin-bottom:10px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:16px;color:#a855f7;align-items:center;gap:12px">
       <span style="font-size:20px">🏅</span>
       <div>
-        <div style="font-weight:600">Gå til sluttfase</div>
-        <div style="font-size:13px;color:rgba(168,85,247,.7);margin-top:1px">Omgruppper basert på innledningstabell</div>
+        <div style="font-weight:600">Start sluttfase</div>
+        <div style="font-size:13px;color:rgba(168,85,247,.7);margin-top:1px">Omgruppper basert på innledningstabellen</div>
       </div>
     </button>
     <button onclick="lukkAdminMeny();visDeltakerModal()"
@@ -1785,9 +1785,9 @@
 <div class="modal-bakgrunn" id="modal-sluttfase" style="display:none"
   onclick="if(event.target===this)lukkSluttfaseModal()">
   <div class="modal">
-    <div class="modal-tittel">🏅 Gå til sluttfase?</div>
+    <div class="modal-tittel">🏅 Start sluttfase?</div>
     <div class="modal-tekst" style="margin-bottom:16px">
-      Spillerne omgrupperes basert på tabellen. Poeng nullstilles. Denne handlingen kan ikke angres.
+      Topp halvdel fra hver gruppe rykker opp. Poeng nullstilles. Kan ikke angres.
     </div>
     <div id="sluttfase-tabell-forhandsvisning" style="background:var(--navy3);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:14px;color:var(--muted2);min-height:48px">
       Laster forhåndsvisning…

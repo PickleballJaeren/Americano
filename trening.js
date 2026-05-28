@@ -833,7 +833,7 @@ export async function bekreftNesteRunde() {
       await batch.commit();
       app.runde = nyRunde; app.baneOversikt = nyBaneOversikt; app.venteliste = nyVenteliste;
       _setKampStatusCache({}); _oppdaterRundeUI(); _startKampLytter(); _naviger('baner');
-      visMelding('Runde ' + nyRunde + ' — sluttfase!');
+      visMelding('Runde ' + nyRunde + ' — opprykksrunde startet!');
       return;
     }
 
@@ -1762,7 +1762,7 @@ export async function triggerSluttfase(ekstraSpillerGruppe = 'topp') {
     app.kvalToppgruppe = toppSpillere.map(s => s.id);
     app.kvalBunngruppe = bunnSpillere.map(s => s.id);
     _setKampStatusCache({}); _oppdaterRundeUI(); _startKampLytter(); _naviger('baner');
-    visMelding('🏅 Sluttfase startet!');
+    visMelding('🏅 Opprykksrunde startet!');
     stoppFailSafe(); frigiUI();
   } catch (e) {
     console.error('[triggerSluttfase]', e);

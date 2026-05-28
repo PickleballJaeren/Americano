@@ -207,10 +207,10 @@ export async function visRundeResultat() {
       const erSluttfase = app.kvalFase === 'sluttfase';
       const gruppeAIds  = new Set(erSluttfase ? (app.kvalToppgruppe ?? []) : (app.kvalGruppeA ?? []));
       const gruppeBIds  = new Set(erSluttfase ? (app.kvalBunngruppe ?? []) : (app.kvalGruppeB ?? []));
-      const tittelA     = erSluttfase ? '🏅 Toppgruppe' : '🟢 Gruppe A';
-      const tittelB     = erSluttfase ? '🤝 Bunngruppe' : '🔵 Gruppe B';
-      const fargeA      = erSluttfase ? 'var(--green2)' : 'var(--green2)';
-      const fargeB      = erSluttfase ? 'var(--accent2)' : 'var(--accent2)';
+      const tittelA     = erSluttfase ? '🏅 Opprykksgruppe' : '🟢 Gruppe A';
+      const tittelB     = erSluttfase ? '🤝 Nedrykkgruppe'  : '🔵 Gruppe B';
+      const fargeA      = erSluttfase ? 'var(--green2)'     : 'var(--green2)';
+      const fargeB      = erSluttfase ? 'var(--accent2)'    : 'var(--accent2)';
 
       const listeA = sammenlagt.filter(s => gruppeAIds.has(s.spillerId));
       const listeB = sammenlagt.filter(s => gruppeBIds.has(s.spillerId));

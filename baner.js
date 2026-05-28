@@ -2211,11 +2211,11 @@ export async function visSluttfaseModal() {
         }).join('');
 
       forhandsvis.innerHTML =
-        lagSeksjon('Gruppe A', 'var(--green2)', toppA, 'topp') +
-        lagSeksjon('Gruppe A', 'var(--muted2)', bunnA, 'bunn') +
-        lagSeksjon('Gruppe B', 'var(--accent2)', toppB, 'topp') +
-        lagSeksjon('Gruppe B', 'var(--muted2)', bunnB, 'bunn') +
-        `<div style="margin-top:8px;font-size:12px;color:var(--muted2)">🏅 Toppgruppe · 🤝 Bunngruppe</div>`;
+        lagSeksjon('Gruppe A — rykker opp', 'var(--green2)', toppA, 'topp') +
+        lagSeksjon('Gruppe A — rykker ned', 'var(--muted2)', bunnA, 'bunn') +
+        lagSeksjon('Gruppe B — rykker opp', 'var(--accent2)', toppB, 'topp') +
+        lagSeksjon('Gruppe B — rykker ned', 'var(--muted2)', bunnB, 'bunn') +
+        `<div style="margin-top:8px;font-size:12px;color:var(--muted2)">🏅 Opprykksgruppe · 🤝 Nedrykkgruppe</div>`;
     };
 
     oppdaterVisning();
