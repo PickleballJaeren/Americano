@@ -275,13 +275,10 @@ function settSpillModus(modus) {
     app.mixAbGruppeA = [];
     app.mixAbGruppeB = [];
   }
-  // Kveldsturnering: nullstill ved modusbytte
   if (modus !== 'kvalifisering') {
-    app.kvalGruppeA    = [];
-    app.kvalGruppeB    = [];
-    app.kvalFase       = 'innledning';
-    app.kvalToppgruppe = [];
-    app.kvalBunngruppe = [];
+    app.kvalGruppeA = []; app.kvalGruppeB = [];
+    app.kvalFase = 'innledning';
+    app.kvalToppgruppe = []; app.kvalBunngruppe = [];
   }
 
   // Oppdater spillerliste — viser/skjuler rating og A/B-knapper basert på modus
@@ -497,7 +494,7 @@ function apneAdminMeny() {
   const redigerOppsett = document.getElementById('admin-meny-rediger-oppsett');
   const redigerKamper  = document.getElementById('admin-meny-rediger-kamper');
   const erMixAdmin     = erMix() && app.treningId && getErAdmin();
-  const erKvalAdmin   = erKval() && app.treningId && getErAdmin();
+  const erKvalAdmin    = erKval() && app.treningId && getErAdmin();
   if (redigerBaner)   redigerBaner.style.display   = (!erMixAdmin && !erKvalAdmin) ? 'flex' : 'none';
   if (redigerOppsett) redigerOppsett.style.display  = (erMixAdmin || erKvalAdmin)  ? 'flex' : 'none';
   if (redigerKamper)  redigerKamper.style.display   = (erMixAdmin || erKvalAdmin)  ? 'flex' : 'none';
