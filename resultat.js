@@ -6,7 +6,7 @@ import {
   collection, doc, updateDoc,
   query, where, getDocs,
 } from './firebase.js';
-import { app, erMix, erMixAB } from './state.js';
+import { app, erMix, erMixAB, erKval } from './state.js';
 import { getParter } from './rotasjon.js';
 import { getNivaaKlasse } from './rating.js';
 import { escHtml } from './ui.js';
@@ -99,7 +99,7 @@ export async function visRundeResultat() {
   let kamperFraDB = Object.values(getKampStatusCache());
   try {
     const kampSpørring = (db && app.treningId)
-      ? getDocs(erMix()
+      ? getDocs((erMix() || erKval())
           ? query(collection(db, SAM.KAMPER), where('treningId', '==', app.treningId))
           : query(collection(db, SAM.KAMPER), where('treningId', '==', app.treningId), where('rundeNr', '==', app.runde)))
       : Promise.resolve(null);
@@ -126,30 +126,30 @@ export async function visRundeResultat() {
   // ── Forflytningsmerker ────────────────────────────────────────────────────
   // KONKURRANSE : opprykk/nedrykk beregnes og vises på ikke-siste runder
   // MIX         : ingen forflytning — alle stokkes om uansett
-  const forflytninger = (!erSiste && !erMix()) ? beregnForflytninger(app.rangerteBaner) : {};
+  const forflytninger = (!erSiste && !erMix() && !erKval()) ? beregnForflytninger(app.rangerteBaner) : {};
   const nestKnapp = document.getElementById('neste-runde-resultat-knapp');
-  nestKnapp.textContent = erSiste ? 'AVSLUTT ØKT' : (erMix() ? 'NYE LAG →' : 'NESTE RUNDE →');
+  nestKnapp.textContent = erSiste ? 'AVSLUTT ØKT' : ((erMix() || erKval()) ? 'NYE LAG →' : 'NESTE RUNDE →');
   nestKnapp.onclick     = erSiste ? _visAvsluttModal : () => _krevAdmin('Neste kamp', 'Kun administrator kan starte neste kamp. Skriv inn PIN-koden.', _bekreftNesteRunde);
 
   // Mix: Kamp X resultat / konkurranse: Runde X resultat
   document.getElementById('res-runde-nummer').textContent = app.runde;
   const resultatAppName = document.querySelector('#skjerm-resultat .app-name');
   if (resultatAppName) {
-    resultatAppName.innerHTML = erMix()
+    resultatAppName.innerHTML = (erMix() || erKval())
       ? `Kamp <span id="res-runde-nummer">${app.runde}</span> resultat`
       : `Runde <span id="res-runde-nummer">${app.runde}</span> resultat`;
   }
 
   const resultatSub = document.getElementById('resultat-hdr-sub');
   if (resultatSub) {
-    resultatSub.textContent = erMix()
+    resultatSub.textContent = (erMix() || erKval())
       ? (erSiste ? 'Takk for spillet! 🎉' : 'Hvem scoret mest?')
       : 'Rangering og forflytning';
   }
 
   document.getElementById('res-runde-nummer').textContent = app.runde;
 
-  if (erMix()) {
+  if (erMix() || erKval()) {
     // ── MIX: Akkumuler statistikk direkte fra alle kamper i økten ────────
     const totaler = {};
     kamperFraDB
@@ -672,14 +672,14 @@ export async function visSluttresultat() {
     return;
   }
 
-  // ── Mix-økt er aktiv — vis live sammenlagtabell ──────────
-  if (erMix() && app.treningId && app._oektAktiv) {
+  // ── Mix/Kval-økt er aktiv — vis live sammenlagtabell ──────────
+  if ((erMix() || erKval()) && app.treningId && app._oektAktiv) {
     await visMixLiveTabell();
     return;
   }
 
   // ── Konkurranse-økt er aktiv — vis foreløpig banestatus ──
-  if (!erMix() && app.treningId && app._oektAktiv) {
+  if (!erMix() && !erKval() && app.treningId && app._oektAktiv) {
     await visKonkurranseLiveTabell();
     return;
   }
@@ -747,9 +747,10 @@ export async function visSluttresultat() {
     return;
   }
 
-  // Bestem layout: mix-mode, lagret mix-økt, eller konkurranse
-  const visMixLayout = erMix()
+  // Bestem layout: mix-mode, kval-mode, lagret mix-økt, eller konkurranse
+  const visMixLayout = erMix() || erKval()
     || data[0]?.spillModus === 'mix'
+    || data[0]?.spillModus === 'kvalifisering'
     || data.every(s => s.endring === 0 && s.nyRating === s.ratingVedStart);
 
   if (visMixLayout) {
