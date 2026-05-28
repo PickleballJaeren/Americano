@@ -150,7 +150,7 @@ export async function visRundeResultat() {
   document.getElementById('res-runde-nummer').textContent = app.runde;
 
   if (erMix() || erKval()) {
-    // ── MIX: Akkumuler statistikk direkte fra alle kamper i økten ────────
+    // ── MIX/KVAL: Akkumuler statistikk direkte fra alle kamper i økten ────────
     const totaler = {};
     kamperFraDB
       .filter(k => k.ferdig && k.lag1Poeng != null && k.lag2Poeng != null)
@@ -180,13 +180,9 @@ export async function visRundeResultat() {
 
     const kampLabel  = erSiste ? `Alle ${app.runde} kamper` : `Etter kamp ${app.runde}`;
     const banner     = _lagMixLiveBanner(sammenlagt, app.runde);
-    const mixNesteInfo = !erSiste
-      ? `<div class="mix-neste-info">🎲 Nye lag trekkes til neste kamp</div>`
-      : '';
-
     const plasseringSymbol = p => p === 1 ? '🥇' : p === 2 ? '🥈' : p === 3 ? '🥉' : `${p}.`;
 
-    const rader = sammenlagt.map((s, i) => {
+    const lagTabellRader = (liste) => liste.map((s, i) => {
       const plass   = i + 1;
       const erLeder = plass === 1;
       return `<div class="rang-rad${erLeder ? ' mix-rang-leder' : ''}">
@@ -198,29 +194,102 @@ export async function visRundeResultat() {
       </div>`;
     }).join('');
 
-    document.getElementById('resultat-innhold').innerHTML = `
-      <div class="kort" style="margin-bottom:10px">
-        <div class="kort-innhold" style="padding:12px 14px">
-          <div style="font-size:15px;font-weight:500;color:var(--accent2)">${banner}</div>
-        </div>
-      </div>
-      <div class="kort">
-        <div class="kort-hode">
-          <div style="font-family:'Bebas Neue',cursive;font-size:20px;letter-spacing:1px;color:var(--green2)">
-            🎲 ${kampLabel}
+    const kolonneHode = `<div style="display:grid;grid-template-columns:32px 1fr 36px 28px 28px;gap:0;padding:8px 14px;border-bottom:1px solid var(--border2);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:600">
+      <span>#</span><span>Navn</span>
+      <span style="text-align:right">Poeng</span>
+      <span style="text-align:right">S</span>
+      <span style="text-align:right">K</span>
+    </div>`;
+
+    // ── KVAL: To separate tabeller ────────────────────────────────────────
+    if (erKval()) {
+      // Bestem gruppe-IDer basert på fase
+      const erSluttfase = app.kvalFase === 'sluttfase';
+      const gruppeAIds  = new Set(erSluttfase ? (app.kvalToppgruppe ?? []) : (app.kvalGruppeA ?? []));
+      const gruppeBIds  = new Set(erSluttfase ? (app.kvalBunngruppe ?? []) : (app.kvalGruppeB ?? []));
+      const tittelA     = erSluttfase ? '🏅 Toppgruppe' : '🟢 Gruppe A';
+      const tittelB     = erSluttfase ? '🤝 Bunngruppe' : '🔵 Gruppe B';
+      const fargeA      = erSluttfase ? 'var(--green2)' : 'var(--green2)';
+      const fargeB      = erSluttfase ? 'var(--accent2)' : 'var(--accent2)';
+
+      const listeA = sammenlagt.filter(s => gruppeAIds.has(s.spillerId));
+      const listeB = sammenlagt.filter(s => gruppeBIds.has(s.spillerId));
+      // Spillere som ikke har spilt ennå men er i gruppen
+      const alleIds = new Set(sammenlagt.map(s => s.spillerId));
+      const alleSpillere = [
+        ...(app.baneOversikt ?? []).flatMap(b => b.spillere ?? []),
+        ...(app.venteliste   ?? []),
+      ];
+      const unikSpillere = [...new Map(alleSpillere.map(s => [s.id, s])).values()];
+      unikSpillere.forEach(s => {
+        if (!alleIds.has(s.id)) {
+          const obj = { spillerId: s.id, navn: s.navn ?? 'Ukjent', seire: 0, poeng: 0, kamper: 0 };
+          if (gruppeAIds.has(s.id)) listeA.push(obj);
+          else if (gruppeBIds.has(s.id)) listeB.push(obj);
+        }
+      });
+
+      const mixNesteInfo = !erSiste
+        ? `<div class="mix-neste-info">🎲 Nye lag trekkes til neste kamp</div>`
+        : '';
+
+      document.getElementById('resultat-innhold').innerHTML = `
+        <div class="kort" style="margin-bottom:10px">
+          <div class="kort-innhold" style="padding:12px 14px">
+            <div style="font-size:15px;font-weight:500;color:var(--accent2)">${banner}</div>
           </div>
         </div>
-        <div class="kort-innhold" style="padding:0">
-          <div style="display:grid;grid-template-columns:32px 1fr 36px 28px 28px;gap:0;padding:8px 14px;border-bottom:1px solid var(--border2);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:600">
-            <span>#</span><span>Navn</span>
-            <span style="text-align:right">Poeng</span>
-            <span style="text-align:right">S</span>
-            <span style="text-align:right">K</span>
+        <div class="kort" style="margin-bottom:10px">
+          <div class="kort-hode">
+            <div style="font-family:'Bebas Neue',cursive;font-size:20px;letter-spacing:1px;color:${fargeA}">
+              ${tittelA}
+            </div>
+            <div style="font-size:13px;color:var(--muted2)">${kampLabel}</div>
           </div>
-          ${rader}
-          ${mixNesteInfo}
+          <div class="kort-innhold" style="padding:0">
+            ${kolonneHode}
+            ${lagTabellRader(listeA)}
+            ${mixNesteInfo}
+          </div>
         </div>
-      </div>`;
+        <div class="kort">
+          <div class="kort-hode">
+            <div style="font-family:'Bebas Neue',cursive;font-size:20px;letter-spacing:1px;color:${fargeB}">
+              ${tittelB}
+            </div>
+            <div style="font-size:13px;color:var(--muted2)">${kampLabel}</div>
+          </div>
+          <div class="kort-innhold" style="padding:0">
+            ${kolonneHode}
+            ${lagTabellRader(listeB)}
+            ${mixNesteInfo}
+          </div>
+        </div>`;
+
+    } else {
+      // ── MIX: Én samlet tabell ──────────────────────────────────────────
+      const mixNesteInfo = !erSiste
+        ? `<div class="mix-neste-info">🎲 Nye lag trekkes til neste kamp</div>`
+        : '';
+      document.getElementById('resultat-innhold').innerHTML = `
+        <div class="kort" style="margin-bottom:10px">
+          <div class="kort-innhold" style="padding:12px 14px">
+            <div style="font-size:15px;font-weight:500;color:var(--accent2)">${banner}</div>
+          </div>
+        </div>
+        <div class="kort">
+          <div class="kort-hode">
+            <div style="font-family:'Bebas Neue',cursive;font-size:20px;letter-spacing:1px;color:var(--green2)">
+              🎲 ${kampLabel}
+            </div>
+          </div>
+          <div class="kort-innhold" style="padding:0">
+            ${kolonneHode}
+            ${lagTabellRader(sammenlagt)}
+            ${mixNesteInfo}
+          </div>
+        </div>`;
+    }
 
   } else {
     // ── KONKURRANSE: Rangering per bane med opprykk/nedrykk ─────────────
