@@ -1141,6 +1141,65 @@ export async function avsluttTreningUI() {
         .sort((a, b) => b.for - a.for || b.seire - a.seire || b.diff - a.diff || Math.random() - 0.5);
       rangerteBaner = [{ baneNr: 1, erSingel: false, rangert: alle.map((s, i) => ({ ...s, baneRang: i + 1 })) }];
 
+    } else if (erKval()) {
+      // Kval: sorter per sluttfase-gruppe (toppgruppe og bunngruppe separat)
+      // Kun sluttfase-kamper teller for sluttrangeringen
+      const toppIds = new Set(app.kvalToppgruppe ?? []);
+      const bunnIds = new Set(app.kvalBunngruppe ?? []);
+
+      // Kun poeng fra sluttfasen — finn første sluttfase-runde
+      // (runden etter omgrupperingen)
+      const innledningKamper = alleKamper.filter(k =>
+        !(toppIds.has(k.lag1_s1) || toppIds.has(k.lag2_s1) ||
+          bunnIds.has(k.lag1_s1) || bunnIds.has(k.lag2_s1))
+      );
+      // Sluttfase-kamper: alle kamper der begge lag tilhører enten topp eller bunn
+      const sluttfaseKamper = alleKamper.filter(k => harPoeng(k) && (
+        toppIds.has(k.lag1_s1) || toppIds.has(k.lag2_s1) ||
+        bunnIds.has(k.lag1_s1) || bunnIds.has(k.lag2_s1)
+      ));
+
+      const sluttTotaler = {};
+      sluttfaseKamper.forEach(kamp => {
+        const lag1 = [
+          kamp.lag1_s1 ? { id: kamp.lag1_s1, navn: kamp.lag1_s1_navn ?? 'Ukjent', lag: 1 } : null,
+          kamp.lag1_s2 ? { id: kamp.lag1_s2, navn: kamp.lag1_s2_navn ?? 'Ukjent', lag: 1 } : null,
+        ].filter(Boolean);
+        const lag2 = [
+          kamp.lag2_s1 ? { id: kamp.lag2_s1, navn: kamp.lag2_s1_navn ?? 'Ukjent', lag: 2 } : null,
+          kamp.lag2_s2 ? { id: kamp.lag2_s2, navn: kamp.lag2_s2_navn ?? 'Ukjent', lag: 2 } : null,
+        ].filter(Boolean);
+        const lag1Vant = kamp.lag1Poeng > kamp.lag2Poeng;
+        const lag2Vant = kamp.lag2Poeng > kamp.lag1Poeng;
+        [...lag1, ...lag2].forEach(spiller => {
+          if (!spiller?.id) return;
+          if (!sluttTotaler[spiller.id]) {
+            sluttTotaler[spiller.id] = { spillerId: spiller.id, navn: spiller.navn, seire: 0, kamper: 0, for: 0, imot: 0, diff: 0 };
+          }
+          const erLag1 = spiller.lag === 1;
+          const mine   = erLag1 ? kamp.lag1Poeng : kamp.lag2Poeng;
+          const deres  = erLag1 ? kamp.lag2Poeng : kamp.lag1Poeng;
+          if ((erLag1 && lag1Vant) || (!erLag1 && lag2Vant)) sluttTotaler[spiller.id].seire += 1;
+          sluttTotaler[spiller.id].kamper += 1;
+          sluttTotaler[spiller.id].for    += mine;
+          sluttTotaler[spiller.id].imot   += deres;
+          sluttTotaler[spiller.id].diff   += mine - deres;
+        });
+      });
+
+      const sorterGruppe = ids => Object.values(sluttTotaler)
+        .filter(s => ids.has(s.spillerId))
+        .sort((a, b) => b.for - a.for || b.seire - a.seire || b.diff - a.diff);
+
+      const toppRangert = sorterGruppe(toppIds);
+      const bunnRangert = sorterGruppe(bunnIds);
+
+      // To virtuelle «baner» — én for toppgruppe, én for bunngruppe
+      rangerteBaner = [
+        { baneNr: 1, erSingel: false, kvalGruppe: 'topp', rangert: toppRangert.map((s, i) => ({ ...s, baneRang: i + 1 })) },
+        { baneNr: 2, erSingel: false, kvalGruppe: 'bunn', rangert: bunnRangert.map((s, i) => ({ ...s, baneRang: i + 1 })) },
+      ];
+
     } else {
       // Konkurranse: bruk kun siste fullførte runde
       const sisteFullforteRunde = fullforteRunder[fullforteRunder.length - 1];
@@ -1217,8 +1276,7 @@ export async function avsluttTreningUI() {
     });
 
     const sluttrangering = (() => {
-      // 6-spiller-format: ranger alle 6 spillere sam
-      // let på tvers av baner (dobbel + singel)
+      // 6-spiller-format: ranger alle 6 spillere samlet på tvers av baner
       if (app.er6SpillerFormat) {
         const alle = rangerteBaner.flatMap(bane =>
           (bane.rangert ?? []).map(s => ({
@@ -1228,12 +1286,25 @@ export async function avsluttTreningUI() {
         ).sort((a, b) => b.seire - a.seire || b.diff - a.diff || b.for - a.for);
         return alle.map((s, i) => ({ ...s, sluttPlassering: i + 1 }));
       }
+
+      // Kval: to separate lister — toppgruppe plassering 1..N, bunngruppe 1..N
+      if (erKval()) {
+        return rangerteBaner.flatMap(bane => {
+          let plassering = 1;
+          return [...(bane.rangert ?? [])].map(s => ({
+            ...s,
+            sluttPlassering: plassering++,
+            ratingVedStart:  tsMap[s.spillerId]?.ratingVedStart ?? STARTRATING,
+            kvalGruppe:      bane.kvalGruppe,
+          }));
+        });
+      }
+
       // Standard: bane-for-bane rangering
       let plassering = 1;
       return rangerteBaner
         .sort((a, b) => a.baneNr - b.baneNr)
         .flatMap(bane => {
-          // Re-sorter med rating som tiebreaker nå som tsMap er tilgjengelig
           const resortert = [...(bane.rangert ?? [])].sort((a, b) =>
             b.seire - a.seire || b.diff - a.diff || b.for - a.for ||
             (tsMap[b.spillerId]?.ratingVedStart ?? STARTRATING) - (tsMap[a.spillerId]?.ratingVedStart ?? STARTRATING)
@@ -1300,11 +1371,11 @@ export async function avsluttTreningUI() {
         ratingEndring: r.endring,
         dato:          serverTimestamp(),
         spillModus:    app.spillModus,
-        // Mix & Match: lagre poengstatistikk (brukes i resultatvisning)
         totalPoeng:    r.for          ?? 0,
         antallKamper:  r.antallKamper ?? 0,
         seire:         r.seire        ?? 0,
         imot:          r.imot         ?? 0,
+        ...(erKval() && r.kvalGruppe ? { kvalGruppe: r.kvalGruppe } : {}),
       });
 
       // Konkurranse: lagre i ratinghistorikk (brukes i profilgraf)
