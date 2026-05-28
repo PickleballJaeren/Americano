@@ -1,61 +1,34 @@
 // ════════════════════════════════════════════════════════
 // sw.js — Service Worker
-// Cache-shell strategi: cacher app-skallet (HTML, CSS, JS)
-// for rask oppstart. Firebase/Firestore-kall går alltid
-// direkte til nett — aldri fra cache.
+// Strategi:
+//   JS/CSS/HTML  → Network-first (alltid siste versjon)
+//   Bilder/ikoner → Cache-first  (endres sjelden)
+//   Firebase      → Alltid nett
+//
+// Oppdateringsflyt:
+//   Ny SW installeres → skipWaiting() kalles umiddelbart
+//   → clients.claim() → alle faner får ny versjon uten
+//   at brukeren må gjøre noe.
 // ════════════════════════════════════════════════════════
 
 const CACHE_NAVN = 'pb-jaeren-v3';
 
-const SHELL = [
-  './',
-  './index.html',
-  './style.css',
-  './turnering.css',
-  './app.js',
-  './state.js',
-  './firebase.js',
-  './konstanter.js',
-  './render-helpers.js',
-  './batch-helpers.js',
-  './rotasjon.js',
-  './rating.js',
-  './ui.js',
-  './admin.js',
-  './lyttere.js',
-  './spillere.js',
-  './baner.js',
-  './poeng.js',
-  './resultat.js',
-  './trening.js',
-  './profil.js',
-  './global-profil.js',
-  './ledertavle.js',
-  './arkiv.js',
-  './utfordrer.js',
-  './turnering.js',
-  './turnering-logikk.js',
-  './turnering-ui.js',
-  './turnering-spill-ui.js',
-  './turnering-skjermer.html',
-  './viewer.html',
-  './mix-viewer.html',
-  './mix-skjerm.html',
+const SHELL_STATISK = [
   './logo.svg',
   './icon-192.png',
   './icon-512.png',
 ];
 
-// ── INSTALL — cach app-skallet ──────────────────────────
+// ── INSTALL — cach kun statiske filer ──────────────────
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE_NAVN).then(cache => cache.addAll(SHELL))
+    caches.open(CACHE_NAVN).then(cache => cache.addAll(SHELL_STATISK))
   );
-  // Ikke skipWaiting() automatisk — vent til brukeren godkjenner
-  // via oppdateringsbannneret i index.html
+  // Ta over umiddelbart — ingen ventetid på fane-lukking
+  self.skipWaiting();
 });
 
-// ── MESSAGE — brukeren trykket "Last på nytt" ───────────
+// ── MESSAGE ─────────────────────────────────────────────
 self.addEventListener('message', e => {
   if (e.data?.type === 'SKIP_WAITING') {
     self.skipWaiting();
@@ -73,14 +46,15 @@ self.addEventListener('activate', e => {
       )
     )
   );
+  // Overta alle åpne faner umiddelbart
   self.clients.claim();
 });
 
-// ── FETCH — cache-first for shell, nett-first for alt annet ──
+// ── FETCH ───────────────────────────────────────────────
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
-  // La Firebase, Firestore og Google Fonts alltid gå til nett
+  // Firebase/Firestore/Google — alltid nett, aldri cache
   const erEkstern =
     url.hostname.includes('firebase') ||
     url.hostname.includes('firestore') ||
@@ -93,29 +67,39 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Cache-first for lokale filer
-  // Bruk pathname uten query-parametere for cache-oppslag
-  // slik at ?okt=... ikke hindrer treff på index.html eller mix-viewer.html
+  // Bilder og ikoner — cache-first (endres ikke ofte)
+  const erStatisk = /\.(png|jpg|jpeg|svg|ico|webp)$/.test(url.pathname);
+  if (erStatisk) {
+    e.respondWith(
+      caches.match(e.request, { ignoreSearch: true }).then(cached => {
+        if (cached) return cached;
+        return fetch(e.request).then(res => {
+          if (res.status === 200) {
+            const kopi = res.clone();
+            caches.open(CACHE_NAVN).then(c => c.put(e.request, kopi));
+          }
+          return res;
+        });
+      })
+    );
+    return;
+  }
+
+  // JS, CSS, HTML — network-first med cache-fallback
+  // Brukerne får alltid siste versjon når de er online.
+  // Ved nettverksfeil brukes cached versjon.
   e.respondWith(
-    caches.match(e.request, { ignoreSearch: true }).then(cached => {
-      if (cached) return cached;
-      return fetch(e.request).then(response => {
-        // Cache kun gyldige GET-svar
-        if (
-          e.request.method === 'GET' &&
-          response.status === 200
-        ) {
-          const kopi = response.clone();
-          caches.open(CACHE_NAVN).then(cache =>
-            cache.put(e.request, kopi)
-          );
-        }
-        return response;
-      }).catch(() => {
-        // Nettverksfeil — prøv å returnere index.html som fallback
-        // slik at appen kan laste selv offline
-        return caches.match('./index.html');
-      });
-    })
+    fetch(e.request).then(response => {
+      if (e.request.method === 'GET' && response.status === 200) {
+        const kopi = response.clone();
+        caches.open(CACHE_NAVN).then(cache =>
+          cache.put(e.request, kopi)
+        );
+      }
+      return response;
+    }).catch(() =>
+      caches.match(e.request, { ignoreSearch: true })
+        .then(cached => cached ?? caches.match('./index.html'))
+    )
   );
 });
