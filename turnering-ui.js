@@ -139,7 +139,7 @@ window.turneringFremover = async function() {
 // Aktiv turnering-ID i denne økten
 let _aktivTurneringId = null;
 export function getAktivTurneringId() { return _aktivTurneringId; }
-export function setAktivTurneringId(id) { _aktivTurneringId = id; }
+function setAktivTurneringId(id) { _aktivTurneringId = id; }
 
 
 // ════════════════════════════════════════════════════════
@@ -288,7 +288,7 @@ async function _apneTurneringKjerne(id, settUrl = true) {
 
 window.apneTurnering = (id) => _apneTurneringKjerne(id, true);
 
-export async function apneTurneringFraLenke(id) {
+async function apneTurneringFraLenke(id) {
   await _apneTurneringKjerne(id, false);
 }
 

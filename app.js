@@ -3,7 +3,7 @@ import {
   collection, doc, addDoc, updateDoc, getDoc, getDocs,
   query, where, orderBy, limit, serverTimestamp, writeBatch, runTransaction,
 } from './firebase.js';
-import { MIX_ROTASJON_FAST, UBEGRENSET_RUNDER } from './konstanter.js';
+import { MIX_ROTASJON_FAST, MIX_ROTASJON_DYNAMISK } from './konstanter.js';
 import { app, erMix, erMixAB, erKval } from './state.js';
 import {
   getParter, blandArray, beregnPoengForKamp,
@@ -323,12 +323,12 @@ function settMixRotasjon(modus) {
   app.mixRotasjonsModus = modus;
   const btnDyn  = document.getElementById('mix-rot-knapp-dynamisk');
   const btnFast = document.getElementById('mix-rot-knapp-fast');
-  if (btnDyn)  btnDyn.classList.toggle('modus-aktiv',  modus === 'dynamisk');
+  if (btnDyn)  btnDyn.classList.toggle('modus-aktiv',  modus === MIX_ROTASJON_DYNAMISK);
   if (btnFast) btnFast.classList.toggle('modus-aktiv', modus === MIX_ROTASJON_FAST);
   const infoDyn  = document.getElementById('mix-rot-info-dynamisk');
   const infoFast = document.getElementById('mix-rot-info-fast');
-  if (infoDyn)  infoDyn.style.display  = modus === 'dynamisk'        ? 'block' : 'none';
-  if (infoFast) infoFast.style.display = modus === MIX_ROTASJON_FAST ? 'block' : 'none';
+  if (infoDyn)  infoDyn.style.display  = modus === MIX_ROTASJON_DYNAMISK ? 'block' : 'none';
+  if (infoFast) infoFast.style.display = modus === MIX_ROTASJON_FAST     ? 'block' : 'none';
 }
 window.settMixRotasjon = settMixRotasjon;
 
@@ -337,7 +337,7 @@ export function oppdaterMixRotasjonsVelger() {
   if (!velger) return;
   const kan7 = app.valgtIds.size === 7 && app.antallBaner === 1 && app.spillModus === 'mix';
   velger.style.display = kan7 ? 'block' : 'none';
-  if (!kan7 && app.mixRotasjonsModus === MIX_ROTASJON_FAST) settMixRotasjon('dynamisk');
+  if (!kan7 && app.mixRotasjonsModus === MIX_ROTASJON_FAST) settMixRotasjon(MIX_ROTASJON_DYNAMISK);
 }
 window.oppdaterMixRotasjonsVelger = oppdaterMixRotasjonsVelger;
 

@@ -4,6 +4,8 @@
 // Import: import { app } from './state.js';
 // ════════════════════════════════════════════════════════
 
+import { MIX_ROTASJON_DYNAMISK } from './konstanter.js';
+
 export const app = {
   spillere:          [],
   valgtIds:          new Set(),
@@ -29,9 +31,9 @@ export const app = {
   aktivTurnering:    null,
   // Spillere tatt ut av rotasjonen midt i økten (Set av spillerId-strenger)
   ekskluderteIds:    new Set(),
-  // Mix & Match rotasjonsmodus: 'dynamisk' | 'fast'
+  // Mix & Match rotasjonsmodus: MIX_ROTASJON_DYNAMISK | MIX_ROTASJON_FAST
   // 'fast' bruker MIX_7_ROTASJON fra konstanter.js (kun for 7 spl, 1 bane)
-  mixRotasjonsModus:   'dynamisk',
+  mixRotasjonsModus:   MIX_ROTASJON_DYNAMISK,
   // Tilfeldig tildelt spillerrekkefølge for fast rotasjon [id, id, id, id, id, id, id]
   // Posisjon 0 = A, 1 = B, ... 6 = G i rotasjonstabellen
   mixRotasjonSpillere: [],

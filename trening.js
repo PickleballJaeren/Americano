@@ -16,7 +16,7 @@ import {
   neste6SpillerRunde, oppdater6SpillerStreak, hent6SpillerStreak,
   snakeDraft,
 } from './rotasjon.js';
-import { MIX_ROTASJON_FAST, UBEGRENSET_RUNDER } from './konstanter.js';
+import { MIX_ROTASJON_FAST, MIX_ROTASJON_DYNAMISK, UBEGRENSET_RUNDER } from './konstanter.js';
 import { beregnEloForOkt } from './rating.js';
 import {
   visMelding, visFBFeil,
@@ -195,7 +195,7 @@ export async function startTrening() {
         baneOversikt = resultat.baneOversikt;
         mixHviler    = resultat.hviler ?? [];
       } else {
-        if (app.mixRotasjonsModus === MIX_ROTASJON_FAST) app.mixRotasjonsModus = 'dynamisk';
+        if (app.mixRotasjonsModus === MIX_ROTASJON_FAST) app.mixRotasjonsModus = MIX_ROTASJON_DYNAMISK;
         const resultat = fordelBanerMix(valgte, app.antallBaner, app.poengPerKamp ?? 15);
         baneOversikt = resultat.baneOversikt;
         mixHviler    = resultat.hviler ?? [];
@@ -278,7 +278,7 @@ export async function startTrening() {
       mixLastSitOutRunde:  {},
       mix6DobbelStreak:    {},
       mix6DobbelTotalt:    {},
-      mixRotasjonsModus:   app.mixRotasjonsModus ?? 'dynamisk',
+      mixRotasjonsModus:   app.mixRotasjonsModus ?? MIX_ROTASJON_DYNAMISK,
       mixRotasjonSpillere: app.mixRotasjonSpillere ?? [],
     } : {};
 
