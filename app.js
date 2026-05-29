@@ -795,6 +795,19 @@ async function init() {
   registrerBeforeunload(() => !!app.treningId);
   registrerHarAktivOkt(() => !!app.treningId);
 
+  // ── Offline-banner ──────────────────────────────────────
+  // Viser et banner øverst på skjermen når nettforbindelsen ryker,
+  // og skjuler det igjen automatisk når forbindelsen er gjenopprettet.
+  const offlineBanner = document.getElementById('offline-banner');
+  if (offlineBanner) {
+    const visOffline = () => offlineBanner.classList.add('vis');
+    const visOnline  = () => offlineBanner.classList.remove('vis');
+    window.addEventListener('offline', visOffline);
+    window.addEventListener('online',  visOnline);
+    // Vis umiddelbart om appen allerede er offline ved oppstart
+    if (!navigator.onLine) visOffline();
+  }
+
   // Eksponer getErAdmin globalt for inline onclick-attributter
   window.getErAdmin = getErAdmin;
   window.leggTilSpillerIOkt = leggTilSpillerIOkt;

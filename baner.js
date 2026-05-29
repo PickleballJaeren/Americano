@@ -796,6 +796,9 @@ window.b3VelgPoeng = function(felt, verdi) {
     }
     document.getElementById('b3-feil').textContent = '';
 
+    // Kort haptisk bekreftelse
+    navigator.vibrate?.(30);
+
     // Autolagre dette gamet til Firestore
     _b3AutolagreGame(_b3AktivGame, game).then(() => {
       const stilling = _b3Stilling();
@@ -1066,6 +1069,9 @@ function _velgPoeng(kampIdx, lag, verdi) {
 
   // Kall validerInndata slik at autolagring fungerer som før
   validerInndata(kampIdx, lag);
+
+  // Kort haptisk bekreftelse — fungerer på Android og iOS (via nettleser)
+  navigator.vibrate?.(30);
 
   // Lukk picker etter kort forsinkelse
   setTimeout(() => {

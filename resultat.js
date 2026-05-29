@@ -9,7 +9,7 @@ import {
 import { app, erMix, erMixAB, erKval } from './state.js';
 import { getParter } from './rotasjon.js';
 import { getNivaaKlasse } from './rating.js';
-import { escHtml } from './ui.js';
+import { escHtml, visMelding } from './ui.js';
 import { lagInitialer } from './render-helpers.js';
 import { getKampStatusCache } from './baner.js';
 import { getErAdmin } from './admin.js';
@@ -813,35 +813,8 @@ function visKvalSluttresultat(data) {
   if (ratingEl?.closest?.('.kort')) ratingEl.closest('.kort').style.display = 'none';
 
   const plasseringSymbol = p => p === 1 ? '🥇' : p === 2 ? '🥈' : p === 3 ? '🥉' : `${p}.`;
-
-  // Bygg gruppe-sett fra lagrede kvalGruppe-felt i RESULTATER-dataene (påliteligst).
-  // Faller tilbake på app-state for spillere uten eksplisitt felt (bakoverkompatibilitet).
-  // En spiller som mangler kvalGruppe-felt tildeles gruppen med færrest spillere,
-  // samme logikk som i trening.js og visRundeResultat.
-  const toppIds = new Set(
-    data.filter(s => s.kvalGruppe === 'topp').map(s => s.spillerId)
-  );
-  const bunnIds = new Set(
-    data.filter(s => s.kvalGruppe === 'bunn').map(s => s.spillerId)
-  );
-
-  // Fallback for eldre økt-data uten kvalGruppe-felt på RESULTATER-dokumentene
-  if (toppIds.size === 0 && bunnIds.size === 0) {
-    (app.kvalToppgruppe ?? []).forEach(id => toppIds.add(id));
-    (app.kvalBunngruppe ?? []).forEach(id => bunnIds.add(id));
-  }
-
-  // Spillere i data som fremdeles mangler gruppe (f.eks. lagt til etter sluttfasestart
-  // i en eldre versjon uten Fix 2) — tildel rettferdig.
-  data.forEach(s => {
-    if (!toppIds.has(s.spillerId) && !bunnIds.has(s.spillerId)) {
-      if (toppIds.size <= bunnIds.size) toppIds.add(s.spillerId);
-      else bunnIds.add(s.spillerId);
-    }
-  });
-
-  const toppData = data.filter(s => toppIds.has(s.spillerId));
-  const bunnData = data.filter(s => bunnIds.has(s.spillerId));
+  const toppData = data.filter(s => s.kvalGruppe === 'topp' || (app.kvalToppgruppe ?? []).includes(s.spillerId));
+  const bunnData = data.filter(s => s.kvalGruppe === 'bunn' || (app.kvalBunngruppe ?? []).includes(s.spillerId));
 
   const lagKort = (tittel, farge, liste) => {
     if (!liste.length) return '';
@@ -991,6 +964,54 @@ function visMixSluttresultat(data) {
   }).join('');
 }
 
+
+// ════════════════════════════════════════════════════════
+// DEL RESULTATER
+// Bygger en lesbar tekstoppsummering og deler via
+// Web Share API (native mobilark) med clipboard-fallback.
+// ════════════════════════════════════════════════════════
+
+export function delResultater() {
+  const data = app.ratingEndringer ?? [];
+  if (!data.length) { visMelding('Ingen resultater å dele ennå.', 'advarsel'); return; }
+
+  const erMixData = erMix() || data[0]?.spillModus === 'mix';
+  const medal     = p => p === 1 ? '🥇' : p === 2 ? '🥈' : p === 3 ? '🥉' : `${p}.`;
+  const dato      = new Date().toLocaleDateString('no-NO', { day: 'numeric', month: 'long' });
+
+  let tekst;
+
+  if (erMixData) {
+    // Mix & Match — sorter etter totalpoeng
+    const sortert = [...data].sort((a, b) => (b.for ?? 0) - (a.for ?? 0));
+    tekst = `🎲 Mix & Match — ${dato}\n\n`;
+    tekst += sortert.map((s, i) =>
+      `${medal(i + 1)} ${s.navn ?? 'Ukjent'} — ${s.for ?? 0} poeng`
+    ).join('\n');
+  } else {
+    // Konkurranse — sorter etter sluttplassering
+    const sortert = [...data].sort((a, b) => a.sluttPlassering - b.sluttPlassering);
+    tekst = `🏆 Americano — ${dato}\n\n`;
+    tekst += sortert.map(s => {
+      const endringTekst = s.endring >= 0 ? `+${s.endring}` : `${s.endring}`;
+      return `${medal(s.sluttPlassering)} ${s.navn ?? 'Ukjent'} — ${s.nyRating} (${endringTekst})`;
+    }).join('\n');
+  }
+
+  tekst += '\n\n📱 PB Jæren Americano';
+
+  if (navigator.share) {
+    navigator.share({ text: tekst }).catch(() => {});
+  } else {
+    // Fallback: kopier til utklippstavlen
+    navigator.clipboard?.writeText(tekst).then(() => {
+      visMelding('Resultater kopiert til utklippstavlen!');
+    }).catch(() => {
+      visMelding('Deling ikke støttet i denne nettleseren.', 'advarsel');
+    });
+  }
+}
+window.delResultater = delResultater;
 
 // ════════════════════════════════════════════════════════
 // SPILLERPROFIL
