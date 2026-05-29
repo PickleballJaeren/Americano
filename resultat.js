@@ -179,12 +179,9 @@ export async function visRundeResultat() {
         }
       });
 
-    // Legg til spillere på venteliste uten kamp-poeng (hviler via rotasjon)
+    // Legg til spillere uten poeng (hviler via rotasjon)
     const alleKjente = new Set(Object.keys(totaler));
-    [
-      ...(app.baneOversikt ?? []).flatMap(b => b.spillere ?? []),
-      ...(app.venteliste   ?? []),
-    ].forEach(s => {
+    [...(app.baneOversikt ?? []).flatMap(b => b.spillere ?? []), ...(app.venteliste ?? [])].forEach(s => {
       if (s?.id && !alleKjente.has(s.id)) {
         totaler[s.id] = { spillerId: s.id, navn: s.navn ?? 'Ukjent', seire: 0, poeng: 0, kamper: 0 };
         alleKjente.add(s.id);
@@ -194,28 +191,26 @@ export async function visRundeResultat() {
     const sammenlagt = Object.values(totaler)
       .sort((a, b) => b.poeng - a.poeng || b.seire - a.seire);
 
-    const kampLabel  = erSiste ? `Alle ${app.runde} kamper` : `Etter kamp ${app.runde}`;
-    const banner     = _lagMixLiveBanner(sammenlagt, app.runde);
-    const mixNesteInfo = !erSiste
-      ? `<div class="mix-neste-info">🎲 Nye lag trekkes til neste kamp</div>`
-      : '';
+    const kampLabel    = erSiste ? `Alle ${app.runde} kamper` : `Etter kamp ${app.runde}`;
+    const banner       = _lagMixLiveBanner(sammenlagt, app.runde);
+    const mixNesteInfo = !erSiste ? `<div class="mix-neste-info">🎲 Nye lag trekkes til neste kamp</div>` : '';
 
     const plasseringSymbol = p => p === 1 ? '🥇' : p === 2 ? '🥈' : p === 3 ? '🥉' : `${p}.`;
-
     const kolonneHode = `<div style="display:grid;grid-template-columns:32px 1fr 36px 28px 28px;gap:0;padding:8px 14px;border-bottom:1px solid var(--border2);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:600"><span>#</span><span>Navn</span><span style="text-align:right">Poeng</span><span style="text-align:right">S</span><span style="text-align:right">K</span></div>`;
 
     const lagRad = (s, i) => {
-      const plass    = i + 1;
-      const erLeder  = plass === 1;
+      const erLeder  = i === 0;
       const erHviler = s.kamper === 0;
       return `<div class="rang-rad${erLeder ? ' mix-rang-leder' : ''}">
-        <div style="font-family:'Bebas Neue',cursive;font-size:${plass <= 3 ? '22' : '18'}px;min-width:32px;line-height:1">${plasseringSymbol(plass)}</div>
+        <div style="font-family:'Bebas Neue',cursive;font-size:${i < 3 ? '22' : '18'}px;min-width:32px;line-height:1">${plasseringSymbol(i+1)}</div>
         <div class="rang-navn" style="flex:1">${escHtml(s.navn)}${erHviler ? '<span style="font-size:11px;color:var(--orange);margin-left:6px">💤</span>' : ''}</div>
         <div style="font-family:'DM Mono',monospace;font-size:20px;font-weight:600;color:${erLeder ? 'var(--yellow)' : 'var(--white)'};min-width:36px;text-align:right">${s.poeng}</div>
         <div style="font-family:'DM Mono',monospace;font-size:14px;color:var(--green2);min-width:28px;text-align:right">${s.seire}S</div>
         <div style="font-family:'DM Mono',monospace;font-size:14px;color:var(--muted2);min-width:28px;text-align:right">${s.kamper}K</div>
       </div>`;
     };
+
+    const bannerKort2 = `<div class="kort" style="margin-bottom:10px"><div class="kort-innhold" style="padding:12px 14px"><div style="font-size:15px;font-weight:500;color:var(--accent2)">${banner}</div></div></div>`;
 
     if (erKval()) {
       const erSluttfase = app.kvalFase === 'sluttfase';
@@ -233,9 +228,8 @@ export async function visRundeResultat() {
       });
       const listeA = sammenlagt.filter(s => gruppeAIds.has(s.spillerId));
       const listeB = sammenlagt.filter(s => gruppeBIds.has(s.spillerId));
-      document.getElementById('resultat-innhold').innerHTML = `
-        <div class="kort" style="margin-bottom:10px"><div class="kort-innhold" style="padding:12px 14px"><div style="font-size:15px;font-weight:500;color:var(--accent2)">${banner}</div></div></div>
-        <div class="kort" style="margin-bottom:10px">
+      document.getElementById('resultat-innhold').innerHTML = bannerKort2 +
+        `<div class="kort" style="margin-bottom:10px">
           <div class="kort-hode"><div style="font-family:'Bebas Neue',cursive;font-size:20px;letter-spacing:1px;color:${fargeA}">${tittelA}</div><div style="font-size:13px;color:var(--muted2)">${kampLabel}</div></div>
           <div class="kort-innhold" style="padding:0">${kolonneHode}${listeA.map(lagRad).join('')}${mixNesteInfo}</div>
         </div>
@@ -244,9 +238,8 @@ export async function visRundeResultat() {
           <div class="kort-innhold" style="padding:0">${kolonneHode}${listeB.map(lagRad).join('')}${mixNesteInfo}</div>
         </div>`;
     } else {
-      document.getElementById('resultat-innhold').innerHTML = `
-        <div class="kort" style="margin-bottom:10px"><div class="kort-innhold" style="padding:12px 14px"><div style="font-size:15px;font-weight:500;color:var(--accent2)">${banner}</div></div></div>
-        <div class="kort">
+      document.getElementById('resultat-innhold').innerHTML = bannerKort2 +
+        `<div class="kort">
           <div class="kort-hode"><div style="font-family:'Bebas Neue',cursive;font-size:20px;letter-spacing:1px;color:var(--green2)">🎲 ${kampLabel}</div></div>
           <div class="kort-innhold" style="padding:0">${kolonneHode}${sammenlagt.map(lagRad).join('')}${mixNesteInfo}</div>
         </div>`;
@@ -343,120 +336,133 @@ export function beregnForflytninger(rangerteBaner) {
 // Henter alle ferdigspilte kamper og beregner sammenlagt.
 // ────────────────────────────────────────────────────────
 async function visMixLiveTabell() {
-  // Sett header
   const sluttNavn = document.getElementById('slutt-hdr-navn');
   const sluttSub  = document.getElementById('slutt-hdr-sub');
-  if (sluttNavn) sluttNavn.textContent = 'Mix & Match';
+  if (sluttNavn) sluttNavn.textContent = erKval() ? 'Opprykk' : 'Mix & Match';
   if (sluttSub)  sluttSub.textContent  = 'Sammenlagt';
 
-  // Vis live-indikator
-  const indikator     = document.getElementById('mix-live-indikator');
+  const indikator      = document.getElementById('mix-live-indikator');
   const indikatorTekst = document.getElementById('mix-live-indikator-tekst');
-  if (indikator)      indikator.style.display      = 'flex';
-  if (indikatorTekst) indikatorTekst.textContent   = `Kamp ${app.runde ?? 1} pågår`;
+  if (indikator)      indikator.style.display    = 'flex';
+  if (indikatorTekst) indikatorTekst.textContent = `Kamp ${app.runde ?? 1} pågår`;
 
-  // Vis live-seksjon, skjul slutt-seksjonene
-  const liveSeksjon   = document.getElementById('mix-live-tabell-seksjon');
-  const mixBanner     = document.getElementById('mix-slutt-banner');
-  const ledLabel      = document.getElementById('slutt-ledertavle-label');
-  const ledertavleEl  = document.getElementById('ledertavle');
-  const ratingEl      = document.getElementById('rating-endringer');
-  const ratingSection = [...document.querySelectorAll('.seksjon-etikett')]
-    .find(el => el.textContent.includes('Ratingendringer'));
-
-  if (liveSeksjon)    liveSeksjon.style.display    = 'block';
-  if (mixBanner)      mixBanner.style.display      = 'none';
-  if (ledLabel)       ledLabel.style.display       = 'none';
-  if (ledertavleEl)   ledertavleEl.closest('.kort').style.display = 'none';
-  if (ratingEl)       ratingEl.closest('.kort').style.display     = 'none';
-  if (ratingSection)  ratingSection.style.display                 = 'none';
+  const liveSeksjon  = document.getElementById('mix-live-tabell-seksjon');
+  const mixBanner    = document.getElementById('mix-slutt-banner');
+  const ledLabel     = document.getElementById('slutt-ledertavle-label');
+  const ledertavleEl = document.getElementById('ledertavle');
+  const ratingEl     = document.getElementById('rating-endringer');
+  const ratingSeksj  = [...document.querySelectorAll('.seksjon-etikett')].find(el => el.textContent.includes('Ratingendringer'));
+  if (liveSeksjon)  liveSeksjon.style.display  = 'block';
+  if (mixBanner)    mixBanner.style.display    = 'none';
+  if (ledLabel)     ledLabel.style.display     = 'none';
+  if (ledertavleEl) ledertavleEl.closest?.('.kort') && (ledertavleEl.closest('.kort').style.display = 'none');
+  if (ratingEl)     ratingEl.closest?.('.kort') && (ratingEl.closest('.kort').style.display = 'none');
+  if (ratingSeksj)  ratingSeksj.style.display  = 'none';
 
   const innhold = document.getElementById('mix-live-tabell-innhold');
   if (!innhold) return;
-
   innhold.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted2)">Laster…</div>';
 
   try {
     const snap = await getDocs(
       query(collection(db, SAM.KAMPER), where('treningId', '==', app.treningId))
     );
-    const alleKamper = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    let alleKamper = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-    // Beregn sammenlagt — samme logikk som mix-viewer.html
-    const totaler = {};
-    alleKamper
-      .filter(k => k.ferdig && k.lag1Poeng != null && k.lag2Poeng != null)
-      .forEach(k => {
-        const lag1Vant = k.lag1Poeng > k.lag2Poeng;
-        const lag2Vant = k.lag2Poeng > k.lag1Poeng;
-        const leggTil = (id, navn, mine, vant) => {
-          if (!id) return;
-          if (!totaler[id]) totaler[id] = { navn: navn ?? 'Ukjent', poeng: 0, seire: 0, kamper: 0 };
-          totaler[id].poeng  += mine;
-          totaler[id].kamper += 1;
-          if (vant) totaler[id].seire += 1;
-        };
-        leggTil(k.lag1_s1, k.lag1_s1_navn, k.lag1Poeng, lag1Vant);
-        leggTil(k.lag1_s2, k.lag1_s2_navn, k.lag1Poeng, lag1Vant);
-        leggTil(k.lag2_s1, k.lag2_s1_navn, k.lag2Poeng, lag2Vant);
-        leggTil(k.lag2_s2, k.lag2_s2_navn, k.lag2Poeng, lag2Vant);
-        if (k.hviler_id) {
-          const hvp = k.hvilerPoeng ?? Math.ceil((k.lag1Poeng + k.lag2Poeng) / 2);
-          if (!totaler[k.hviler_id]) totaler[k.hviler_id] = { navn: k.hviler_navn ?? 'Ukjent', poeng: 0, seire: 0, kamper: 0 };
-          totaler[k.hviler_id].poeng += hvp;
-        }
-      });
-
-    const sammenlagt = Object.values(totaler)
-      .sort((a, b) => b.poeng - a.poeng || b.seire - a.seire);
-
-    if (!sammenlagt.length) {
-      innhold.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted2);font-size:15px">Ingen kamper er ferdig ennå.</div>';
-      return;
+    // Kval sluttfase: filtrer bort innledningskamper
+    if (erKval() && app.kvalFase === 'sluttfase') {
+      const startRunde = app.kvalSluttfaseStartRunde ?? null;
+      if (startRunde) alleKamper = alleKamper.filter(k => k.rundeNr >= startRunde);
     }
 
-    // Engasjementstekst
+    // Beregn poeng
+    const totaler = {};
+    alleKamper.filter(k => k.ferdig && k.lag1Poeng != null && k.lag2Poeng != null).forEach(k => {
+      const lag1Vant = k.lag1Poeng > k.lag2Poeng;
+      const lag2Vant = k.lag2Poeng > k.lag1Poeng;
+      const leggTil = (id, navn, mine, vant) => {
+        if (!id) return;
+        if (!totaler[id]) totaler[id] = { spillerId: id, navn: navn ?? 'Ukjent', poeng: 0, seire: 0, kamper: 0 };
+        totaler[id].poeng  += mine;
+        totaler[id].kamper += 1;
+        if (vant) totaler[id].seire += 1;
+      };
+      leggTil(k.lag1_s1, k.lag1_s1_navn, k.lag1Poeng, lag1Vant);
+      leggTil(k.lag1_s2, k.lag1_s2_navn, k.lag1Poeng, lag1Vant);
+      leggTil(k.lag2_s1, k.lag2_s1_navn, k.lag2Poeng, lag2Vant);
+      leggTil(k.lag2_s2, k.lag2_s2_navn, k.lag2Poeng, lag2Vant);
+      if (k.hviler_id) {
+        const hvp = k.hvilerPoeng ?? Math.ceil((k.lag1Poeng + k.lag2Poeng) / 2);
+        if (!totaler[k.hviler_id]) totaler[k.hviler_id] = { spillerId: k.hviler_id, navn: k.hviler_navn ?? 'Ukjent', poeng: 0, seire: 0, kamper: 0 };
+        totaler[k.hviler_id].poeng += hvp;
+      }
+    });
+
+    // Legg til spillere uten poeng (hviler via rotasjon)
+    const alleKjente = new Set(Object.keys(totaler));
+    [...(app.baneOversikt ?? []).flatMap(b => b.spillere ?? []), ...(app.venteliste ?? [])].forEach(s => {
+      if (s?.id && !alleKjente.has(s.id)) {
+        totaler[s.id] = { spillerId: s.id, navn: s.navn ?? 'Ukjent', poeng: 0, seire: 0, kamper: 0 };
+        alleKjente.add(s.id);
+      }
+    });
+
+    const sammenlagt = Object.values(totaler).sort((a, b) => b.poeng - a.poeng || b.seire - a.seire);
     const banner = _lagMixLiveBanner(sammenlagt, app.runde ?? 1);
 
-    // Tabell-header
     const plasseringSymbol = p => p === 1 ? '🥇' : p === 2 ? '🥈' : p === 3 ? '🥉' : `${p}.`;
+    const kolonneHode = `<div style="display:grid;grid-template-columns:32px 1fr 36px 28px 28px;gap:0;padding:8px 14px;border-bottom:1px solid var(--border2);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:600"><span>#</span><span>Navn</span><span style="text-align:right">Poeng</span><span style="text-align:right">S</span><span style="text-align:right">K</span></div>`;
 
-    const rader = sammenlagt.map((s, i) => {
-      const plass   = i + 1;
-      const erLeder = plass === 1;
+    const lagRad = (s, i) => {
+      const erLeder  = i === 0;
+      const erHviler = s.kamper === 0;
       return `<div class="rang-rad${erLeder ? ' mix-rang-leder' : ''}">
-        <div style="font-family:'Bebas Neue',cursive;font-size:${plass <= 3 ? '22' : '18'}px;min-width:32px;line-height:1">${plasseringSymbol(plass)}</div>
-        <div class="rang-navn" style="flex:1">${escHtml(s.navn)}</div>
+        <div style="font-family:'Bebas Neue',cursive;font-size:${i < 3 ? '22' : '18'}px;min-width:32px;line-height:1">${plasseringSymbol(i+1)}</div>
+        <div class="rang-navn" style="flex:1">${escHtml(s.navn)}${erHviler ? '<span style="font-size:11px;color:var(--orange);margin-left:6px">💤</span>' : ''}</div>
         <div style="font-family:'DM Mono',monospace;font-size:20px;font-weight:600;color:${erLeder ? 'var(--yellow)' : 'var(--white)'};min-width:36px;text-align:right">${s.poeng}</div>
         <div style="font-family:'DM Mono',monospace;font-size:14px;color:var(--green2);min-width:28px;text-align:right">${s.seire}S</div>
         <div style="font-family:'DM Mono',monospace;font-size:14px;color:var(--muted2);min-width:28px;text-align:right">${s.kamper}K</div>
       </div>`;
-    }).join('');
+    };
 
-    innhold.innerHTML = `
-      <div class="kort" style="margin-bottom:10px">
-        <div class="kort-innhold" style="padding:12px 14px">
-          <div style="font-size:15px;font-weight:500;color:var(--accent2);margin-bottom:2px">${banner}</div>
+    const bannerKort = `<div class="kort" style="margin-bottom:10px"><div class="kort-innhold" style="padding:12px 14px"><div style="font-size:15px;font-weight:500;color:var(--accent2)">${banner}</div></div></div>`;
+
+    if (erKval()) {
+      const erSluttfase = app.kvalFase === 'sluttfase';
+      const gruppeAIds  = new Set(erSluttfase ? (app.kvalToppgruppe ?? []) : (app.kvalGruppeA ?? []));
+      const gruppeBIds  = new Set(erSluttfase ? (app.kvalBunngruppe ?? []) : (app.kvalGruppeB ?? []));
+      const tittelA = erSluttfase ? '🏅 Opprykksgruppe' : '🟢 Gruppe A';
+      const tittelB = erSluttfase ? '🤝 Nedrykkgruppe'  : '🔵 Gruppe B';
+      const fargeA  = 'var(--green2)';
+      const fargeB  = 'var(--accent2)';
+      sammenlagt.forEach(s => {
+        if (!gruppeAIds.has(s.spillerId) && !gruppeBIds.has(s.spillerId)) {
+          if (gruppeAIds.size <= gruppeBIds.size) gruppeAIds.add(s.spillerId);
+          else gruppeBIds.add(s.spillerId);
+        }
+      });
+      const listeA = sammenlagt.filter(s => gruppeAIds.has(s.spillerId));
+      const listeB = sammenlagt.filter(s => gruppeBIds.has(s.spillerId));
+      innhold.innerHTML = bannerKort +
+        `<div class="kort" style="margin-bottom:10px">
+          <div class="kort-hode"><div style="font-family:'Bebas Neue',cursive;font-size:20px;letter-spacing:1px;color:${fargeA}">${tittelA}</div></div>
+          <div class="kort-innhold" style="padding:0">${kolonneHode}${listeA.map(lagRad).join('')}</div>
         </div>
-      </div>
-      <div class="kort">
-        <div class="kort-innhold" style="padding:0">
-          <div style="display:grid;grid-template-columns:32px 1fr 36px 28px 28px;gap:0;padding:8px 14px;border-bottom:1px solid var(--border2);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:600">
-            <span>#</span><span>Navn</span>
-            <span style="text-align:right">Poeng</span>
-            <span style="text-align:right">S</span>
-            <span style="text-align:right">K</span>
-          </div>
-          ${rader}
-        </div>
-      </div>`;
+        <div class="kort">
+          <div class="kort-hode"><div style="font-family:'Bebas Neue',cursive;font-size:20px;letter-spacing:1px;color:${fargeB}">${tittelB}</div></div>
+          <div class="kort-innhold" style="padding:0">${kolonneHode}${listeB.map(lagRad).join('')}</div>
+        </div>`;
+    } else {
+      innhold.innerHTML = bannerKort +
+        `<div class="kort">
+          <div class="kort-innhold" style="padding:0">${kolonneHode}${sammenlagt.map(lagRad).join('')}</div>
+        </div>`;
+    }
 
   } catch (e) {
-    if (innhold) innhold.innerHTML =
-      `<div style="padding:16px;color:var(--red2);font-size:14px">Feil ved lasting: ${escHtml(e?.message ?? String(e))}</div>`;
+    if (innhold) innhold.innerHTML = `<div style="padding:16px;color:var(--red2);font-size:14px">Feil: ${escHtml(e?.message ?? String(e))}</div>`;
   }
 }
-
 function _lagMixLiveBanner(sammenlagt, runde) {
   if (!sammenlagt.length) return `⏸ Venter på resultater fra kamp ${runde}…`;
   if (sammenlagt.length >= 2) {
@@ -812,17 +818,16 @@ function visKvalSluttresultat(data) {
 
   const lagKort = (tittel, farge, liste) => {
     if (!liste.length) return '';
-    const rader = liste.map((s, i) => {
-      const erLeder = i === 0;
-      return `<div class="rang-rad${erLeder ? ' mix-rang-leder' : ''}">
-        <div style="font-family:'Bebas Neue',cursive;font-size:${i < 3 ? '22' : '18'}px;min-width:32px;line-height:1">${plasseringSymbol(i+1)}</div>
-        <div class="rang-navn" style="flex:1">${escHtml(s.navn ?? 'Ukjent')}</div>
-        <div style="font-family:'DM Mono',monospace;font-size:20px;font-weight:600;color:${erLeder ? 'var(--yellow)' : 'var(--white)'};min-width:36px;text-align:right">${s.for ?? s.totalPoeng ?? 0}</div>
-      </div>`;
-    }).join('');
     return `<div class="kort" style="margin-bottom:10px">
       <div class="kort-hode"><div style="font-family:'Bebas Neue',cursive;font-size:20px;letter-spacing:1px;color:${farge}">${tittel}</div></div>
-      <div class="kort-innhold" style="padding:0">${rader}</div>
+      <div class="kort-innhold" style="padding:0">${liste.map((s, i) => {
+        const erLeder = i === 0;
+        return `<div class="rang-rad${erLeder ? ' mix-rang-leder' : ''}">
+          <div style="font-family:'Bebas Neue',cursive;font-size:${i < 3 ? '22' : '18'}px;min-width:32px;line-height:1">${plasseringSymbol(i+1)}</div>
+          <div class="rang-navn" style="flex:1">${escHtml(s.navn ?? 'Ukjent')}</div>
+          <div style="font-family:'DM Mono',monospace;font-size:20px;font-weight:600;color:${erLeder ? 'var(--yellow)' : 'var(--white)'};min-width:36px;text-align:right">${s.for ?? s.totalPoeng ?? 0}</div>
+        </div>`;
+      }).join('')}</div>
     </div>`;
   };
   document.getElementById('ledertavle').innerHTML =
