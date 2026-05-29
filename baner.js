@@ -29,11 +29,13 @@ const erMixEllerKval = () => erMix() || erKval();
 let _naviger            = () => {};
 let _oppdaterAvbrytKnapp = () => {};
 let _getAktivKlubbId    = () => null;
+let _startKampLytter    = () => {};
 
 export function banerInit(deps) {
   _naviger             = deps.naviger;
   _oppdaterAvbrytKnapp = deps.oppdaterAvbrytKnapp;
   _getAktivKlubbId     = deps.getAktivKlubbId ?? (() => null);
+  _startKampLytter     = deps.startKampLytter  ?? (() => {});
 }
 
 // kampStatusCache — bruk alltid getKampStatusCache()/setKampStatusCache()
@@ -1639,6 +1641,9 @@ window._lagreRedigerBaner = async function() {
 
     app.baneOversikt = _redigerBaner;
     kampStatusCache  = {};
+    // Restart kamp-lytteren slik at nye kamp-dokumenter
+    // umiddelbart fylles inn i kampStatusCache
+    if (spillereEndret) _startKampLytter();
     _lukkRedigerModal();
     visBaner();
     visMelding('Banefordeling oppdatert ✓');
