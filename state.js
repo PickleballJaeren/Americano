@@ -40,11 +40,11 @@ export const app = {
   mixAbGruppeB:      [],
   // Mix A/B — antall baner per gruppe (settes i oppsett)
   mixAbBanerA:       1,
-  kvalFase:          'innledning',
-  kvalGruppeA:       [],
-  kvalGruppeB:       [],
-  kvalToppgruppe:    [],
-  kvalBunngruppe:    [],
+  kvalFase:              'innledning',
+  kvalGruppeA:           [],
+  kvalGruppeB:           [],
+  kvalToppgruppe:        [],
+  kvalBunngruppe:        [],
   kvalSluttfaseStartRunde: null,
 };
 

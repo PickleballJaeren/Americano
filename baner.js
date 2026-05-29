@@ -1641,8 +1641,6 @@ window._lagreRedigerBaner = async function() {
 
     app.baneOversikt = _redigerBaner;
     kampStatusCache  = {};
-    // Restart kamp-lytteren slik at nye kamp-dokumenter
-    // umiddelbart fylles inn i kampStatusCache
     if (spillereEndret) _startKampLytter();
     _lukkRedigerModal();
     visBaner();
@@ -2209,6 +2207,14 @@ export async function visSluttfaseModal() {
     // Per-gruppe sortering
     const gruppeAIds = new Set(app.kvalGruppeA ?? []);
     const gruppeBIds = new Set(app.kvalGruppeB ?? []);
+
+    // Nye spillere tildeles gruppen med færrest spillere
+    unik.forEach(s => {
+      if (!gruppeAIds.has(s.id) && !gruppeBIds.has(s.id)) {
+        if (gruppeAIds.size <= gruppeBIds.size) gruppeAIds.add(s.id);
+        else gruppeBIds.add(s.id);
+      }
+    });
 
     const sorter = liste => [...liste].sort((a, b) => {
       const pA = poengMap[a.id] ?? 0; const pB = poengMap[b.id] ?? 0;

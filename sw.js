@@ -1,34 +1,61 @@
 // ════════════════════════════════════════════════════════
 // sw.js — Service Worker
-// Strategi:
-//   JS/CSS/HTML  → Network-first (alltid siste versjon)
-//   Bilder/ikoner → Cache-first  (endres sjelden)
-//   Firebase      → Alltid nett
-//
-// Oppdateringsflyt:
-//   Ny SW installeres → skipWaiting() kalles umiddelbart
-//   → clients.claim() → alle faner får ny versjon uten
-//   at brukeren må gjøre noe.
+// Cache-shell strategi: cacher app-skallet (HTML, CSS, JS)
+// for rask oppstart. Firebase/Firestore-kall går alltid
+// direkte til nett — aldri fra cache.
 // ════════════════════════════════════════════════════════
 
 const CACHE_NAVN = 'pb-jaeren-v4';
 
-const SHELL_STATISK = [
+const SHELL = [
+  './',
+  './index.html',
+  './style.css',
+  './turnering.css',
+  './app.js',
+  './state.js',
+  './firebase.js',
+  './konstanter.js',
+  './render-helpers.js',
+  './batch-helpers.js',
+  './rotasjon.js',
+  './rating.js',
+  './ui.js',
+  './admin.js',
+  './lyttere.js',
+  './spillere.js',
+  './baner.js',
+  './poeng.js',
+  './resultat.js',
+  './trening.js',
+  './profil.js',
+  './global-profil.js',
+  './ledertavle.js',
+  './arkiv.js',
+  './utfordrer.js',
+  './turnering.js',
+  './turnering-logikk.js',
+  './turnering-ui.js',
+  './turnering-spill-ui.js',
+  './turnering-skjermer.html',
+  './viewer.html',
+  './mix-viewer.html',
+  './mix-skjerm.html',
   './logo.svg',
   './icon-192.png',
   './icon-512.png',
 ];
 
-// ── INSTALL — cach kun statiske filer ──────────────────
+// ── INSTALL — cach app-skallet ──────────────────────────
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE_NAVN).then(cache => cache.addAll(SHELL_STATISK))
+    caches.open(CACHE_NAVN).then(cache => cache.addAll(SHELL))
   );
-  // Ta over umiddelbart — ingen ventetid på fane-lukking
-  self.skipWaiting();
+  // Ikke skipWaiting() automatisk — vent til brukeren godkjenner
+  // via oppdateringsbannneret i index.html
 });
 
-// ── MESSAGE ─────────────────────────────────────────────
+// ── MESSAGE — brukeren trykket "Last på nytt" ───────────
 self.addEventListener('message', e => {
   if (e.data?.type === 'SKIP_WAITING') {
     self.skipWaiting();
@@ -46,15 +73,14 @@ self.addEventListener('activate', e => {
       )
     )
   );
-  // Overta alle åpne faner umiddelbart
   self.clients.claim();
 });
 
-// ── FETCH ───────────────────────────────────────────────
+// ── FETCH — cache-first for shell, nett-first for alt annet ──
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
-  // Firebase/Firestore/Google — alltid nett, aldri cache
+  // La Firebase, Firestore og Google Fonts alltid gå til nett
   const erEkstern =
     url.hostname.includes('firebase') ||
     url.hostname.includes('firestore') ||
@@ -67,34 +93,15 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Bilder og ikoner — cache-first (endres ikke ofte)
-  const erStatisk = /\.(png|jpg|jpeg|svg|ico|webp)$/.test(url.pathname);
-  if (erStatisk) {
-    e.respondWith(
-      caches.match(e.request, { ignoreSearch: true }).then(cached => {
-        if (cached) return cached;
-        return fetch(e.request).then(res => {
-          if (res.status === 200) {
-            const kopi = res.clone();
-            caches.open(CACHE_NAVN).then(c => c.put(e.request, kopi));
-          }
-          return res;
-        });
-      })
-    );
-    return;
-  }
-
-  // JS, CSS, HTML — network-first med cache-fallback
-  // Brukerne får alltid siste versjon når de er online.
-  // Ved nettverksfeil brukes cached versjon.
+  // Cache-first for lokale filer
+  // Bruk pathname uten query-parametere for cache-oppslag
+  // slik at ?okt=... ikke hindrer treff på index.html eller mix-viewer.html
+  // Network-first: alltid hent siste versjon fra nett
   e.respondWith(
     fetch(e.request).then(response => {
       if (e.request.method === 'GET' && response.status === 200) {
         const kopi = response.clone();
-        caches.open(CACHE_NAVN).then(cache =>
-          cache.put(e.request, kopi)
-        );
+        caches.open(CACHE_NAVN).then(cache => cache.put(e.request, kopi));
       }
       return response;
     }).catch(() =>

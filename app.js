@@ -281,7 +281,7 @@ function settSpillModus(modus) {
     app.kvalToppgruppe = []; app.kvalBunngruppe = [];
   }
 
-  // Oppdater spillerliste — viser/skjuler rating og A/B-knapper basert på modus
+  // Oppdater spillerliste
   visSpillere();
   oppdaterMixRotasjonsVelger();
   oppdaterMixABBaneVelger();

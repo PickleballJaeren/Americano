@@ -425,11 +425,10 @@ export async function apneTreningsdetalj(treningId) {
 
     // ── Sluttrangering og ratingendringer ────────────────
     if (resultater.length > 0) {
-      const modus = resultater[0]?.spillModus ?? t.spillModus ?? 'konkurranse';
+      const modus       = resultater[0]?.spillModus ?? t.spillModus ?? 'konkurranse';
       const erMixArkiv  = modus === 'mix' || modus === 'mix-ab';
       const erKvalArkiv = modus === 'kvalifisering';
 
-      // Skjul rating-seksjonen for mix og opprykk
       const ratingSeksjonEl = document.getElementById('detalj-rating-seksjon');
       const ratingKortEl    = document.getElementById('detalj-rating')?.closest?.('.kort');
       if (erMixArkiv || erKvalArkiv) {
@@ -440,46 +439,36 @@ export async function apneTreningsdetalj(treningId) {
         if (ratingKortEl)    ratingKortEl.style.display    = '';
       }
 
+      const plasseringSymbol = p => p === 1 ? '🥇' : p === 2 ? '🥈' : p === 3 ? '🥉' : `${p}.`;
+
       if (erKvalArkiv) {
-        // Opprykk: to separate grupper
-        const plasseringSymbol = p => p === 1 ? '🥇' : p === 2 ? '🥈' : p === 3 ? '🥉' : `${p}.`;
         const toppData = resultater.filter(r => r.kvalGruppe === 'topp');
         const bunnData = resultater.filter(r => r.kvalGruppe === 'bunn');
-
-        const lagGruppeHTML = (tittel, farge, liste) => {
+        const lagKort = (tittel, farge, liste) => {
           if (!liste.length) return '';
-          const rader = liste.map((r, i) => {
-            const ini = lagInitialer(r.spillerNavn);
-            return `<div class="lb-rad" style="cursor:default">
-              <div class="lb-plass">${plasseringSymbol(i + 1)}</div>
-              <div class="lb-avatar">${ini}</div>
+          return `<div style="font-size:12px;font-weight:600;color:${farge};margin:10px 0 4px;text-transform:uppercase;letter-spacing:1px">${tittel}</div>` +
+            liste.map((r, i) => `<div class="lb-rad" style="cursor:default">
+              <div class="lb-plass">${plasseringSymbol(i+1)}</div>
+              <div class="lb-avatar">${lagInitialer(r.spillerNavn)}</div>
               <div class="lb-navn">${escHtml(r.spillerNavn ?? 'Ukjent')}</div>
               <div style="text-align:right;font-family:'DM Mono',monospace;font-size:15px;color:var(--yellow)">${r.totalPoeng ?? 0}</div>
-            </div>`;
-          }).join('');
-          return `<div style="font-size:12px;font-weight:600;color:${farge};margin:10px 0 4px;text-transform:uppercase;letter-spacing:1px">${tittel}</div>${rader}`;
+            </div>`).join('');
         };
-
         document.getElementById('detalj-rangering').innerHTML =
-          lagGruppeHTML('🏅 Opprykksgruppe', 'var(--green2)', toppData) +
-          lagGruppeHTML('🤝 Nedrykkgruppe',  'var(--accent2)', bunnData);
+          lagKort('🏅 Opprykksgruppe', 'var(--green2)', toppData) +
+          lagKort('🤝 Nedrykkgruppe',  'var(--accent2)', bunnData);
 
       } else if (erMixArkiv) {
-        // Mix: poeng-tabell
-        const plasseringSymbol = p => p === 1 ? '🥇' : p === 2 ? '🥈' : p === 3 ? '🥉' : `${p}.`;
         const sortert = [...resultater].sort((a, b) => (a.sluttPlassering ?? 999) - (b.sluttPlassering ?? 999));
-        document.getElementById('detalj-rangering').innerHTML = sortert.map((r, i) => {
-          const ini = lagInitialer(r.spillerNavn);
-          return `<div class="lb-rad" style="cursor:default">
-            <div class="lb-plass">${plasseringSymbol(i + 1)}</div>
-            <div class="lb-avatar">${ini}</div>
+        document.getElementById('detalj-rangering').innerHTML = sortert.map((r, i) =>
+          `<div class="lb-rad" style="cursor:default">
+            <div class="lb-plass">${plasseringSymbol(i+1)}</div>
+            <div class="lb-avatar">${lagInitialer(r.spillerNavn)}</div>
             <div class="lb-navn">${escHtml(r.spillerNavn ?? 'Ukjent')}</div>
             <div style="text-align:right;font-family:'DM Mono',monospace;font-size:15px;color:var(--yellow)">${r.totalPoeng ?? 0}</div>
-          </div>`;
-        }).join('');
+          </div>`).join('');
 
       } else {
-        // Konkurranse: rating-layout
         document.getElementById('detalj-rangering').innerHTML = resultater.map(r => {
           const ini = lagInitialer(r.spillerNavn);
           return `<div class="lb-rad" style="cursor:default">
