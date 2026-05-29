@@ -519,6 +519,14 @@ export async function bekreftNesteRunde() {
         ...(app.baneOversikt ?? []).flatMap(b => b.spillere ?? []),
         ...(app.venteliste   ?? []),
       ];
+      // Nye spillere lagt til etter oppstart tildeles gruppen med færrest spillere
+      const unikAlleAB = [...new Map(alleSpillere.map(s => [s.id, s])).values()];
+      unikAlleAB.forEach(s => {
+        if (!gruppeAIds.has(s.id) && !gruppeBIds.has(s.id)) {
+          if (gruppeAIds.size <= gruppeBIds.size) gruppeAIds.add(s.id);
+          else gruppeBIds.add(s.id);
+        }
+      });
       const spillereA = alleSpillere.filter(s => gruppeAIds.has(s.id));
       const spillereB = alleSpillere.filter(s => gruppeBIds.has(s.id));
 
@@ -600,7 +608,16 @@ export async function bekreftNesteRunde() {
 
       // Oppdater statistikk med kampene og hvile-runden som nettopp ble spilt
       const gjeldBaneOversikt = app.baneOversikt ?? [];
-      const forrigeHvilere    = app.venteliste   ?? [];
+      // Inkluder spillere som hviler på banen (indeks 4 ved 5-spillers bane)
+      // i tillegg til de som er på ventelisten
+      const baneHvilere = gjeldBaneOversikt
+        .filter(b => (b.spillere?.length ?? 0) === 5)
+        .map(b => b.spillere[4])
+        .filter(Boolean);
+      const forrigeHvilere = [
+        ...(app.venteliste ?? []),
+        ...baneHvilere,
+      ];
       oppdaterMixStatistikk(
         gjeldBaneOversikt, forrigeHvilere,
         playedWith, playedAgainst, gamesPlayed,
@@ -608,11 +625,13 @@ export async function bekreftNesteRunde() {
         app.runde
       );
 
-      // Alle spillere i rotasjonen
-      const alleSpillere = [
+      // Alle spillere i rotasjonen — dedupliser siden 5. spiller på bane
+      // er inkludert både i baneOversikt og forrigeHvilere
+      const alleSpillereRaw = [
         ...(app.baneOversikt ?? []).flatMap(b => b.spillere ?? []),
         ...forrigeHvilere,
       ];
+      const alleSpillere = [...new Map(alleSpillereRaw.map(s => [s.id, s])).values()];
 
       let nyBaneOversikt, nyVenteliste = [];
       const mp = app.poengPerKamp ?? 15;
@@ -749,10 +768,20 @@ export async function bekreftNesteRunde() {
       const banerB     = Math.max(1, (app.baneOversikt ?? []).length - banerA);
       const gruppeAIds = new Set(treningData?.kvalGruppeA ?? []);
       const gruppeBIds = new Set(treningData?.kvalGruppeB ?? []);
+
+      // Nye spillere som er lagt til etter oppstart og ikke er i noen gruppe ennå
       const alleSpillere = [
         ...(app.baneOversikt ?? []).flatMap(b => b.spillere ?? []),
         ...(app.venteliste   ?? []),
       ];
+      const unikAlleSpillere = [...new Map(alleSpillere.map(s => [s.id, s])).values()];
+      unikAlleSpillere.forEach(s => {
+        if (!gruppeAIds.has(s.id) && !gruppeBIds.has(s.id)) {
+          // Tildel gruppen med færrest spillere
+          if (gruppeAIds.size <= gruppeBIds.size) gruppeAIds.add(s.id);
+          else gruppeBIds.add(s.id);
+        }
+      });
       const spillereA = alleSpillere.filter(s => gruppeAIds.has(s.id));
       const spillereB = alleSpillere.filter(s => gruppeBIds.has(s.id));
       const baneOversiktA = (app.baneOversikt ?? []).filter((_, i) => i < banerA);
@@ -1782,6 +1811,14 @@ export async function triggerSluttfase(ekstraSpillerGruppe = 'topp') {
     const { data: treningData } = await hentTrening();
     const gruppeAIds = new Set(treningData?.kvalGruppeA ?? []);
     const gruppeBIds = new Set(treningData?.kvalGruppeB ?? []);
+
+    // Nye spillere lagt til etter oppstart tildeles gruppen med færrest spillere
+    unik.forEach(s => {
+      if (!gruppeAIds.has(s.id) && !gruppeBIds.has(s.id)) {
+        if (gruppeAIds.size <= gruppeBIds.size) gruppeAIds.add(s.id);
+        else gruppeBIds.add(s.id);
+      }
+    });
 
     const sorter = liste => [...liste].sort((a, b) => {
       const pA = poengMap[a.id] ?? 0; const pB = poengMap[b.id] ?? 0;
