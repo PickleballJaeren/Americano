@@ -21,6 +21,7 @@ import {
 } from './firebase.js';
 import { app, erMix, erKval } from './state.js';
 import { getParter, erSingelBane, hentParter } from './rotasjon.js';
+import { UBEGRENSET_RUNDER } from './konstanter.js';
 import { visMelding, visFBFeil, escHtml } from './ui.js';
 
 const erMixEllerKval = () => erMix() || erKval();
@@ -68,8 +69,8 @@ export function erAlleBanerFerdig() {
 }
 
 export function oppdaterRundeUI() {
-  // 99 er intern "ingen fast grense"-verdi — skal ikke vises til bruker
-  const visMaks = app.maksRunder < 99;
+  // UBEGRENSET_RUNDER er intern «ingen fast grense»-verdi — skal ikke vises til bruker
+  const visMaks = app.maksRunder < UBEGRENSET_RUNDER;
   const rundeLabel = erMixEllerKval() ? 'Kamp' : 'Runde';
 
   const rundeHdr = document.getElementById('runde-hdr');

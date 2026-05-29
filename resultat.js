@@ -813,8 +813,35 @@ function visKvalSluttresultat(data) {
   if (ratingEl?.closest?.('.kort')) ratingEl.closest('.kort').style.display = 'none';
 
   const plasseringSymbol = p => p === 1 ? '🥇' : p === 2 ? '🥈' : p === 3 ? '🥉' : `${p}.`;
-  const toppData = data.filter(s => s.kvalGruppe === 'topp' || (app.kvalToppgruppe ?? []).includes(s.spillerId));
-  const bunnData = data.filter(s => s.kvalGruppe === 'bunn' || (app.kvalBunngruppe ?? []).includes(s.spillerId));
+
+  // Bygg gruppe-sett fra lagrede kvalGruppe-felt i RESULTATER-dataene (påliteligst).
+  // Faller tilbake på app-state for spillere uten eksplisitt felt (bakoverkompatibilitet).
+  // En spiller som mangler kvalGruppe-felt tildeles gruppen med færrest spillere,
+  // samme logikk som i trening.js og visRundeResultat.
+  const toppIds = new Set(
+    data.filter(s => s.kvalGruppe === 'topp').map(s => s.spillerId)
+  );
+  const bunnIds = new Set(
+    data.filter(s => s.kvalGruppe === 'bunn').map(s => s.spillerId)
+  );
+
+  // Fallback for eldre økt-data uten kvalGruppe-felt på RESULTATER-dokumentene
+  if (toppIds.size === 0 && bunnIds.size === 0) {
+    (app.kvalToppgruppe ?? []).forEach(id => toppIds.add(id));
+    (app.kvalBunngruppe ?? []).forEach(id => bunnIds.add(id));
+  }
+
+  // Spillere i data som fremdeles mangler gruppe (f.eks. lagt til etter sluttfasestart
+  // i en eldre versjon uten Fix 2) — tildel rettferdig.
+  data.forEach(s => {
+    if (!toppIds.has(s.spillerId) && !bunnIds.has(s.spillerId)) {
+      if (toppIds.size <= bunnIds.size) toppIds.add(s.spillerId);
+      else bunnIds.add(s.spillerId);
+    }
+  });
+
+  const toppData = data.filter(s => toppIds.has(s.spillerId));
+  const bunnData = data.filter(s => bunnIds.has(s.spillerId));
 
   const lagKort = (tittel, farge, liste) => {
     if (!liste.length) return '';

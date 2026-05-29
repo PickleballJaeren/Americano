@@ -3,7 +3,7 @@ import {
   collection, doc, addDoc, updateDoc, getDoc, getDocs,
   query, where, orderBy, limit, serverTimestamp, writeBatch, runTransaction,
 } from './firebase.js';
-import { MIX_ROTASJON_FAST } from './konstanter.js';
+import { MIX_ROTASJON_FAST, UBEGRENSET_RUNDER } from './konstanter.js';
 import { app, erMix, erMixAB, erKval } from './state.js';
 import {
   getParter, blandArray, beregnPoengForKamp,
@@ -103,6 +103,10 @@ import {
 } from './turnering-spill-ui.js';
 // ════════════════════════════════════════════════════════
 // KLUBB-KONFIGURASJON
+// MERK: PIN-ene er synlige i klientkoden og gir ikke ekte
+// sikkerhet — de hindrer kun utilsiktet bruk, ikke bevisst
+// misbruk. Tilgangskontroll til data håndteres av
+// Firestore Security Rules i Firebase Console.
 // ════════════════════════════════════════════════════════
 const KLUBBER = {
   'pickleball-jaeren': { navn: 'Pickleball Jæren', pin: '9436', demo: false },

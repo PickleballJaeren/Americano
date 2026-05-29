@@ -34,7 +34,8 @@ export const PARTER_6_SINGEL = [
 
 
 // Admin avslutter manuelt — ingen automatisk grense på antall runder.
-// Verdien 99 brukes direkte i trening.js som intern «ingen grense»-markør.
+// UBEGRENSET_RUNDER brukes som intern «ingen grense»-markør i trening.js og baner.js.
+export const UBEGRENSET_RUNDER = 99;
 
 // ════════════════════════════════════════════════════════
 // MIX & MATCH — FAST 7-SPILLERS ROTASJON

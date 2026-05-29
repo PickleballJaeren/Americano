@@ -16,7 +16,7 @@ import {
   neste6SpillerRunde, oppdater6SpillerStreak, hent6SpillerStreak,
   snakeDraft,
 } from './rotasjon.js';
-import { MIX_ROTASJON_FAST } from './konstanter.js';
+import { MIX_ROTASJON_FAST, UBEGRENSET_RUNDER } from './konstanter.js';
 import { beregnEloForOkt } from './rating.js';
 import {
   visMelding, visFBFeil,
@@ -230,7 +230,7 @@ export async function startTrening() {
         .map(s => ({ id: s.id, navn: s.navn ?? 'Ukjent', rating: s.rating ?? STARTRATING }));
 
   // Ingen fast rundetgrense — admin avslutter manuelt
-  const effektivMaksRunder = 99;
+  const effektivMaksRunder = UBEGRENSET_RUNDER;
 
   try {
     const batch    = writeBatch(db);
@@ -1620,7 +1620,7 @@ export async function gjenopprettTrening(treningId) {
   app.venteliste        = data.venteliste       ?? [];
   app.antallBaner       = data.antallBaner      ?? 3;
   app.poengPerKamp      = data.poengPerKamp     ?? 15;
-  app.maksRunder        = 99; // ingen fast grense
+  app.maksRunder        = UBEGRENSET_RUNDER; // ingen fast grense
   app.er6SpillerFormat  = data.er6SpillerFormat ?? false;
   app.spillModus        = data.spillModus       ?? 'konkurranse';
   app.scoringsFormat    = data.scoringsFormat   ?? 'americano';
