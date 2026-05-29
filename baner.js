@@ -1567,6 +1567,24 @@ window._lagreRedigerBaner = async function() {
           lag2_s1_navn: bane.spillere[1].navn, lag2_s2_navn: null,
           lag1Poeng: null, lag2Poeng: null, ferdig: false,
         });
+      } else if (erMixEllerKval()) {
+        // Mix/Opprykk: alltid 1 kamp per bane — 5. spiller hviler
+        const [s1, s2, s3, s4, s5] = bane.spillere;
+        if (!s1 || !s2 || !s3 || !s4) return;
+        const hvilerFelt = s5 ? { hviler_id: s5.id, hviler_navn: s5.navn } : {};
+        batch.set(doc(collection(db, SAM.KAMPER)), {
+          treningId: app.treningId,
+          baneNr:    `bane${bane.baneNr}`,
+          rundeNr:   app.runde,
+          kampNr:    1,
+          erSingel:  false,
+          lag1_s1: s1.id, lag1_s2: s2.id,
+          lag2_s1: s3.id, lag2_s2: s4.id,
+          lag1_s1_navn: s1.navn, lag1_s2_navn: s2.navn,
+          lag2_s1_navn: s3.navn, lag2_s2_navn: s4.navn,
+          lag1Poeng: null, lag2Poeng: null, ferdig: false,
+          ...hvilerFelt,
+        });
       } else {
         const parter = erDobbel6 ? PARTER_6_DOBBEL : getParter(n);
         parter.forEach(par => {
@@ -1591,24 +1609,25 @@ window._lagreRedigerBaner = async function() {
       }
     }); // slutt if (spillereEndret) forEach
 
-    // Oppdater maksPoeng basert på admin-valgt poengverdi og antall spillere per bane.
-    // Hvis det finnes både 4- og 5-spillerbaner: behold 3/5-justeringen for 5-spillerbaner.
-    // Hvis alle baner er 5-spillerbaner (eller alle 4): bruk valgt verdi direkte.
+    // Mix/Opprykk: alltid fast poengmål — ingen 3/5-justering for 5-spillerbaner
     const mp   = _redigerMaksPoeng ?? app.poengPerKamp ?? 15;
-    const har4 = _redigerBaner.some(b => (b.spillere?.length ?? 0) === 4);
-    const har5 = _redigerBaner.some(b => (b.spillere?.length ?? 0) === 5);
-    _redigerBaner.forEach(b => {
-      const n = b.spillere?.length ?? 0;
-      if (n === 4) {
-        b.maksPoeng = mp;
-      } else if (n === 5) {
-        // Kun juster ned hvis det faktisk finnes 4-spillerbaner på samme økt
-        b.maksPoeng = (har4 && har5) ? Math.round(mp * 3 / 5) : mp;
-      } else if (n === 2 || b.erSingel === true) {
-        // 6-spiller singelbane — samme poengmål som admin har valgt
-        b.maksPoeng = mp;
-      }
-    });
+    if (!erMixEllerKval()) {
+      const har4 = _redigerBaner.some(b => (b.spillere?.length ?? 0) === 4);
+      const har5 = _redigerBaner.some(b => (b.spillere?.length ?? 0) === 5);
+      _redigerBaner.forEach(b => {
+        const n = b.spillere?.length ?? 0;
+        if (n === 4) {
+          b.maksPoeng = mp;
+        } else if (n === 5) {
+          b.maksPoeng = (har4 && har5) ? Math.round(mp * 3 / 5) : mp;
+        } else if (n === 2 || b.erSingel === true) {
+          b.maksPoeng = mp;
+        }
+      });
+    } else {
+      // Mix/Opprykk: sett alltid mp, uavhengig av antall spillere
+      _redigerBaner.forEach(b => { b.maksPoeng = mp; });
+    }
 
     // Oppdater baneOversikt i treningsdokumentet
     batch.update(doc(db, SAM.TRENINGER, app.treningId), {
