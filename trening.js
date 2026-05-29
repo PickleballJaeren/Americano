@@ -318,7 +318,7 @@ export async function startTrening() {
 
     // Skriv kamper for runde 1
     if (erMix() || erKval()) {
-      skrivMixKamper(batch, treningRef.id, 1, baneOversikt, venteliste);
+      skrivMixKamper(batch, treningRef.id, 1, baneOversikt);
     } else {
       baneOversikt.forEach(bane =>
         skrivKamper(batch, treningRef.id, 1, bane.baneNr, bane.spillere, bane.erSingel ?? false, bane.erDobbel ?? false)
@@ -406,18 +406,7 @@ function skrivKamper(batch, treningId, rundeNr, baneNr, spillere, erSingel = fal
 
 // Mix & Match — skriv én kamp per bane per runde.
 // Håndterer både dobbel (4 spl) og singel (2 spl) baner.
-function skrivMixKamper(batch, treningId, rundeNr, baneOversikt, hvilerListe = []) {
-  // Fordel venteliste-hviler-spillere på baner (én per bane, syklisk)
-  // slik at hviler_id/hviler_navn kan lagres i kamp-dokumentet
-  const hvilerPrBane = {};
-  hvilerListe.forEach((s, i) => {
-    const bane = baneOversikt[i % baneOversikt.length];
-    if (bane) {
-      if (!hvilerPrBane[bane.baneNr]) hvilerPrBane[bane.baneNr] = [];
-      hvilerPrBane[bane.baneNr].push(s);
-    }
-  });
-
+function skrivMixKamper(batch, treningId, rundeNr, baneOversikt) {
   baneOversikt.forEach(bane => {
     const spl = bane.spillere ?? [];
 
@@ -444,10 +433,9 @@ function skrivMixKamper(batch, treningId, rundeNr, baneOversikt, hvilerListe = [
     const [s1, s2, s3, s4, s5] = spl;
     if (!s1 || !s2 || !s3 || !s4) return;
 
-    // 5. spiller på banen hviler, ellers sjekk venteliste-hviler for denne banen
-    const baneHviler = s5 ?? hvilerPrBane[bane.baneNr]?.[0] ?? null;
-    const hvilerFelt = baneHviler
-      ? { hviler_id: baneHviler.id, hviler_navn: baneHviler.navn }
+    // 5 spillere: s5 hviler
+    const hvilerFelt = s5
+      ? { hviler_id: s5.id, hviler_navn: s5.navn }
       : {};
 
     batch.set(doc(collection(db, SAM.KAMPER)), {
@@ -544,11 +532,17 @@ export async function bekreftNesteRunde() {
 
       // Oppdater statistikk for kamper som nettopp ble spilt
       const gjeldBaneOversikt = app.baneOversikt ?? [];
-      const forrigeHvilere    = app.venteliste   ?? [];
+      const baneHvilere = gjeldBaneOversikt
+        .filter(b => (b.spillere?.length ?? 0) === 5)
+        .map(b => b.spillere[4])
+        .filter(Boolean);
+      const forrigeHvilere = [...(app.venteliste ?? []), ...baneHvilere];
       const baneOversiktA = gjeldBaneOversikt.filter((_, i) => i < banerA);
       const baneOversiktB = gjeldBaneOversikt.filter((_, i) => i >= banerA);
-      const hvilerA = forrigeHvilere.filter(s => gruppeAIds.has(s.id));
-      const hvilerB = forrigeHvilere.filter(s => gruppeBIds.has(s.id));
+      const baneHvilereA3 = baneOversiktA.filter(b => (b.spillere?.length ?? 0) === 5).map(b => b.spillere[4]).filter(Boolean);
+      const baneHvilereB3 = baneOversiktB.filter(b => (b.spillere?.length ?? 0) === 5).map(b => b.spillere[4]).filter(Boolean);
+      const hvilerA = [...forrigeHvilere.filter(s => gruppeAIds.has(s.id)), ...baneHvilereA3];
+      const hvilerB = [...forrigeHvilere.filter(s => gruppeBIds.has(s.id)), ...baneHvilereB3];
 
       oppdaterMixStatistikk(
         baneOversiktA, hvilerA,
@@ -593,7 +587,7 @@ export async function bekreftNesteRunde() {
         mixAbSitOutCountB:     statistikkB.sitOutCount,
         mixAbLastSitOutRundeB: statistikkB.lastSitOutRunde,
       });
-      skrivMixKamper(batch, app.treningId, nyRunde, nyBaneOversikt, nyVenteliste);
+      skrivMixKamper(batch, app.treningId, nyRunde, nyBaneOversikt);
       await batch.commit();
 
       app.runde        = nyRunde;
@@ -743,7 +737,7 @@ export async function bekreftNesteRunde() {
         } : {}),
       });
       // Mix: én kamp per bane per runde — lagene er allerede trukket i nyBaneOversikt
-      skrivMixKamper(batch, app.treningId, nyRunde, nyBaneOversikt, nyVenteliste);
+      skrivMixKamper(batch, app.treningId, nyRunde, nyBaneOversikt);
       await batch.commit();
 
       app.runde        = nyRunde;
@@ -798,8 +792,11 @@ export async function bekreftNesteRunde() {
       const spillereB = alleSpillere.filter(s => gruppeBIds.has(s.id));
       const baneOversiktA = (app.baneOversikt ?? []).filter((_, i) => i < banerA);
       const baneOversiktB = (app.baneOversikt ?? []).filter((_, i) => i >= banerA);
-      const hvilerA = (app.venteliste ?? []).filter(s => gruppeAIds.has(s.id));
-      const hvilerB = (app.venteliste ?? []).filter(s => gruppeBIds.has(s.id));
+      // Inkluder spillere som hviler på banen (indeks 4) i statistikken
+      const baneHvilereA = baneOversiktA.filter(b => (b.spillere?.length ?? 0) === 5).map(b => b.spillere[4]).filter(Boolean);
+      const baneHvilereB = baneOversiktB.filter(b => (b.spillere?.length ?? 0) === 5).map(b => b.spillere[4]).filter(Boolean);
+      const hvilerA = [...(app.venteliste ?? []).filter(s => gruppeAIds.has(s.id)), ...baneHvilereA];
+      const hvilerB = [...(app.venteliste ?? []).filter(s => gruppeBIds.has(s.id)), ...baneHvilereB];
       oppdaterMixStatistikk(baneOversiktA, hvilerA, statistikkA.playedWith, statistikkA.playedAgainst, statistikkA.gamesPlayed, statistikkA.sitOutCount, statistikkA.lastSitOutRunde, app.runde);
       oppdaterMixStatistikk(baneOversiktB, hvilerB, statistikkB.playedWith, statistikkB.playedAgainst, statistikkB.gamesPlayed, statistikkB.sitOutCount, statistikkB.lastSitOutRunde, app.runde);
       const res = lagMixABKampoppsett(spillereA, spillereB, statistikkA, statistikkB, banerA, banerB, nyRunde, app.poengPerKamp ?? 15);
@@ -818,7 +815,7 @@ export async function bekreftNesteRunde() {
         kvalGamesPlayedB: statistikkB.gamesPlayed, kvalSitOutCountB: statistikkB.sitOutCount,
         kvalLastSitOutRundeB: statistikkB.lastSitOutRunde,
       });
-      skrivMixKamper(batch, app.treningId, nyRunde, nyBaneOversikt, nyVenteliste);
+      skrivMixKamper(batch, app.treningId, nyRunde, nyBaneOversikt);
       await batch.commit();
       app.runde = nyRunde; app.baneOversikt = nyBaneOversikt; app.venteliste = nyVenteliste;
       _setKampStatusCache({}); _oppdaterRundeUI(); _startKampLytter(); _naviger('baner');
@@ -857,8 +854,10 @@ export async function bekreftNesteRunde() {
       const banerB = Math.max(1, (app.baneOversikt ?? []).length - banerA);
       const baneOversiktA = (app.baneOversikt ?? []).filter((_, i) => i < banerA);
       const baneOversiktB = (app.baneOversikt ?? []).filter((_, i) => i >= banerA);
-      const hvilerA = (app.venteliste ?? []).filter(s => toppIds.has(s.id));
-      const hvilerB = (app.venteliste ?? []).filter(s => bunnIds.has(s.id));
+      const baneHvilereA2 = baneOversiktA.filter(b => (b.spillere?.length ?? 0) === 5).map(b => b.spillere[4]).filter(Boolean);
+      const baneHvilereB2 = baneOversiktB.filter(b => (b.spillere?.length ?? 0) === 5).map(b => b.spillere[4]).filter(Boolean);
+      const hvilerA = [...(app.venteliste ?? []).filter(s => toppIds.has(s.id)), ...baneHvilereA2];
+      const hvilerB = [...(app.venteliste ?? []).filter(s => bunnIds.has(s.id)), ...baneHvilereB2];
       oppdaterMixStatistikk(baneOversiktA, hvilerA, statistikkA.playedWith, statistikkA.playedAgainst, statistikkA.gamesPlayed, statistikkA.sitOutCount, statistikkA.lastSitOutRunde, app.runde);
       oppdaterMixStatistikk(baneOversiktB, hvilerB, statistikkB.playedWith, statistikkB.playedAgainst, statistikkB.gamesPlayed, statistikkB.sitOutCount, statistikkB.lastSitOutRunde, app.runde);
       const res = lagMixABKampoppsett(spillereTopp, spillereBunn, statistikkA, statistikkB, banerA, banerB, nyRunde, app.poengPerKamp ?? 15);
@@ -877,7 +876,7 @@ export async function bekreftNesteRunde() {
         kvalGamesPlayedB: statistikkB.gamesPlayed, kvalSitOutCountB: statistikkB.sitOutCount,
         kvalLastSitOutRundeB: statistikkB.lastSitOutRunde,
       });
-      skrivMixKamper(batch, app.treningId, nyRunde, nyBaneOversikt, nyVenteliste);
+      skrivMixKamper(batch, app.treningId, nyRunde, nyBaneOversikt);
       await batch.commit();
       app.runde = nyRunde; app.baneOversikt = nyBaneOversikt; app.venteliste = nyVenteliste;
       _setKampStatusCache({}); _oppdaterRundeUI(); _startKampLytter(); _naviger('baner');
@@ -1879,7 +1878,7 @@ export async function triggerSluttfase(ekstraSpillerGruppe = 'topp') {
       kvalPlayedWithA: {}, kvalPlayedAgainstA: {}, kvalGamesPlayedA: {}, kvalSitOutCountA: {}, kvalLastSitOutRundeA: {},
       kvalPlayedWithB: {}, kvalPlayedAgainstB: {}, kvalGamesPlayedB: {}, kvalSitOutCountB: {}, kvalLastSitOutRundeB: {},
     });
-    skrivMixKamper(batch, app.treningId, nyRunde, nyBaneOversikt, nyVenteliste);
+    skrivMixKamper(batch, app.treningId, nyRunde, nyBaneOversikt);
     await batch.commit();
     app.runde = nyRunde; app.baneOversikt = nyBaneOversikt; app.venteliste = nyVenteliste;
     app.kvalFase = 'sluttfase';
