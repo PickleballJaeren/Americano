@@ -31,9 +31,10 @@ export function hentParter(bane, isMix, er6Format) {
   const dobbel6 = er6Format && bane?.erDobbel === true;
 
   if (isMix) {
-    return singel
-      ? PARTER_6_SINGEL
-      : [{ nr: 1, lag1: [0, 1], lag2: [2, 3] }];
+    if (singel) return PARTER_6_SINGEL;
+    // 5 spillere på bane: én kamp der spiller index 4 hviler
+    if (n === 5) return [{ nr: 1, lag1: [0, 1], lag2: [2, 3], hviler: 4 }];
+    return [{ nr: 1, lag1: [0, 1], lag2: [2, 3] }];
   }
   if (singel)  return PARTER_6_SINGEL;
   if (dobbel6) return PARTER_6_DOBBEL;

@@ -430,8 +430,14 @@ function skrivMixKamper(batch, treningId, rundeNr, baneOversikt) {
     }
 
     // Dobbel-bane (4 spillere)
-    const [s1, s2, s3, s4] = spl;
+    const [s1, s2, s3, s4, s5] = spl;
     if (!s1 || !s2 || !s3 || !s4) return;
+
+    // 5 spillere: s5 hviler
+    const hvilerFelt = s5
+      ? { hviler_id: s5.id, hviler_navn: s5.navn }
+      : {};
+
     batch.set(doc(collection(db, SAM.KAMPER)), {
       treningId,
       baneNr:   `bane${bane.baneNr}`,
@@ -443,6 +449,7 @@ function skrivMixKamper(batch, treningId, rundeNr, baneOversikt) {
       lag1_s1_navn: s1.navn, lag1_s2_navn: s2.navn,
       lag2_s1_navn: s3.navn, lag2_s2_navn: s4.navn,
       lag1Poeng: null, lag2Poeng: null, ferdig: false,
+      ...hvilerFelt,
     });
   });
 }

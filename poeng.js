@@ -121,10 +121,12 @@ export async function autolagreKamp(i, l1, l2) {
   const bane   = (app.baneOversikt ?? []).find(b => b.baneNr === baneNr);
   const erSingelLagre  = erSingelBane(bane);
   const erDobbelLagre6 = app.er6SpillerFormat && (bane?.erDobbel === true);
-  const parter = erMix()
+  const parter = (erMix() || erKval())
     ? (erSingelLagre
         ? PARTER_6_SINGEL
-        : [{ nr: 1, lag1: [0, 1], lag2: [2, 3] }])
+        : bane?.spillere?.length === 5
+          ? [{ nr: 1, lag1: [0, 1], lag2: [2, 3], hviler: 4 }]
+          : [{ nr: 1, lag1: [0, 1], lag2: [2, 3] }])
     : (erSingelLagre ? PARTER_6_SINGEL : (erDobbelLagre6 ? PARTER_6_DOBBEL : getParter(bane?.spillere?.length ?? 4)));
 
   // Bruk data-kampnr fra kamp-kortet hvis det finnes (enkelt-kamp-visning)
@@ -182,7 +184,11 @@ export function lesOgValiderPoeng() {
   const erSingelLOV = erSingelBane(bane);
   const erDobbelLOV6 = app.er6SpillerFormat && (bane?.erDobbel === true);
   const parter = (erMix() || erKval())
-    ? (erSingelLOV ? PARTER_6_SINGEL : [{ nr: 1, lag1: [0,1], lag2: [2,3] }])
+    ? (erSingelLOV
+        ? PARTER_6_SINGEL
+        : bane?.spillere?.length === 5
+          ? [{ nr: 1, lag1: [0, 1], lag2: [2, 3], hviler: 4 }]
+          : [{ nr: 1, lag1: [0, 1], lag2: [2, 3] }])
     : (erSingelLOV ? PARTER_6_SINGEL : (erDobbelLOV6 ? PARTER_6_DOBBEL : getParter(bane?.spillere?.length ?? 4)));
   const maks = (erMix() || erKval())
     ? (app.poengPerKamp ?? 15)
