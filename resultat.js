@@ -281,6 +281,7 @@ export async function visRundeResultat() {
             ${kolonneHode}${sammenlagt.map(lagRad).join('')}${mixNesteInfo}
           </div>
         </div>`;
+    }
 
   } else {
     // ── KONKURRANSE: Rangering per bane med opprykk/nedrykk ─────────────
