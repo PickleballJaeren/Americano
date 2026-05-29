@@ -6,7 +6,7 @@ import {
   collection, doc, updateDoc,
   query, where, getDocs,
 } from './firebase.js';
-import { app, erMix, erMixAB } from './state.js';
+import { app, erMix, erMixAB, erKval } from './state.js';
 import { getParter } from './rotasjon.js';
 import { getNivaaKlasse } from './rating.js';
 import { escHtml } from './ui.js';
@@ -99,7 +99,7 @@ export async function visRundeResultat() {
   let kamperFraDB = Object.values(getKampStatusCache());
   try {
     const kampSpørring = (db && app.treningId)
-      ? getDocs(erMix()
+      ? getDocs((erMix() || erKval())
           ? query(collection(db, SAM.KAMPER), where('treningId', '==', app.treningId))
           : query(collection(db, SAM.KAMPER), where('treningId', '==', app.treningId), where('rundeNr', '==', app.runde)))
       : Promise.resolve(null);
@@ -112,6 +112,10 @@ export async function visRundeResultat() {
     const [snap] = await Promise.all([kampSpørring, skjermOppdatering]);
     if (snap && !snap.empty) {
       kamperFraDB = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    }
+    if (erKval() && app.kvalFase === 'sluttfase') {
+      const startRunde = app.kvalSluttfaseStartRunde ?? null;
+      if (startRunde) kamperFraDB = kamperFraDB.filter(k => k.rundeNr >= startRunde);
     }
   } catch (e) {
     console.warn('[visRundeResultat] Feil ved henting/oppdatering:', e?.message ?? e);
@@ -126,31 +130,31 @@ export async function visRundeResultat() {
   // ── Forflytningsmerker ────────────────────────────────────────────────────
   // KONKURRANSE : opprykk/nedrykk beregnes og vises på ikke-siste runder
   // MIX         : ingen forflytning — alle stokkes om uansett
-  const forflytninger = (!erSiste && !erMix()) ? beregnForflytninger(app.rangerteBaner) : {};
+  const forflytninger = (!erSiste && !erMix() && !erKval()) ? beregnForflytninger(app.rangerteBaner) : {};
   const nestKnapp = document.getElementById('neste-runde-resultat-knapp');
-  nestKnapp.textContent = erSiste ? 'AVSLUTT ØKT' : (erMix() ? 'NYE LAG →' : 'NESTE RUNDE →');
+  nestKnapp.textContent = erSiste ? 'AVSLUTT ØKT' : ((erMix() || erKval()) ? 'NYE LAG →' : 'NESTE RUNDE →');
   nestKnapp.onclick     = erSiste ? _visAvsluttModal : () => _krevAdmin('Neste kamp', 'Kun administrator kan starte neste kamp. Skriv inn PIN-koden.', _bekreftNesteRunde);
 
   // Mix: Kamp X resultat / konkurranse: Runde X resultat
   document.getElementById('res-runde-nummer').textContent = app.runde;
   const resultatAppName = document.querySelector('#skjerm-resultat .app-name');
   if (resultatAppName) {
-    resultatAppName.innerHTML = erMix()
+    resultatAppName.innerHTML = (erMix() || erKval())
       ? `Kamp <span id="res-runde-nummer">${app.runde}</span> resultat`
       : `Runde <span id="res-runde-nummer">${app.runde}</span> resultat`;
   }
 
   const resultatSub = document.getElementById('resultat-hdr-sub');
   if (resultatSub) {
-    resultatSub.textContent = erMix()
+    resultatSub.textContent = (erMix() || erKval())
       ? (erSiste ? 'Takk for spillet! 🎉' : 'Hvem scoret mest?')
       : 'Rangering og forflytning';
   }
 
   document.getElementById('res-runde-nummer').textContent = app.runde;
 
-  if (erMix()) {
-    // ── MIX: Akkumuler statistikk direkte fra alle kamper i økten ────────
+  if (erMix() || erKval()) {
+    // ── MIX/KVAL: Akkumuler statistikk direkte fra alle kamper i økten ────────
     const totaler = {};
     kamperFraDB
       .filter(k => k.ferdig && k.lag1Poeng != null && k.lag2Poeng != null)
@@ -175,8 +179,7 @@ export async function visRundeResultat() {
         }
       });
 
-    // Legg til spillere på venteliste som ikke har kamp-poeng ennå
-    // (hviler via rotasjon, ikke via hviler_id i kamp-dokument)
+    // Legg til spillere på venteliste uten kamp-poeng (hviler via rotasjon)
     const alleKjente = new Set(Object.keys(totaler));
     [
       ...(app.baneOversikt ?? []).flatMap(b => b.spillere ?? []),
@@ -199,23 +202,15 @@ export async function visRundeResultat() {
 
     const plasseringSymbol = p => p === 1 ? '🥇' : p === 2 ? '🥈' : p === 3 ? '🥉' : `${p}.`;
 
-    const kolonneHode = `<div style="display:grid;grid-template-columns:32px 1fr 36px 28px 28px;gap:0;padding:8px 14px;border-bottom:1px solid var(--border2);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:600">
-      <span>#</span><span>Navn</span>
-      <span style="text-align:right">Poeng</span>
-      <span style="text-align:right">S</span>
-      <span style="text-align:right">K</span>
-    </div>`;
+    const kolonneHode = `<div style="display:grid;grid-template-columns:32px 1fr 36px 28px 28px;gap:0;padding:8px 14px;border-bottom:1px solid var(--border2);font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:600"><span>#</span><span>Navn</span><span style="text-align:right">Poeng</span><span style="text-align:right">S</span><span style="text-align:right">K</span></div>`;
 
     const lagRad = (s, i) => {
-      const plass   = i + 1;
-      const erLeder = plass === 1;
+      const plass    = i + 1;
+      const erLeder  = plass === 1;
       const erHviler = s.kamper === 0;
-      return `<div class="rang-rad${erLeder ? ' mix-rang-leder' : ''}${erHviler ? ' rang-rad-hviler' : ''}">
+      return `<div class="rang-rad${erLeder ? ' mix-rang-leder' : ''}">
         <div style="font-family:'Bebas Neue',cursive;font-size:${plass <= 3 ? '22' : '18'}px;min-width:32px;line-height:1">${plasseringSymbol(plass)}</div>
-        <div class="rang-navn" style="flex:1">
-          ${escHtml(s.navn)}
-          ${erHviler ? '<span style="font-size:11px;color:var(--orange);margin-left:6px">💤 hviler</span>' : ''}
-        </div>
+        <div class="rang-navn" style="flex:1">${escHtml(s.navn)}${erHviler ? '<span style="font-size:11px;color:var(--orange);margin-left:6px">💤</span>' : ''}</div>
         <div style="font-family:'DM Mono',monospace;font-size:20px;font-weight:600;color:${erLeder ? 'var(--yellow)' : 'var(--white)'};min-width:36px;text-align:right">${s.poeng}</div>
         <div style="font-family:'DM Mono',monospace;font-size:14px;color:var(--green2);min-width:28px;text-align:right">${s.seire}S</div>
         <div style="font-family:'DM Mono',monospace;font-size:14px;color:var(--muted2);min-width:28px;text-align:right">${s.kamper}K</div>
@@ -223,14 +218,13 @@ export async function visRundeResultat() {
     };
 
     if (erKval()) {
-      // Kval: to separate grupper
       const erSluttfase = app.kvalFase === 'sluttfase';
       const gruppeAIds  = new Set(erSluttfase ? (app.kvalToppgruppe ?? []) : (app.kvalGruppeA ?? []));
       const gruppeBIds  = new Set(erSluttfase ? (app.kvalBunngruppe ?? []) : (app.kvalGruppeB ?? []));
-      const tittelA     = erSluttfase ? '🏅 Opprykksgruppe' : '🟢 Gruppe A';
-      const tittelB     = erSluttfase ? '🤝 Nedrykkgruppe'  : '🔵 Gruppe B';
-      const fargeA      = erSluttfase ? 'var(--green2)'     : 'var(--green2)';
-      const fargeB      = erSluttfase ? 'var(--accent2)'    : 'var(--accent2)';
+      const tittelA = erSluttfase ? '🏅 Opprykksgruppe' : '🟢 Gruppe A';
+      const tittelB = erSluttfase ? '🤝 Nedrykkgruppe'  : '🔵 Gruppe B';
+      const fargeA  = 'var(--green2)';
+      const fargeB  = 'var(--accent2)';
       sammenlagt.forEach(s => {
         if (!gruppeAIds.has(s.spillerId) && !gruppeBIds.has(s.spillerId)) {
           if (gruppeAIds.size <= gruppeBIds.size) gruppeAIds.add(s.spillerId);
@@ -240,46 +234,21 @@ export async function visRundeResultat() {
       const listeA = sammenlagt.filter(s => gruppeAIds.has(s.spillerId));
       const listeB = sammenlagt.filter(s => gruppeBIds.has(s.spillerId));
       document.getElementById('resultat-innhold').innerHTML = `
+        <div class="kort" style="margin-bottom:10px"><div class="kort-innhold" style="padding:12px 14px"><div style="font-size:15px;font-weight:500;color:var(--accent2)">${banner}</div></div></div>
         <div class="kort" style="margin-bottom:10px">
-          <div class="kort-innhold" style="padding:12px 14px">
-            <div style="font-size:15px;font-weight:500;color:var(--accent2)">${banner}</div>
-          </div>
-        </div>
-        <div class="kort" style="margin-bottom:10px">
-          <div class="kort-hode">
-            <div style="font-family:'Bebas Neue',cursive;font-size:20px;letter-spacing:1px;color:${fargeA}">${tittelA}</div>
-            <div style="font-size:13px;color:var(--muted2)">${kampLabel}</div>
-          </div>
-          <div class="kort-innhold" style="padding:0">
-            ${kolonneHode}${listeA.map(lagRad).join('')}${mixNesteInfo}
-          </div>
+          <div class="kort-hode"><div style="font-family:'Bebas Neue',cursive;font-size:20px;letter-spacing:1px;color:${fargeA}">${tittelA}</div><div style="font-size:13px;color:var(--muted2)">${kampLabel}</div></div>
+          <div class="kort-innhold" style="padding:0">${kolonneHode}${listeA.map(lagRad).join('')}${mixNesteInfo}</div>
         </div>
         <div class="kort">
-          <div class="kort-hode">
-            <div style="font-family:'Bebas Neue',cursive;font-size:20px;letter-spacing:1px;color:${fargeB}">${tittelB}</div>
-            <div style="font-size:13px;color:var(--muted2)">${kampLabel}</div>
-          </div>
-          <div class="kort-innhold" style="padding:0">
-            ${kolonneHode}${listeB.map(lagRad).join('')}${mixNesteInfo}
-          </div>
+          <div class="kort-hode"><div style="font-family:'Bebas Neue',cursive;font-size:20px;letter-spacing:1px;color:${fargeB}">${tittelB}</div><div style="font-size:13px;color:var(--muted2)">${kampLabel}</div></div>
+          <div class="kort-innhold" style="padding:0">${kolonneHode}${listeB.map(lagRad).join('')}${mixNesteInfo}</div>
         </div>`;
     } else {
-      // Mix: én samlet tabell
       document.getElementById('resultat-innhold').innerHTML = `
-        <div class="kort" style="margin-bottom:10px">
-          <div class="kort-innhold" style="padding:12px 14px">
-            <div style="font-size:15px;font-weight:500;color:var(--accent2)">${banner}</div>
-          </div>
-        </div>
+        <div class="kort" style="margin-bottom:10px"><div class="kort-innhold" style="padding:12px 14px"><div style="font-size:15px;font-weight:500;color:var(--accent2)">${banner}</div></div></div>
         <div class="kort">
-          <div class="kort-hode">
-            <div style="font-family:'Bebas Neue',cursive;font-size:20px;letter-spacing:1px;color:var(--green2)">
-              🎲 ${kampLabel}
-            </div>
-          </div>
-          <div class="kort-innhold" style="padding:0">
-            ${kolonneHode}${sammenlagt.map(lagRad).join('')}${mixNesteInfo}
-          </div>
+          <div class="kort-hode"><div style="font-family:'Bebas Neue',cursive;font-size:20px;letter-spacing:1px;color:var(--green2)">🎲 ${kampLabel}</div></div>
+          <div class="kort-innhold" style="padding:0">${kolonneHode}${sammenlagt.map(lagRad).join('')}${mixNesteInfo}</div>
         </div>`;
     }
 
@@ -809,11 +778,14 @@ export async function visSluttresultat() {
   }
 
   // Bestem layout: mix-mode, lagret mix-økt, eller konkurranse
+  const erKvalData = erKval() || data[0]?.spillModus === 'kvalifisering';
   const visMixLayout = erMix()
     || data[0]?.spillModus === 'mix'
     || data.every(s => s.endring === 0 && s.nyRating === s.ratingVedStart);
 
-  if (visMixLayout) {
+  if (erKvalData) {
+    visKvalSluttresultat(data);
+  } else if (visMixLayout) {
     visMixSluttresultat(data);
   } else {
     visKonkurranseSluttresultat(data);
@@ -824,6 +796,40 @@ export async function visSluttresultat() {
 // KONKURRANSE-SLUTTRESULTAT
 // Rating, rangering og Elo-endringer per spiller.
 // ────────────────────────────────────────────────────────
+function visKvalSluttresultat(data) {
+  const mixBanner = document.getElementById('mix-slutt-banner');
+  if (mixBanner) mixBanner.style.display = 'block';
+  const sluttNavn = document.getElementById('slutt-hdr-navn');
+  const sluttSub  = document.getElementById('slutt-hdr-sub');
+  if (sluttNavn) sluttNavn.textContent = 'Opprykk';
+  if (sluttSub)  sluttSub.textContent  = 'Takk for spillet!';
+  const ratingEl = document.getElementById('rating-endringer');
+  if (ratingEl?.closest?.('.kort')) ratingEl.closest('.kort').style.display = 'none';
+
+  const plasseringSymbol = p => p === 1 ? '🥇' : p === 2 ? '🥈' : p === 3 ? '🥉' : `${p}.`;
+  const toppData = data.filter(s => s.kvalGruppe === 'topp' || (app.kvalToppgruppe ?? []).includes(s.spillerId));
+  const bunnData = data.filter(s => s.kvalGruppe === 'bunn' || (app.kvalBunngruppe ?? []).includes(s.spillerId));
+
+  const lagKort = (tittel, farge, liste) => {
+    if (!liste.length) return '';
+    const rader = liste.map((s, i) => {
+      const erLeder = i === 0;
+      return `<div class="rang-rad${erLeder ? ' mix-rang-leder' : ''}">
+        <div style="font-family:'Bebas Neue',cursive;font-size:${i < 3 ? '22' : '18'}px;min-width:32px;line-height:1">${plasseringSymbol(i+1)}</div>
+        <div class="rang-navn" style="flex:1">${escHtml(s.navn ?? 'Ukjent')}</div>
+        <div style="font-family:'DM Mono',monospace;font-size:20px;font-weight:600;color:${erLeder ? 'var(--yellow)' : 'var(--white)'};min-width:36px;text-align:right">${s.for ?? s.totalPoeng ?? 0}</div>
+      </div>`;
+    }).join('');
+    return `<div class="kort" style="margin-bottom:10px">
+      <div class="kort-hode"><div style="font-family:'Bebas Neue',cursive;font-size:20px;letter-spacing:1px;color:${farge}">${tittel}</div></div>
+      <div class="kort-innhold" style="padding:0">${rader}</div>
+    </div>`;
+  };
+  document.getElementById('ledertavle').innerHTML =
+    lagKort('🏅 Opprykksgruppe', 'var(--green2)', toppData) +
+    lagKort('🤝 Nedrykkgruppe',  'var(--accent2)', bunnData);
+}
+
 function visKonkurranseSluttresultat(data) {
   const mixBanner = document.getElementById('mix-slutt-banner');
   if (mixBanner) mixBanner.style.display = 'none';
