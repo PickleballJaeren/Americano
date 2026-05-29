@@ -6,7 +6,7 @@ import {
   collection, doc,
   query, where, getDocs, writeBatch,
 } from './firebase.js';
-import { app, erMix } from './state.js';
+import { app, erMix, erKval } from './state.js';
 import { getParter, erSingelBane } from './rotasjon.js';
 import { PARTER_6_SINGEL, PARTER_6_DOBBEL } from './firebase.js';
 import { visFBFeil } from './ui.js';
@@ -34,7 +34,9 @@ export function validerInndata(i, endretFelt) {
   const l2   = parseInt(el2.value, 10);
   const bane = (app.baneOversikt ?? []).find(b => b.baneNr === app.aktivBane);
   const erSingelValider = erSingelBane(bane);
-  const maks = bane?.maksPoeng ?? (app.poengPerKamp ?? 17);
+  const maks = (erMix() || erKval())
+    ? (app.poengPerKamp ?? 15)
+    : (bane?.maksPoeng ?? (app.poengPerKamp ?? 17));
 
   // Autofyll motstanderens poeng
   let autofylte = false;
@@ -179,10 +181,12 @@ export function lesOgValiderPoeng() {
   const bane   = (app.baneOversikt ?? []).find(b => b.baneNr === app.aktivBane);
   const erSingelLOV = erSingelBane(bane);
   const erDobbelLOV6 = app.er6SpillerFormat && (bane?.erDobbel === true);
-  const parter = erMix()
+  const parter = (erMix() || erKval())
     ? (erSingelLOV ? PARTER_6_SINGEL : [{ nr: 1, lag1: [0,1], lag2: [2,3] }])
     : (erSingelLOV ? PARTER_6_SINGEL : (erDobbelLOV6 ? PARTER_6_DOBBEL : getParter(bane?.spillere?.length ?? 4)));
-  const maks   = bane?.maksPoeng ?? (app.poengPerKamp ?? 17);
+  const maks = (erMix() || erKval())
+    ? (app.poengPerKamp ?? 15)
+    : (bane?.maksPoeng ?? (app.poengPerKamp ?? 17));
   const feil = [];
   const poeng = [];
   for (let i = 0; i < parter.length; i++) {

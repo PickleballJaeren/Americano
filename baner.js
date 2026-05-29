@@ -217,19 +217,28 @@ export function visBaner() {
         </div>`;
       }
 
-      // ── Mix dobbel-bane: 2 vs 2 ──
+      // ── Mix dobbel-bane: 2 vs 2 (evt. 5 spillere der én hviler) ──
+      const s = bane.spillere;
       const lag1 = k
         ? `${k.lag1_s1_navn ?? '?'} + ${k.lag1_s2_navn ?? '?'}`
-        : `${bane.spillere[0]?.navn ?? '?'} + ${bane.spillere[1]?.navn ?? '?'}`;
+        : `${s[0]?.navn ?? '?'} + ${s[1]?.navn ?? '?'}`;
       const lag2 = k
         ? `${k.lag2_s1_navn ?? '?'} + ${k.lag2_s2_navn ?? '?'}`
-        : `${bane.spillere[2]?.navn ?? '?'} + ${bane.spillere[3]?.navn ?? '?'}`;
+        : `${s[2]?.navn ?? '?'} + ${s[3]?.navn ?? '?'}`;
+      // 5. spiller hviler denne kampen
+      const hvilerNavn = k?.hviler_navn ?? (s.length === 5 ? s[4]?.navn : null);
+      const hvilerHTML = hvilerNavn
+        ? `<div style="font-size:13px;color:var(--orange);margin-top:6px;padding:4px 0">💤 ${escHtml(hvilerNavn)} hviler denne runden</div>`
+        : '';
+      // Mix: alltid bruk app.poengPerKamp — aldri arv fra bane.maksPoeng satt i konkurranse
+      const mixMaks = app.poengPerKamp ?? 15;
+      const mixSpillTilMerke = `<span style="font-size:12px;background:rgba(37,99,235,.12);color:var(--accent2);border-radius:4px;padding:2px 7px;font-weight:700">Til ${mixMaks}</span>`;
       return `<div class="kort" onclick="apnePoenginput(${bane.baneNr})" style="cursor:pointer">
         <div class="kort-hode">
           <div style="display:flex;align-items:baseline;gap:10px">
             <div class="bane-nummer-stor" style="color:var(--green2)">${bane.baneNr}</div>
             <div>
-              <div style="font-size:13px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted2)">Bane ${spillTilMerke}</div>
+              <div style="font-size:13px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted2)">Bane ${mixSpillTilMerke}</div>
               <div style="font-size:15px;color:${ferdig ? 'var(--green2)' : 'var(--muted2)'};font-weight:600">${ferdig ? '✓ Ferdig' : 'Mangler poeng'}</div>
             </div>
           </div>
@@ -246,6 +255,7 @@ export function visBaner() {
               ${ferdig ? `${k.lag1Poeng}–${k.lag2Poeng}` : '—'}
             </div>
           </div>
+          ${hvilerHTML}
         </div>
       </div>`;
     }
@@ -409,8 +419,10 @@ export function apnePoenginput(baneNr) {
 
   document.getElementById('poeng-bane-nummer').textContent = baneNr;
   document.getElementById('poeng-bane-stor').textContent   = baneNr;
-  const maksPoeng = bane.maksPoeng ?? (app.poengPerKamp ?? 17);
-  document.getElementById('maks-hint').textContent         = maksPoeng;
+  const maksPoeng = erMixEllerKval()
+    ? (app.poengPerKamp ?? 15)
+    : (bane.maksPoeng ?? (app.poengPerKamp ?? 17));
+  document.getElementById('maks-hint').textContent = maksPoeng;
   document.getElementById('valider-feil').style.display    = 'none';
   const doneBtn = document.getElementById('done-knapp');
   if (doneBtn) doneBtn.style.display = 'none';
@@ -527,7 +539,9 @@ export function apneEnkeltKamp(baneNr, kampNr) {
   }
   document.getElementById('poeng-bane-nummer').textContent = baneNr;
   document.getElementById('poeng-bane-stor').textContent   = baneNr;
-  const maksPoeng = bane.maksPoeng ?? (app.poengPerKamp ?? 17);
+  const maksPoeng = erMixEllerKval()
+    ? (app.poengPerKamp ?? 15)
+    : (bane.maksPoeng ?? (app.poengPerKamp ?? 17));
   document.getElementById('maks-hint').textContent = maksPoeng;
   document.getElementById('valider-feil').style.display = 'none';
   const doneBtn = document.getElementById('done-knapp');
