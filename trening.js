@@ -1235,6 +1235,43 @@ export async function avsluttTreningUI() {
           sluttTotaler[spiller.id].imot   += deres;
           sluttTotaler[spiller.id].diff   += mine - deres;
         });
+        // Hvilende spiller på sluttfasekamp — gir snittpoeng, ingen seir
+        if (kamp.hviler_id) {
+          if (!sluttTotaler[kamp.hviler_id]) {
+            sluttTotaler[kamp.hviler_id] = { spillerId: kamp.hviler_id, navn: kamp.hviler_navn ?? 'Ukjent', seire: 0, kamper: 0, for: 0, imot: 0, diff: 0 };
+          }
+          const hvp = kamp.hvilerPoeng ?? Math.ceil((kamp.lag1Poeng + kamp.lag2Poeng) / 2);
+          sluttTotaler[kamp.hviler_id].for  += hvp;
+          sluttTotaler[kamp.hviler_id].diff += hvp;
+        }
+      });
+
+      // ── FIX: Tildel gruppe til spillere lagt til etter sluttfasestart ──
+      // Spillere som ble lagt til etter at sluttfasen ble trigget er ikke i
+      // toppIds/bunnIds, men har kampdata i sluttTotaler. Uten tildelingen
+      // faller de ut av sorterGruppe() og vises ikke i sluttabellen.
+      Object.keys(sluttTotaler).forEach(id => {
+        if (!toppIds.has(id) && !bunnIds.has(id)) {
+          if (toppIds.size <= bunnIds.size) toppIds.add(id);
+          else bunnIds.add(id);
+        }
+      });
+
+      // ── FIX: Inkluder spillere i toppIds/bunnIds som aldri spilte en kamp ──
+      // Dette gjelder f.eks. spillere som hviler gjennom hele sluttfasen.
+      // De skal vises med 0 kamper i riktig gruppe, ikke utelates.
+      [...toppIds, ...bunnIds].forEach(id => {
+        if (!sluttTotaler[id]) {
+          const funnet =
+            (app.baneOversikt ?? []).flatMap(b => b.spillere ?? []).find(s => s.id === id)
+            ?? (app.venteliste ?? []).find(s => s.id === id)
+            ?? (app.spillere   ?? []).find(s => s.id === id);
+          sluttTotaler[id] = {
+            spillerId: id,
+            navn:      funnet?.navn ?? 'Ukjent',
+            seire: 0, kamper: 0, for: 0, imot: 0, diff: 0,
+          };
+        }
       });
 
       const sorterGruppe = ids => Object.values(sluttTotaler)
@@ -1929,6 +1966,36 @@ export async function leggTilSpillerIOkt(spillerId) {
       navn:   spiller.navn   ?? 'Ukjent',
       rating: spiller.rating ?? STARTRATING,
     }];
+
+    // ── Opprett TS-dokument slik at spilleren vises i sluttabellen ──
+    // startTrening() oppretter TS-poster kun for de opprinnelige spillerne.
+    // Spillere lagt til midt i økten mangler derfor TS-oppføring og forsvinner
+    // fra sluttabellen ved avslutning. Vi sjekker først om dokumentet finnes
+    // (f.eks. om spilleren ble fjernet og lagt til igjen).
+    if (db && app.treningId) {
+      try {
+        const tsEksisterer = await getDocs(query(
+          collection(db, SAM.TS),
+          where('treningId', '==', app.treningId),
+          where('spillerId',  '==', spiller.id),
+          limit(1),
+        ));
+        if (tsEksisterer.empty) {
+          const tsBatch = writeBatch(db);
+          tsBatch.set(doc(collection(db, SAM.TS)), {
+            treningId:       app.treningId,
+            spillerId:       spiller.id,
+            spillerNavn:     spiller.navn   ?? 'Ukjent',
+            ratingVedStart:  spiller.rating ?? STARTRATING,
+            sluttPlassering: null,
+            paVenteliste:    true,
+          });
+          await tsBatch.commit();
+        }
+      } catch (tsFeil) {
+        console.warn('[leggTilSpillerIOkt] Kunne ikke opprette TS-dokument:', tsFeil?.message ?? tsFeil);
+      }
+    }
   }
 
   await _lagreDeltakerEndring();
