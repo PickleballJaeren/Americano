@@ -16,7 +16,7 @@
 
 import {
   db, SAM, STARTRATING, PARTER_6_DOBBEL, PARTER_6_SINGEL,
-  collection, doc, addDoc, updateDoc,
+  collection, doc, addDoc, getDoc, updateDoc,
   query, where, getDocs, writeBatch, serverTimestamp,
 } from './firebase.js';
 import { app, erMix, erKval } from './state.js';
@@ -1645,6 +1645,94 @@ window._lagreRedigerBaner = async function() {
     _lukkRedigerModal();
     visBaner();
     visMelding('Banefordeling oppdatert ✓');
+
+    // ── FIX: Registrer «hvil» for nye spillere i Mix/Opprykk-modus ────────────
+    // Når en spiller legges direkte til via rediger-bane-modalen (ikke via
+    // venteliste + leggTilSpillerIOkt), vet ikke rotasjonsalgoritmen at spilleren
+    // sto over inneværende runde. sitOutCount for dem er 0, og neste runde vil
+    // algoritmen velge dem til å hvile igjen fordi alle andre har sitOutCount ≥ 1.
+    //
+    // Løsning: hent treningsdokumentet og skriv sitOutCount = 1 og
+    // lastSitOutRunde = gjeldende runde for spillere som er nye i baneoppsettet
+    // og mangler i statistikken. Kjøres etter batch.commit() for konsistens,
+    // men er ikke-kritisk (fanget av catch).
+    if (erMixEllerKval() && spillereEndret) {
+      // spillereSomFor er JSON-strengen med de opprinnelige spillerne (baneNr + ids[]).
+      // app.baneOversikt er nå = _redigerBaner (ny tilstand), så vi kan ikke bruke
+      // app.baneOversikt til å finne de gamle spillerne. Parse spillereSomFor i stedet.
+      const gamleIds = new Set(
+        JSON.parse(spillereSomFor).flatMap(b => b.ids ?? [])
+      );
+      try {
+        const tRef   = doc(db, SAM.TRENINGER, app.treningId);
+        const tSnap  = await getDoc(tRef);
+        if (tSnap.exists()) {
+          const td = tSnap.data();
+          const erKvalModus = erKval();
+
+          const sitOutA  = { ...(erKvalModus ? (td.kvalSitOutCountA  ?? {}) : (td.mixAbSitOutCountA  ?? {})) };
+          const lastSitA = { ...(erKvalModus ? (td.kvalLastSitOutRundeA ?? {}) : (td.mixAbLastSitOutRundeA ?? {})) };
+          const sitOutB  = { ...(erKvalModus ? (td.kvalSitOutCountB  ?? {}) : (td.mixAbSitOutCountB  ?? {})) };
+          const lastSitB = { ...(erKvalModus ? (td.kvalLastSitOutRundeB ?? {}) : (td.mixAbLastSitOutRundeB ?? {})) };
+          const gruppeAIds = new Set(erKvalModus ? (td.kvalGruppeA ?? []) : (td.mixAbGruppeA ?? []));
+          const gruppeBIds = new Set(erKvalModus ? (td.kvalGruppeB ?? []) : (td.mixAbGruppeB ?? []));
+
+          let endret = false;
+          _redigerBaner.flatMap(b => b.spillere ?? []).forEach(s => {
+            if (gamleIds.has(s.id)) return; // ikke ny — hopp over
+
+            // Spiller er ny i baneoppsettet denne runden — sett sitOutCount = 1
+            // slik at algoritmen ikke velger dem til å hvile igjen neste runde.
+            if (gruppeAIds.has(s.id)) {
+              if (!(s.id in sitOutA)) {
+                sitOutA[s.id]  = 1;
+                lastSitA[s.id] = app.runde;
+                endret = true;
+              }
+            } else if (gruppeBIds.has(s.id)) {
+              if (!(s.id in sitOutB)) {
+                sitOutB[s.id]  = 1;
+                lastSitB[s.id] = app.runde;
+                endret = true;
+              }
+            } else {
+              // Spiller er ikke i noen gruppe ennå (lagt til via rediger uten
+              // å ha gått via leggTilSpillerIOkt) — tildel gruppen med færrest
+              // spillere og registrer hvil.
+              if (gruppeAIds.size <= gruppeBIds.size) {
+                gruppeAIds.add(s.id);
+                sitOutA[s.id]  = 1;
+                lastSitA[s.id] = app.runde;
+              } else {
+                gruppeBIds.add(s.id);
+                sitOutB[s.id]  = 1;
+                lastSitB[s.id] = app.runde;
+              }
+              endret = true;
+            }
+          });
+
+          if (endret) {
+            await updateDoc(tRef, erKvalModus ? {
+              kvalSitOutCountA:     sitOutA,
+              kvalLastSitOutRundeA: lastSitA,
+              kvalSitOutCountB:     sitOutB,
+              kvalLastSitOutRundeB: lastSitB,
+              kvalGruppeA:          [...gruppeAIds],
+              kvalGruppeB:          [...gruppeBIds],
+            } : {
+              mixAbSitOutCountA:     sitOutA,
+              mixAbLastSitOutRundeA: lastSitA,
+              mixAbSitOutCountB:     sitOutB,
+              mixAbLastSitOutRundeB: lastSitB,
+            });
+          }
+        }
+      } catch (statistikkFeil) {
+        // Ikke kritisk — rotasjonen fungerer uten dette, spilleren kan hvile én gang ekstra
+        console.warn('[redigerBaner] Kunne ikke oppdatere sit-out statistikk:', statistikkFeil?.message ?? statistikkFeil);
+      }
+    }
   } catch (e) {
     console.error('[redigerBaner]', e);
     if (feilEl) feilEl.textContent = 'Lagring feilet: ' + (e?.message ?? e);
