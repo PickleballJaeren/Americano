@@ -1751,6 +1751,14 @@ window._lagreRedigerBaner = async function() {
               mixAbSitOutCountB:     sitOutB,
               mixAbLastSitOutRundeB: lastSitB,
             });
+
+            // Synkroniser minnevariabler med Firestore — uten dette leser
+            // resultat.js og trening.js utdaterte grupper og tildeler ny
+            // spiller feil gruppe via fallback-logikken.
+            if (erKvalModus) {
+              app.kvalGruppeA = [...gruppeAIds];
+              app.kvalGruppeB = [...gruppeBIds];
+            }
           }
         }
       } catch (statistikkFeil) {
