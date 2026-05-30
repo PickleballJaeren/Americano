@@ -530,13 +530,19 @@ export async function bekreftNesteRunde() {
         ...(app.baneOversikt ?? []).flatMap(b => b.spillere ?? []),
         ...(app.venteliste   ?? []),
       ];
-      // Nye spillere lagt til etter oppstart tildeles gruppen med færrest spillere
+      // Bygg oppslag fra ventelisten — spillere lagt til midt i økten har
+      // mixAbGruppe: 'A'/'B' på ventelisteobjektet men mangler i gruppeAIds/B.
+      const ventelisteGruppeAB = {};
+      (app.venteliste ?? []).forEach(s => {
+        if (s?.id && s.mixAbGruppe) ventelisteGruppeAB[s.id] = s.mixAbGruppe;
+      });
       const unikAlleAB = [...new Map(alleSpillere.map(s => [s.id, s])).values()];
       unikAlleAB.forEach(s => {
-        if (!gruppeAIds.has(s.id) && !gruppeBIds.has(s.id)) {
-          if (gruppeAIds.size <= gruppeBIds.size) gruppeAIds.add(s.id);
-          else gruppeBIds.add(s.id);
-        }
+        if (gruppeAIds.has(s.id) || gruppeBIds.has(s.id)) return;
+        if (ventelisteGruppeAB[s.id] === 'B') { gruppeBIds.add(s.id); return; }
+        if (ventelisteGruppeAB[s.id] === 'A') { gruppeAIds.add(s.id); return; }
+        if (gruppeAIds.size <= gruppeBIds.size) gruppeAIds.add(s.id);
+        else gruppeBIds.add(s.id);
       });
       const spillereA = alleSpillere.filter(s => gruppeAIds.has(s.id));
       const spillereB = alleSpillere.filter(s => gruppeBIds.has(s.id));
@@ -790,13 +796,19 @@ export async function bekreftNesteRunde() {
         ...(app.baneOversikt ?? []).flatMap(b => b.spillere ?? []),
         ...(app.venteliste   ?? []),
       ];
+      // Bygg oppslag fra ventelisten — spillere lagt til midt i økten har
+      // kvalGruppe: 'A'/'B' på ventelisteobjektet men mangler i gruppeAIds/B.
+      const ventelisteGruppe = {};
+      (app.venteliste ?? []).forEach(s => {
+        if (s?.id && s.kvalGruppe) ventelisteGruppe[s.id] = s.kvalGruppe;
+      });
       const unikAlleSpillere = [...new Map(alleSpillere.map(s => [s.id, s])).values()];
       unikAlleSpillere.forEach(s => {
-        if (!gruppeAIds.has(s.id) && !gruppeBIds.has(s.id)) {
-          // Tildel gruppen med færrest spillere
-          if (gruppeAIds.size <= gruppeBIds.size) gruppeAIds.add(s.id);
-          else gruppeBIds.add(s.id);
-        }
+        if (gruppeAIds.has(s.id) || gruppeBIds.has(s.id)) return;
+        if (ventelisteGruppe[s.id] === 'B') { gruppeBIds.add(s.id); return; }
+        if (ventelisteGruppe[s.id] === 'A') { gruppeAIds.add(s.id); return; }
+        if (gruppeAIds.size <= gruppeBIds.size) gruppeAIds.add(s.id);
+        else gruppeBIds.add(s.id);
       });
       const spillereA = alleSpillere.filter(s => gruppeAIds.has(s.id));
       const spillereB = alleSpillere.filter(s => gruppeBIds.has(s.id));

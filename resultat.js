@@ -220,11 +220,19 @@ export async function visRundeResultat() {
       const tittelB = erSluttfase ? '🤝 Nedrykkgruppe'  : '🔵 Gruppe B';
       const fargeA  = 'var(--green2)';
       const fargeB  = 'var(--accent2)';
+      // Bygg oppslag fra ventelisten — spillere lagt til midt i økten har
+      // kvalGruppe: 'A'/'B' på ventelisteobjektet men mangler i app.kvalGruppeA/B.
+      // Sjekk dette FØR fallback på gruppestørrelse, ellers havner de i feil gruppe.
+      const ventelisteGruppe = {};
+      (app.venteliste ?? []).forEach(s => {
+        if (s?.id && s.kvalGruppe) ventelisteGruppe[s.id] = s.kvalGruppe;
+      });
       sammenlagt.forEach(s => {
-        if (!gruppeAIds.has(s.spillerId) && !gruppeBIds.has(s.spillerId)) {
-          if (gruppeAIds.size <= gruppeBIds.size) gruppeAIds.add(s.spillerId);
-          else gruppeBIds.add(s.spillerId);
-        }
+        if (gruppeAIds.has(s.spillerId) || gruppeBIds.has(s.spillerId)) return;
+        if (ventelisteGruppe[s.spillerId] === 'B') { gruppeBIds.add(s.spillerId); return; }
+        if (ventelisteGruppe[s.spillerId] === 'A') { gruppeAIds.add(s.spillerId); return; }
+        if (gruppeAIds.size <= gruppeBIds.size) gruppeAIds.add(s.spillerId);
+        else gruppeBIds.add(s.spillerId);
       });
       const listeA = sammenlagt.filter(s => gruppeAIds.has(s.spillerId));
       const listeB = sammenlagt.filter(s => gruppeBIds.has(s.spillerId));
@@ -435,11 +443,19 @@ async function visMixLiveTabell() {
       const tittelB = erSluttfase ? '🤝 Nedrykkgruppe'  : '🔵 Gruppe B';
       const fargeA  = 'var(--green2)';
       const fargeB  = 'var(--accent2)';
+      // Bygg oppslag fra ventelisten — spillere lagt til midt i økten har
+      // kvalGruppe: 'A'/'B' på ventelisteobjektet men mangler i app.kvalGruppeA/B.
+      // Sjekk dette FØR fallback på gruppestørrelse, ellers havner de i feil gruppe.
+      const ventelisteGruppe = {};
+      (app.venteliste ?? []).forEach(s => {
+        if (s?.id && s.kvalGruppe) ventelisteGruppe[s.id] = s.kvalGruppe;
+      });
       sammenlagt.forEach(s => {
-        if (!gruppeAIds.has(s.spillerId) && !gruppeBIds.has(s.spillerId)) {
-          if (gruppeAIds.size <= gruppeBIds.size) gruppeAIds.add(s.spillerId);
-          else gruppeBIds.add(s.spillerId);
-        }
+        if (gruppeAIds.has(s.spillerId) || gruppeBIds.has(s.spillerId)) return;
+        if (ventelisteGruppe[s.spillerId] === 'B') { gruppeBIds.add(s.spillerId); return; }
+        if (ventelisteGruppe[s.spillerId] === 'A') { gruppeAIds.add(s.spillerId); return; }
+        if (gruppeAIds.size <= gruppeBIds.size) gruppeAIds.add(s.spillerId);
+        else gruppeBIds.add(s.spillerId);
       });
       const listeA = sammenlagt.filter(s => gruppeAIds.has(s.spillerId));
       const listeB = sammenlagt.filter(s => gruppeBIds.has(s.spillerId));
@@ -625,6 +641,15 @@ async function visMixABLiveTabell() {
     const gruppeAIds = new Set(app.mixAbGruppeA ?? []);
     const gruppeBIds = new Set(app.mixAbGruppeB ?? []);
     const banerA     = app.mixAbBanerA ?? 1;
+
+    // Spillere lagt til midt i økten har mixAbGruppe: 'A'/'B' på ventelisteobjektet
+    // men mangler i app.mixAbGruppeA/B — legg dem til riktig gruppe her.
+    (app.venteliste ?? []).forEach(s => {
+      if (!s?.id) return;
+      if (gruppeAIds.has(s.id) || gruppeBIds.has(s.id)) return;
+      if (s.mixAbGruppe === 'B') gruppeBIds.add(s.id);
+      else if (s.mixAbGruppe === 'A') gruppeAIds.add(s.id);
+    });
 
     // Fordel kamper på gruppe basert på baneNr
     const kamperA = alleKamper.filter(k => {
