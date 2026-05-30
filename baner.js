@@ -1527,38 +1527,48 @@ window._lagreRedigerBaner = async function() {
   const lagreBtn = document.querySelector('#modal-rediger-baner .knapp-gronn');
   if (lagreBtn) { lagreBtn.disabled = true; lagreBtn.textContent = 'Lagrer…'; }
 
-  // Sjekk om spillersammensetningen faktisk er endret — om ikke, trenger vi
-  // ikke slette og skrive kamp-dokumentene på nytt. Dette bevarer registrerte poeng
-  // når admin kun justerer poengscoren via poeng-velgeren.
+  // Finn hvilke enkeltbaner som faktisk er endret — sammenlign per baneNr.
+  // Dette er kritisk: vi må kun slette og skrive kampdokumenter for baner
+  // som er endret, slik at ferdig-registrerte poeng på uberørte baner bevares.
+  const gammelBaneMap = Object.fromEntries(
+    (app.baneOversikt ?? []).map(b => [
+      b.baneNr,
+      (b.spillere ?? []).map(s => s.id).sort().join(','),
+    ])
+  );
+  const endredeBaner = (_redigerBaner ?? []).filter(b => {
+    const nyeIds = (b.spillere ?? []).map(s => s.id).sort().join(',');
+    return gammelBaneMap[b.baneNr] !== nyeIds;
+  });
+  const spillereEndret = endredeBaner.length > 0;
+
+  // Brukes av sitOutCount-logikken nedenfor for å finne nye spillere
   const spillereSomFor = JSON.stringify(
     (app.baneOversikt ?? []).map(b => ({
       baneNr: b.baneNr,
       ids: (b.spillere ?? []).map(s => s.id).sort(),
     }))
   );
-  const spillerNaa = JSON.stringify(
-    (_redigerBaner ?? []).map(b => ({
-      baneNr: b.baneNr,
-      ids: (b.spillere ?? []).map(s => s.id).sort(),
-    }))
-  );
-  const spillereEndret = spillereSomFor !== spillerNaa;
 
   try {
     const batch = writeBatch(db);
 
     if (spillereEndret) {
-      // Spillersammensetning er endret — slett gamle kamper og skriv nye
-      const eksisterendeSnap = await getDocs(query(
-        collection(db, SAM.KAMPER),
-        where('treningId', '==', app.treningId),
-        where('rundeNr',   '==', app.runde),
-      ));
-      eksisterendeSnap.docs.forEach(d => batch.delete(d.ref));
+      // Slett og skriv kun kampdokumenter for baner som faktisk er endret.
+      // Uberørte baner beholdes i Firestore med sine registrerte poeng intakt.
+      for (const bane of endredeBaner) {
+        const eksisterendeSnap = await getDocs(query(
+          collection(db, SAM.KAMPER),
+          where('treningId', '==', app.treningId),
+          where('rundeNr',   '==', app.runde),
+          where('baneNr',    '==', `bane${bane.baneNr}`),
+        ));
+        eksisterendeSnap.docs.forEach(d => batch.delete(d.ref));
+      }
     }
 
-    // Skriv nye kamper kun hvis spillersammensetningen er endret
-    if (spillereEndret) _redigerBaner.forEach(bane => {
+    // Skriv nye kamper kun for endrede baner
+    if (spillereEndret) endredeBaner.forEach(bane => {
       const n = bane.spillere?.length ?? 0;
       const erSingel  = bane.erSingel === true || n === 2;
       const erDobbel6 = app.er6SpillerFormat && bane.erDobbel === true;
@@ -1616,7 +1626,7 @@ window._lagreRedigerBaner = async function() {
           batch.set(doc(collection(db, SAM.KAMPER)), dokData);
         });
       }
-    }); // slutt if (spillereEndret) forEach
+    }); // slutt endredeBaner.forEach
 
     // Mix/Opprykk: alltid fast poengmål — ingen 3/5-justering for 5-spillerbaner
     const mp   = _redigerMaksPoeng ?? app.poengPerKamp ?? 15;
@@ -1688,31 +1698,39 @@ window._lagreRedigerBaner = async function() {
           _redigerBaner.flatMap(b => b.spillere ?? []).forEach(s => {
             if (gamleIds.has(s.id)) return; // ikke ny — hopp over
 
-            // Spiller er ny i baneoppsettet denne runden — sett sitOutCount = 1
-            // slik at algoritmen ikke velger dem til å hvile igjen neste runde.
+            // Beregn gruppegjennomsnitt for sitOutCount slik at den nye spilleren
+            // ikke systematisk velges til å hvile de neste rundene.
+            // Hardkodet 1 er feil når gruppen allerede har sitOutCount > 1.
+            const snittSitOut = (sitOutObj) => {
+              const verdier = Object.values(sitOutObj);
+              if (!verdier.length) return 1;
+              return Math.round(verdier.reduce((s, v) => s + v, 0) / verdier.length);
+            };
+
+            // Spiller er ny i baneoppsettet denne runden — sett sitOutCount til
+            // gruppegjennomsnitt slik at algoritmen ikke velger dem til å hvile igjen.
             if (gruppeAIds.has(s.id)) {
               if (!(s.id in sitOutA)) {
-                sitOutA[s.id]  = 1;
+                sitOutA[s.id]  = snittSitOut(sitOutA);
                 lastSitA[s.id] = app.runde;
                 endret = true;
               }
             } else if (gruppeBIds.has(s.id)) {
               if (!(s.id in sitOutB)) {
-                sitOutB[s.id]  = 1;
+                sitOutB[s.id]  = snittSitOut(sitOutB);
                 lastSitB[s.id] = app.runde;
                 endret = true;
               }
             } else {
-              // Spiller er ikke i noen gruppe ennå (lagt til via rediger uten
-              // å ha gått via leggTilSpillerIOkt) — tildel gruppen med færrest
-              // spillere og registrer hvil.
+              // Spiller er ikke i noen gruppe ennå — tildel gruppen med færrest
+              // spillere og sett sitOutCount til gruppegjennomsnitt.
               if (gruppeAIds.size <= gruppeBIds.size) {
                 gruppeAIds.add(s.id);
-                sitOutA[s.id]  = 1;
+                sitOutA[s.id]  = snittSitOut(sitOutA);
                 lastSitA[s.id] = app.runde;
               } else {
                 gruppeBIds.add(s.id);
-                sitOutB[s.id]  = 1;
+                sitOutB[s.id]  = snittSitOut(sitOutB);
                 lastSitB[s.id] = app.runde;
               }
               endret = true;
@@ -1738,6 +1756,50 @@ window._lagreRedigerBaner = async function() {
       } catch (statistikkFeil) {
         // Ikke kritisk — rotasjonen fungerer uten dette, spilleren kan hvile én gang ekstra
         console.warn('[redigerBaner] Kunne ikke oppdatere sit-out statistikk:', statistikkFeil?.message ?? statistikkFeil);
+      }
+    }
+
+    // ── FIX: Registrer sitOutCount for nye spillere i vanlig Mix-modus ────────
+    // Same problem som for Mix A/B og Opprykk, men for plain Mix:
+    // nye spillere har sitOutCount = 0 og blir systematisk valgt til å hvile.
+    // Løsning: sett til gjennomsnitt av eksisterende spillere i rotasjonen.
+    if (erMix() && !erKval() && spillereEndret) {
+      const gamleIds = new Set(
+        JSON.parse(spillereSomFor).flatMap(b => b.ids ?? [])
+      );
+      try {
+        const tRef  = doc(db, SAM.TRENINGER, app.treningId);
+        const tSnap = await getDoc(tRef);
+        if (tSnap.exists()) {
+          const td      = tSnap.data();
+          const sitOut  = { ...(td.mixSitOutCount     ?? {}) };
+          const lastSit = { ...(td.mixLastSitOutRunde ?? {}) };
+
+          const snittSitOut = () => {
+            const verdier = Object.values(sitOut);
+            if (!verdier.length) return 1;
+            return Math.round(verdier.reduce((s, v) => s + v, 0) / verdier.length);
+          };
+
+          let endret = false;
+          _redigerBaner.flatMap(b => b.spillere ?? []).forEach(s => {
+            if (gamleIds.has(s.id)) return;
+            if (!(s.id in sitOut)) {
+              sitOut[s.id]  = snittSitOut();
+              lastSit[s.id] = app.runde;
+              endret = true;
+            }
+          });
+
+          if (endret) {
+            await updateDoc(tRef, {
+              mixSitOutCount:     sitOut,
+              mixLastSitOutRunde: lastSit,
+            });
+          }
+        }
+      } catch (statistikkFeil) {
+        console.warn('[redigerBaner] Kunne ikke oppdatere mix sit-out statistikk:', statistikkFeil?.message ?? statistikkFeil);
       }
     }
   } catch (e) {
