@@ -28,7 +28,7 @@ export function ledertavleInit(deps) {
 // ════════════════════════════════════════════════════════
 // GLOBAL LEDERTAVLE
 // ════════════════════════════════════════════════════════
-export function oppdaterGlobalLedertavle() {
+export async function oppdaterGlobalLedertavle(tvingOppdatering = false) {
   const laster = document.getElementById('global-laster');
   const liste  = document.getElementById('global-ledertavle');
   if (laster) laster.style.display = 'none';
@@ -37,6 +37,23 @@ export function oppdaterGlobalLedertavle() {
   // Vis/skjul admin-knapper på spillere-skjermen
   const adminKnapper = document.getElementById('admin-knapper-spillere');
   if (adminKnapper) adminKnapper.style.display = window.getErAdmin?.() ? 'flex' : 'none';
+
+  // Ved manuell oppdatering (knapp): hent ferske spillerdata fra Firestore
+  // og nullstill sesong-cache slik at sesongkåringen også rekalkuleres.
+  if (tvingOppdatering && db) {
+    if (laster) laster.style.display = 'flex';
+    try {
+      const aktivKlubbId = _getAktivKlubbId();
+      if (aktivKlubbId) {
+        const snap = await getDocs(query(collection(db, SAM.SPILLERE), where('klubbId', '==', aktivKlubbId)));
+        app.spillere = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      }
+    } catch (e) {
+      console.warn('[oppdaterGlobalLedertavle] Kunne ikke hente spillere:', e?.message ?? e);
+    }
+    _sesongCache = null;
+    if (laster) laster.style.display = 'none';
+  }
 
   try {
     const spillere = [...(app.spillere ?? [])].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));

@@ -653,6 +653,9 @@ function _lyttereCallbacks() {
       stoppLyttere();
       naviger('slutt');
       visHjemStatus();
+      // Restart spillere-lytteren så app.spillere oppdateres med ny rating
+      // fra Firestore etter økt-avslutning (uten dette må bruker refreshe appen).
+      lyttPaaSpillere();
       // Restart oppstartslytter så tilskuer automatisk kobles til neste økt
       _startVentPaaOkt();
     },
