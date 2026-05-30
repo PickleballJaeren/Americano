@@ -1695,20 +1695,37 @@ window._lagreRedigerBaner = async function() {
           const gruppeBIds = new Set(erKvalModus ? (td.kvalGruppeB ?? []) : (td.mixAbGruppeB ?? []));
 
           let endret = false;
+
+          // Bygg et oppslag: hvilken bane havnet hver ny spiller på?
+          // Brukes til å avgjøre gruppe A vs B basert på baneplassering,
+          // ikke på gruppestørrelse som ville gitt feil resultat ved likt antall.
+          const nySpillerBaneNr = {};
+          _redigerBaner.forEach(bane => {
+            (bane.spillere ?? []).forEach(s => {
+              if (!gamleIds.has(s.id)) nySpillerBaneNr[s.id] = bane.baneNr;
+            });
+          });
+          const banerA = erKvalModus
+            ? (td.kvalBanerA ?? Math.ceil((app.baneOversikt ?? []).length / 2))
+            : (td.mixAbBanerA ?? app.mixAbBanerA ?? Math.ceil((app.baneOversikt ?? []).length / 2));
+
           _redigerBaner.flatMap(b => b.spillere ?? []).forEach(s => {
             if (gamleIds.has(s.id)) return; // ikke ny — hopp over
 
             // Beregn gruppegjennomsnitt for sitOutCount slik at den nye spilleren
             // ikke systematisk velges til å hvile de neste rundene.
-            // Hardkodet 1 er feil når gruppen allerede har sitOutCount > 1.
             const snittSitOut = (sitOutObj) => {
               const verdier = Object.values(sitOutObj);
               if (!verdier.length) return 1;
               return Math.round(verdier.reduce((s, v) => s + v, 0) / verdier.length);
             };
 
-            // Spiller er ny i baneoppsettet denne runden — sett sitOutCount til
-            // gruppegjennomsnitt slik at algoritmen ikke velger dem til å hvile igjen.
+            // Bestem gruppe basert på hvilken bane spilleren ble plassert på.
+            // Bane 1..banerA = gruppe A, bane (banerA+1).. = gruppe B.
+            // Dette respekterer admin sitt valg fremfor å gjette fra gruppestørrelse.
+            const placertPaaBaneNr = nySpillerBaneNr[s.id] ?? 999;
+            const skalVaereIGruppeA = placertPaaBaneNr <= banerA;
+
             if (gruppeAIds.has(s.id)) {
               if (!(s.id in sitOutA)) {
                 sitOutA[s.id]  = snittSitOut(sitOutA);
@@ -1722,9 +1739,8 @@ window._lagreRedigerBaner = async function() {
                 endret = true;
               }
             } else {
-              // Spiller er ikke i noen gruppe ennå — tildel gruppen med færrest
-              // spillere og sett sitOutCount til gruppegjennomsnitt.
-              if (gruppeAIds.size <= gruppeBIds.size) {
+              // Spiller er ikke i noen gruppe ennå — tildel basert på bane.
+              if (skalVaereIGruppeA) {
                 gruppeAIds.add(s.id);
                 sitOutA[s.id]  = snittSitOut(sitOutA);
                 lastSitA[s.id] = app.runde;
@@ -1750,6 +1766,8 @@ window._lagreRedigerBaner = async function() {
               mixAbLastSitOutRundeA: lastSitA,
               mixAbSitOutCountB:     sitOutB,
               mixAbLastSitOutRundeB: lastSitB,
+              mixAbGruppeA:          [...gruppeAIds],
+              mixAbGruppeB:          [...gruppeBIds],
             });
 
             // Synkroniser minnevariabler med Firestore — uten dette leser
@@ -1758,6 +1776,9 @@ window._lagreRedigerBaner = async function() {
             if (erKvalModus) {
               app.kvalGruppeA = [...gruppeAIds];
               app.kvalGruppeB = [...gruppeBIds];
+            } else {
+              app.mixAbGruppeA = [...gruppeAIds];
+              app.mixAbGruppeB = [...gruppeBIds];
             }
           }
         }
