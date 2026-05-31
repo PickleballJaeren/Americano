@@ -161,7 +161,13 @@ export function visBaner() {
     return;
   }
 
-  const vl     = app.venteliste ?? [];
+  // Filtrer bort spillere som allerede er plassert på en bane (f.eks. som
+  // hviler på en 5-spillerbane via mixEkstraBane). Uten dette vises de
+  // dobbelt — én gang i ventelisten og én gang som hviler på banekortet.
+  const baneSpillerIds = new Set(
+    (app.baneOversikt ?? []).flatMap(b => (b.spillere ?? []).map(s => s.id))
+  );
+  const vl     = (app.venteliste ?? []).filter(s => !baneSpillerIds.has(s.id));
   const vlWrap = document.getElementById('venteliste-visning');
   if (vl.length > 0) {
     vlWrap.innerHTML = `<div class="venteliste-boks">
@@ -1656,71 +1662,10 @@ window._lagreRedigerBaner = async function() {
       ? (_redigerBaner.find(b => (b.spillere?.length ?? 0) === 5)?.baneNr ?? null)
       : null;
 
-    // ── Beregn gruppe-tildeling FØR batch.commit() ──────────────────────────
-    // Gruppe-feltene skrives i SAMME batch som baneOversikt — atomisk.
-    // Tidligere ble dette gjort i en separat updateDoc() etterpå, noe som
-    // skapte en race condition: UI ble oppdatert før gruppene var skrevet.
-    let gruppeOppdatering = {};
-    if (erMixEllerKval() && spillereEndret) {
-      try {
-        const tRef2  = doc(db, SAM.TRENINGER, app.treningId);
-        const tSnap2 = await getDoc(tRef2);
-        if (tSnap2.exists()) {
-          const td2        = tSnap2.data();
-          const erKvalModus = erKval();
-          const sitOutA    = { ...(erKvalModus ? (td2.kvalSitOutCountA      ?? {}) : (td2.mixAbSitOutCountA      ?? {})) };
-          const lastSitA   = { ...(erKvalModus ? (td2.kvalLastSitOutRundeA  ?? {}) : (td2.mixAbLastSitOutRundeA  ?? {})) };
-          const sitOutB    = { ...(erKvalModus ? (td2.kvalSitOutCountB      ?? {}) : (td2.mixAbSitOutCountB      ?? {})) };
-          const lastSitB   = { ...(erKvalModus ? (td2.kvalLastSitOutRundeB  ?? {}) : (td2.mixAbLastSitOutRundeB  ?? {})) };
-          const grpA       = new Set(erKvalModus ? (td2.kvalGruppeA ?? []) : (td2.mixAbGruppeA ?? []));
-          const grpB       = new Set(erKvalModus ? (td2.kvalGruppeB ?? []) : (td2.mixAbGruppeB ?? []));
-          const gamleIds2  = new Set([...grpA, ...grpB]);
-          const banerA2    = erKvalModus
-            ? (td2.kvalBanerA ?? Math.ceil((app.baneOversikt ?? []).length / 2))
-            : (td2.mixAbBanerA ?? app.mixAbBanerA ?? Math.ceil((app.baneOversikt ?? []).length / 2));
-          const baneNrMap  = {};
-          _redigerBaner.forEach(b => {
-            (b.spillere ?? []).forEach(s => { if (!gamleIds2.has(s.id)) baneNrMap[s.id] = b.baneNr; });
-          });
-          const snitt = (obj) => {
-            const v = Object.values(obj);
-            return v.length ? Math.round(v.reduce((a, x) => a + x, 0) / v.length) : 1;
-          };
-          let endret2 = false;
-          _redigerBaner.flatMap(b => b.spillere ?? []).forEach(s => {
-            if (gamleIds2.has(s.id)) return;
-            if ((baneNrMap[s.id] ?? 999) <= banerA2) {
-              grpA.add(s.id); sitOutA[s.id] = snitt(sitOutA); lastSitA[s.id] = app.runde;
-            } else {
-              grpB.add(s.id); sitOutB[s.id] = snitt(sitOutB); lastSitB[s.id] = app.runde;
-            }
-            endret2 = true;
-          });
-          if (endret2) {
-            gruppeOppdatering = erKvalModus ? {
-              kvalGruppeA: [...grpA], kvalGruppeB: [...grpB],
-              kvalSitOutCountA: sitOutA, kvalLastSitOutRundeA: lastSitA,
-              kvalSitOutCountB: sitOutB, kvalLastSitOutRundeB: lastSitB,
-            } : {
-              mixAbGruppeA: [...grpA], mixAbGruppeB: [...grpB],
-              mixAbSitOutCountA: sitOutA, mixAbLastSitOutRundeA: lastSitA,
-              mixAbSitOutCountB: sitOutB, mixAbLastSitOutRundeB: lastSitB,
-            };
-            if (erKvalModus) { app.kvalGruppeA = [...grpA]; app.kvalGruppeB = [...grpB]; }
-            else             { app.mixAbGruppeA = [...grpA]; app.mixAbGruppeB = [...grpB]; }
-          }
-        }
-      } catch (e2) {
-        console.warn('[redigerBaner] gruppe-beregning feilet:', e2?.message ?? e2);
-      }
-    }
-
-    console.log('[redigerBaner] gruppeOppdatering:', JSON.stringify(gruppeOppdatering));
     batch.update(doc(db, SAM.TRENINGER, app.treningId), {
-      baneOversikt:       _redigerBaner,
-      sisteAktivitetDato: serverTimestamp(),
+      baneOversikt:         _redigerBaner,
+      sisteAktivitetDato:   serverTimestamp(),
       ...(erMixEllerKval() ? { mixEkstraBane: ekstraBane5 } : {}),
-      ...gruppeOppdatering,
     });
 
     await batch.commit();

@@ -407,14 +407,40 @@ function skrivKamper(batch, treningId, rundeNr, baneNr, spillere, erSingel = fal
 // Mix & Match — skriv én kamp per bane per runde.
 // Håndterer både dobbel (4 spl) og singel (2 spl) baner.
 function skrivMixKamper(batch, treningId, rundeNr, baneOversikt, hvilerListe = []) {
-  // Fordel venteliste-hviler-spillere på baner (én per bane, syklisk)
+  // Fordel venteliste-hviler-spillere på baner.
+  // Hvis hviler-objektet har gruppe-felt (kvalGruppe, kvalSluttGruppe, mixAbGruppe),
+  // tildeles spilleren en bane fra sin egen gruppe — ikke syklisk på tvers av grupper.
+  // Dette forhindrer at bunn-gruppe-hviler havner på topp-gruppe-baner.
   const hvilerPrBane = {};
-  hvilerListe.forEach((s, i) => {
-    const bane = baneOversikt[i % baneOversikt.length];
-    if (bane) {
-      if (!hvilerPrBane[bane.baneNr]) hvilerPrBane[bane.baneNr] = [];
-      hvilerPrBane[bane.baneNr].push(s);
+  const leggTilHviler = (s, bane) => {
+    if (!bane) return;
+    if (!hvilerPrBane[bane.baneNr]) hvilerPrBane[bane.baneNr] = [];
+    hvilerPrBane[bane.baneNr].push(s);
+  };
+  // Tell baner per gruppe for syklisk fordeling innad i gruppen
+  const baneTeller = {};
+  hvilerListe.forEach(s => {
+    // Finn hvilken gruppe hviler-spilleren tilhører
+    const gruppe = s.kvalSluttGruppe ?? s.kvalGruppe ?? s.mixAbGruppe ?? null;
+    let kandidatBaner;
+    if (gruppe === 'topp' || gruppe === 'A') {
+      // Topp-gruppe eller gruppe A — baner med lavest baneNr (banerA)
+      const sortert = [...baneOversikt].sort((a, b) => a.baneNr - b.baneNr);
+      const halvpunkt = Math.ceil(sortert.length / 2);
+      kandidatBaner = sortert.slice(0, halvpunkt);
+    } else if (gruppe === 'bunn' || gruppe === 'B') {
+      // Bunn-gruppe eller gruppe B — baner med høyest baneNr
+      const sortert = [...baneOversikt].sort((a, b) => a.baneNr - b.baneNr);
+      const halvpunkt = Math.ceil(sortert.length / 2);
+      kandidatBaner = sortert.slice(halvpunkt);
+      if (kandidatBaner.length === 0) kandidatBaner = sortert; // fallback
+    } else {
+      // Ingen gruppe-info — syklisk fordeling som før
+      kandidatBaner = baneOversikt;
     }
+    const idx = (baneTeller[gruppe ?? '_'] ?? 0) % kandidatBaner.length;
+    baneTeller[gruppe ?? '_'] = (baneTeller[gruppe ?? '_'] ?? 0) + 1;
+    leggTilHviler(s, kandidatBaner[idx]);
   });
 
   baneOversikt.forEach(bane => {
@@ -1897,9 +1923,6 @@ export async function triggerSluttfase(ekstraSpillerGruppe = 'topp') {
     const gruppeAIds = new Set(treningData?.kvalGruppeA ?? []);
     const gruppeBIds = new Set(treningData?.kvalGruppeB ?? []);
 
-    console.log('[triggerSluttfase] kvalGruppeA fra Firestore:', treningData?.kvalGruppeA);
-    console.log('[triggerSluttfase] kvalGruppeB fra Firestore:', treningData?.kvalGruppeB);
-
     // Nye spillere lagt til etter oppstart tildeles gruppen med færrest spillere
     unik.forEach(s => {
       if (!gruppeAIds.has(s.id) && !gruppeBIds.has(s.id)) {
@@ -1929,15 +1952,8 @@ export async function triggerSluttfase(ekstraSpillerGruppe = 'topp') {
     const toppFraB = sortertB.slice(0, halvB + (oddeB && ekstraSpillerGruppe === 'topp' ? 1 : 0));
     const bunnFraB = sortertB.slice(toppFraB.length);
 
-    console.log('[triggerSluttfase] ekstraSpillerGruppe:', ekstraSpillerGruppe);
-    console.log('[triggerSluttfase] sortertA.length:', sortertA.length, 'halvA:', halvA, 'oddeA:', oddeA);
-    console.log('[triggerSluttfase] sortertB.length:', sortertB.length, 'halvB:', halvB, 'oddeB:', oddeB);
-    console.log('[triggerSluttfase] toppFraA:', toppFraA.map(s=>s.navn), 'bunnFraA:', bunnFraA.map(s=>s.navn));
-    console.log('[triggerSluttfase] toppFraB:', toppFraB.map(s=>s.navn), 'bunnFraB:', bunnFraB.map(s=>s.navn));
-
     const toppSpillere = [...toppFraA, ...toppFraB];
     const bunnSpillere = [...bunnFraA, ...bunnFraB];
-    console.log('[triggerSluttfase] toppSpillere:', toppSpillere.map(s=>s.navn), 'bunnSpillere:', bunnSpillere.map(s=>s.navn));
     const totalt   = toppSpillere.length + bunnSpillere.length;
     const mp       = app.poengPerKamp ?? 15;
     const nyRunde  = app.runde + 1;
