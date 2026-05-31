@@ -1926,6 +1926,12 @@ export async function triggerSluttfase(ekstraSpillerGruppe = 'topp') {
     const toppFraB = sortertB.slice(0, halvB + (oddeB && ekstraSpillerGruppe === 'topp' ? 1 : 0));
     const bunnFraB = sortertB.slice(toppFraB.length);
 
+    console.log('[triggerSluttfase] ekstraSpillerGruppe:', ekstraSpillerGruppe);
+    console.log('[triggerSluttfase] sortertA.length:', sortertA.length, 'halvA:', halvA, 'oddeA:', oddeA);
+    console.log('[triggerSluttfase] sortertB.length:', sortertB.length, 'halvB:', halvB, 'oddeB:', oddeB);
+    console.log('[triggerSluttfase] toppFraA:', toppFraA.map(s=>s.navn), 'bunnFraA:', bunnFraA.map(s=>s.navn));
+    console.log('[triggerSluttfase] toppFraB:', toppFraB.map(s=>s.navn), 'bunnFraB:', bunnFraB.map(s=>s.navn));
+
     const toppSpillere = [...toppFraA, ...toppFraB];
     const bunnSpillere = [...bunnFraA, ...bunnFraB];
     const totalt   = toppSpillere.length + bunnSpillere.length;
