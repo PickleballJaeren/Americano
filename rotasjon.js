@@ -450,7 +450,7 @@ export function lagMixKampoppsett(
     spillere, antallHvilere, sitOutCount, lastSitOutRunde, runde,
   );
 
-  if (aktive.length < 4) return { baneOversikt: [], hviler };\
+  if (aktive.length < 4) return { baneOversikt: [], hviler };
 
   // ── Finn optimal matching ──
   // Hvis ekstraBaneNr er satt: én av de aktive spillerne skal plasseres som
