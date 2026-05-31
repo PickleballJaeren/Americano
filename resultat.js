@@ -220,17 +220,25 @@ export async function visRundeResultat() {
       const tittelB = erSluttfase ? '🤝 Nedrykkgruppe'  : '🔵 Gruppe B';
       const fargeA  = 'var(--green2)';
       const fargeB  = 'var(--accent2)';
-      // Bygg oppslag fra ventelisten — spillere lagt til midt i økten har
-      // kvalGruppe: 'A'/'B' på ventelisteobjektet men mangler i app.kvalGruppeA/B.
-      // Sjekk dette FØR fallback på gruppestørrelse, ellers havner de i feil gruppe.
+      // Bygg oppslag fra ventelisten for spillere som ikke er i noen gruppe ennå.
+      // I innledningsfase: les kvalGruppe ('A'/'B').
+      // I sluttfase: les kvalSluttGruppe ('topp'/'bunn') — feltet er forskjellig!
       const ventelisteGruppe = {};
       (app.venteliste ?? []).forEach(s => {
-        if (s?.id && s.kvalGruppe) ventelisteGruppe[s.id] = s.kvalGruppe;
+        if (!s?.id) return;
+        if (erSluttfase && s.kvalSluttGruppe) ventelisteGruppe[s.id] = s.kvalSluttGruppe;
+        else if (!erSluttfase && s.kvalGruppe) ventelisteGruppe[s.id] = s.kvalGruppe;
       });
       sammenlagt.forEach(s => {
         if (gruppeAIds.has(s.spillerId) || gruppeBIds.has(s.spillerId)) return;
-        if (ventelisteGruppe[s.spillerId] === 'B') { gruppeBIds.add(s.spillerId); return; }
-        if (ventelisteGruppe[s.spillerId] === 'A') { gruppeAIds.add(s.spillerId); return; }
+        if (erSluttfase) {
+          // Sluttfase: 'topp' → opprykksgruppe (A), 'bunn' → nedrykkgruppe (B)
+          if (ventelisteGruppe[s.spillerId] === 'topp') { gruppeAIds.add(s.spillerId); return; }
+          if (ventelisteGruppe[s.spillerId] === 'bunn') { gruppeBIds.add(s.spillerId); return; }
+        } else {
+          if (ventelisteGruppe[s.spillerId] === 'B') { gruppeBIds.add(s.spillerId); return; }
+          if (ventelisteGruppe[s.spillerId] === 'A') { gruppeAIds.add(s.spillerId); return; }
+        }
         if (gruppeAIds.size <= gruppeBIds.size) gruppeAIds.add(s.spillerId);
         else gruppeBIds.add(s.spillerId);
       });
@@ -443,17 +451,24 @@ async function visMixLiveTabell() {
       const tittelB = erSluttfase ? '🤝 Nedrykkgruppe'  : '🔵 Gruppe B';
       const fargeA  = 'var(--green2)';
       const fargeB  = 'var(--accent2)';
-      // Bygg oppslag fra ventelisten — spillere lagt til midt i økten har
-      // kvalGruppe: 'A'/'B' på ventelisteobjektet men mangler i app.kvalGruppeA/B.
-      // Sjekk dette FØR fallback på gruppestørrelse, ellers havner de i feil gruppe.
+      // Bygg oppslag fra ventelisten for spillere som ikke er i noen gruppe ennå.
+      // I innledningsfase: les kvalGruppe ('A'/'B').
+      // I sluttfase: les kvalSluttGruppe ('topp'/'bunn') — feltet er forskjellig!
       const ventelisteGruppe = {};
       (app.venteliste ?? []).forEach(s => {
-        if (s?.id && s.kvalGruppe) ventelisteGruppe[s.id] = s.kvalGruppe;
+        if (!s?.id) return;
+        if (erSluttfase && s.kvalSluttGruppe) ventelisteGruppe[s.id] = s.kvalSluttGruppe;
+        else if (!erSluttfase && s.kvalGruppe) ventelisteGruppe[s.id] = s.kvalGruppe;
       });
       sammenlagt.forEach(s => {
         if (gruppeAIds.has(s.spillerId) || gruppeBIds.has(s.spillerId)) return;
-        if (ventelisteGruppe[s.spillerId] === 'B') { gruppeBIds.add(s.spillerId); return; }
-        if (ventelisteGruppe[s.spillerId] === 'A') { gruppeAIds.add(s.spillerId); return; }
+        if (erSluttfase) {
+          if (ventelisteGruppe[s.spillerId] === 'topp') { gruppeAIds.add(s.spillerId); return; }
+          if (ventelisteGruppe[s.spillerId] === 'bunn') { gruppeBIds.add(s.spillerId); return; }
+        } else {
+          if (ventelisteGruppe[s.spillerId] === 'B') { gruppeBIds.add(s.spillerId); return; }
+          if (ventelisteGruppe[s.spillerId] === 'A') { gruppeAIds.add(s.spillerId); return; }
+        }
         if (gruppeAIds.size <= gruppeBIds.size) gruppeAIds.add(s.spillerId);
         else gruppeBIds.add(s.spillerId);
       });
