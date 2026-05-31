@@ -107,6 +107,15 @@ export function startLyttere(callbacks = {}) {
       app.baneOversikt = data.baneOversikt  ?? [];
       app.venteliste   = data.venteliste    ?? [];
 
+      // Synkroniser gruppe-lister fra Firestore — disse kan endres av
+      // _lagreRedigerBaner() og bekreftNesteRunde() på andre enheter
+      // eller etter gjenoppretting. Uten dette leser resultat.js og
+      // trening.js utdaterte grupper fra minnet.
+      if (data.kvalGruppeA  !== undefined) app.kvalGruppeA  = data.kvalGruppeA;
+      if (data.kvalGruppeB  !== undefined) app.kvalGruppeB  = data.kvalGruppeB;
+      if (data.mixAbGruppeA !== undefined) app.mixAbGruppeA = data.mixAbGruppeA;
+      if (data.mixAbGruppeB !== undefined) app.mixAbGruppeB = data.mixAbGruppeB;
+
       callbacks.onOktOppdatert?.(data);
 
       // Økt avsluttet av admin — naviger alle til sluttresultat
