@@ -1897,6 +1897,9 @@ export async function triggerSluttfase(ekstraSpillerGruppe = 'topp') {
     const gruppeAIds = new Set(treningData?.kvalGruppeA ?? []);
     const gruppeBIds = new Set(treningData?.kvalGruppeB ?? []);
 
+    console.log('[triggerSluttfase] kvalGruppeA fra Firestore:', treningData?.kvalGruppeA);
+    console.log('[triggerSluttfase] kvalGruppeB fra Firestore:', treningData?.kvalGruppeB);
+
     // Nye spillere lagt til etter oppstart tildeles gruppen med færrest spillere
     unik.forEach(s => {
       if (!gruppeAIds.has(s.id) && !gruppeBIds.has(s.id)) {
