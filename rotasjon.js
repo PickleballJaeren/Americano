@@ -447,8 +447,14 @@ export function lagMixKampoppsett(
   // ── Bygg baneOversikt ──
   const idTilSpiller = Object.fromEntries(spillere.map(s => [s.id, s]));
 
+  // Bland bane-numrene tilfeldig slik at 5-spillerbanen (håndtert av admin
+  // via redigeringsmodalen) ikke systematisk havner på bane 1 hver runde.
+  // Selve spillerfordelingen (hvem spiller med hvem) er uendret — kun
+  // hvilken bane-etikett (1, 2, 3...) hvert kamppar får er tilfeldig.
+  const baneNumre = blandArray([...Array(antallBaner).keys()].map(i => i + 1));
+
   const baneOversikt = kamper.slice(0, antallBaner).map(([par1, par2], i) => ({
-    baneNr:    i + 1,
+    baneNr:    baneNumre[i],
     maksPoeng: poengPerKamp,
     erDobbel:  true,
     erSingel:  false,
@@ -456,7 +462,7 @@ export function lagMixKampoppsett(
       const s = idTilSpiller[id];
       return { id, navn: s?.navn ?? 'Ukjent', rating: s?.rating ?? STARTRATING };
     }),
-  }));
+  })).sort((a, b) => a.baneNr - b.baneNr);
 
   return { baneOversikt, hviler };
 }
