@@ -578,6 +578,8 @@ export async function bekreftNesteRunde() {
         statistikkA, statistikkB,
         banerA, banerB,
         nyRunde, app.poengPerKamp ?? 15,
+        treningData?.mixEkstraBane != null && treningData.mixEkstraBane <= banerA ? treningData.mixEkstraBane : null,
+        treningData?.mixEkstraBane != null && treningData.mixEkstraBane > banerA  ? treningData.mixEkstraBane : null,
       );
 
       const nyBaneOversikt = res.baneOversikt;
@@ -730,7 +732,8 @@ export async function bekreftNesteRunde() {
             sitOutCount, lastSitOutRunde,
             app.baneOversikt.length,
             nyRunde,
-            mp
+            mp,
+            treningData?.mixEkstraBane ?? null,
           );
           nyBaneOversikt = resultat.baneOversikt;
           nyVenteliste   = resultat.hviler ?? [];
@@ -823,7 +826,10 @@ export async function bekreftNesteRunde() {
       const hvilerB = [...(app.venteliste ?? []).filter(s => gruppeBIds.has(s.id)), ...baneHvilereB];
       oppdaterMixStatistikk(baneOversiktA, hvilerA, statistikkA.playedWith, statistikkA.playedAgainst, statistikkA.gamesPlayed, statistikkA.sitOutCount, statistikkA.lastSitOutRunde, app.runde);
       oppdaterMixStatistikk(baneOversiktB, hvilerB, statistikkB.playedWith, statistikkB.playedAgainst, statistikkB.gamesPlayed, statistikkB.sitOutCount, statistikkB.lastSitOutRunde, app.runde);
-      const res = lagMixABKampoppsett(spillereA, spillereB, statistikkA, statistikkB, banerA, banerB, nyRunde, app.poengPerKamp ?? 15);
+      const res = lagMixABKampoppsett(spillereA, spillereB, statistikkA, statistikkB, banerA, banerB, nyRunde, app.poengPerKamp ?? 15,
+        treningData?.mixEkstraBane != null && treningData.mixEkstraBane <= banerA ? treningData.mixEkstraBane : null,
+        treningData?.mixEkstraBane != null && treningData.mixEkstraBane > banerA  ? treningData.mixEkstraBane : null,
+      );
       const nyBaneOversikt = res.baneOversikt;
       const nyVenteliste   = [
         ...(res.hvilerA ?? []).map(s => ({ ...s, kvalGruppe: 'A' })),
@@ -886,7 +892,10 @@ export async function bekreftNesteRunde() {
       const hvilerB = [...(app.venteliste ?? []).filter(s => bunnIds.has(s.id)), ...baneHvilereBS];
       oppdaterMixStatistikk(baneOversiktA, hvilerA, statistikkA.playedWith, statistikkA.playedAgainst, statistikkA.gamesPlayed, statistikkA.sitOutCount, statistikkA.lastSitOutRunde, app.runde);
       oppdaterMixStatistikk(baneOversiktB, hvilerB, statistikkB.playedWith, statistikkB.playedAgainst, statistikkB.gamesPlayed, statistikkB.sitOutCount, statistikkB.lastSitOutRunde, app.runde);
-      const res = lagMixABKampoppsett(spillereTopp, spillereBunn, statistikkA, statistikkB, banerA, banerB, nyRunde, app.poengPerKamp ?? 15);
+      const res = lagMixABKampoppsett(spillereTopp, spillereBunn, statistikkA, statistikkB, banerA, banerB, nyRunde, app.poengPerKamp ?? 15,
+        treningData?.mixEkstraBane != null && treningData.mixEkstraBane <= banerA ? treningData.mixEkstraBane : null,
+        treningData?.mixEkstraBane != null && treningData.mixEkstraBane > banerA  ? treningData.mixEkstraBane : null,
+      );
       const nyBaneOversikt = res.baneOversikt;
       const nyVenteliste   = [
         ...(res.hvilerA ?? []).map(s => ({ ...s, kvalSluttGruppe: 'topp' })),

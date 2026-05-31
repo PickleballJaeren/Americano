@@ -426,11 +426,23 @@ export function lagMixKampoppsett(
   spillere, playedWith, playedAgainst,
   gamesPlayed, sitOutCount, lastSitOutRunde,
   antallBaner, runde, mp,
+  ekstraBaneNr = null,
 ) {
   if (!spillere?.length) return { baneOversikt: [], hviler: [] };
 
   const poengPerKamp  = mp ?? 15;
-  const plasser       = antallBaner * 4;
+
+  // Hvis admin har valgt en bestemt bane for ekstraspilleren, beregner vi
+  // antall plasser som antallBaner*4 + 1 (én bane får 5 spillere).
+  // Hvilerlogikken velger da én spiller til å hvile PÅ den banen (sitOut-runde
+  // per bane), ikke til å sitte helt ute — de resterende baner har 4 spillere.
+  // Uten ekstraBaneNr: standard atferd — alle baner har 4 spillere, overskudd hviler.
+  const harEkstra   = ekstraBaneNr != null
+    && ekstraBaneNr >= 1
+    && ekstraBaneNr <= antallBaner
+    && spillere.length === antallBaner * 4 + 1;
+
+  const plasser       = harEkstra ? antallBaner * 4 + 1 : antallBaner * 4;
   const antallHvilere = Math.max(0, spillere.length - plasser);
 
   // ── Velg hvem som hviler ──
@@ -438,33 +450,88 @@ export function lagMixKampoppsett(
     spillere, antallHvilere, sitOutCount, lastSitOutRunde, runde,
   );
 
-  if (aktive.length < 4) return { baneOversikt: [], hviler };
+  if (aktive.length < 4) return { baneOversikt: [], hviler };\
 
   // ── Finn optimal matching ──
-  const kamper = _lagOptimalMatching(aktive, playedWith, playedAgainst);
+  // Hvis ekstraBaneNr er satt: én av de aktive spillerne skal plasseres som
+  // hviler på den spesifikke banen. Vi matcher 4*(antallBaner-1) spillere normalt
+  // og setter de resterende 5 på ekstraBanen.
+  let kamper;
+  let ekstraSpiller = null;
+
+  if (harEkstra) {
+    // Velg hvilken av de 5 som hviler på ekstraBanen — den med lavest sitOutCount
+    // (samme logikk som _velgHvilere, men begrenset til disse 5 spillerne).
+    // De øvrige 4*(antallBaner-1) spillerne matches optimalt på de andre banene.
+    const ekstraBaneAktive = [...aktive];
+
+    // Sorter etter hvile-score — den med lavest score hviler denne runden på banen
+    const scorert = ekstraBaneAktive.map(s => ({
+      s,
+      score: (sitOutCount[s.id] ?? 0) * MIX_HVILE_SITOUT_VEKT
+           + (lastSitOutRunde[s.id] ?? 0) * MIX_HVILE_ALDER_VEKT
+           + Math.random() * MIX_TIEBREAKER_STØY,
+    })).sort((a, b) => a.score - b.score);
+
+    // Lavest score hviler på banen — de resterende matches optimalt
+    ekstraSpiller        = scorert[0].s;
+    const tilMatching    = scorert.slice(1).map(x => x.s);
+    kamper               = _lagOptimalMatching(tilMatching, playedWith, playedAgainst);
+  } else {
+    kamper = _lagOptimalMatching(aktive, playedWith, playedAgainst);
+  }
+
   if (!kamper) return { baneOversikt: [], hviler };
 
   // ── Bygg baneOversikt ──
   const idTilSpiller = Object.fromEntries(spillere.map(s => [s.id, s]));
 
-  // Bland bane-numrene tilfeldig slik at 5-spillerbanen (håndtert av admin
-  // via redigeringsmodalen) ikke systematisk havner på bane 1 hver runde.
-  // Selve spillerfordelingen (hvem spiller med hvem) er uendret — kun
-  // hvilken bane-etikett (1, 2, 3...) hvert kamppar får er tilfeldig.
-  const baneNumre = blandArray([...Array(antallBaner).keys()].map(i => i + 1));
+  // Bland bane-numrene tilfeldig — men bevar ekstraBaneNr sin posisjon
+  // ved å trekke ut de resterende banene og blande dem.
+  let andreNumre;
+  if (harEkstra) {
+    andreNumre = blandArray(
+      [...Array(antallBaner).keys()].map(i => i + 1).filter(n => n !== ekstraBaneNr)
+    );
+  } else {
+    andreNumre = blandArray([...Array(antallBaner).keys()].map(i => i + 1));
+  }
 
-  const baneOversikt = kamper.slice(0, antallBaner).map(([par1, par2], i) => ({
-    baneNr:    baneNumre[i],
-    maksPoeng: poengPerKamp,
-    erDobbel:  true,
-    erSingel:  false,
-    spillere:  [...par1, ...par2].map(id => {
-      const s = idTilSpiller[id];
-      return { id, navn: s?.navn ?? 'Ukjent', rating: s?.rating ?? STARTRATING };
-    }),
-  })).sort((a, b) => a.baneNr - b.baneNr);
+  const baneOversikt = kamper.slice(0, harEkstra ? antallBaner - 1 : antallBaner)
+    .map(([par1, par2], i) => ({
+      baneNr:    harEkstra ? andreNumre[i] : andreNumre[i],
+      maksPoeng: poengPerKamp,
+      erDobbel:  true,
+      erSingel:  false,
+      spillere:  [...par1, ...par2].map(id => {
+        const s = idTilSpiller[id];
+        return { id, navn: s?.navn ?? 'Ukjent', rating: s?.rating ?? STARTRATING };
+      }),
+    }));
 
-  return { baneOversikt, hviler };
+  // Legg til ekstra-banen med 5 spillere (4 aktive + 1 hviler på banen)
+  if (harEkstra && ekstraSpiller) {
+    // Hent de 4 spillerne på ekstraBaneNr — siste kamp i listen
+    const ekstraKamp = kamper[antallBaner - 1];
+    if (ekstraKamp) {
+      const [par1, par2] = ekstraKamp;
+      baneOversikt.push({
+        baneNr:    ekstraBaneNr,
+        maksPoeng: poengPerKamp,
+        erDobbel:  true,
+        erSingel:  false,
+        spillere:  [...par1, ...par2, ekstraSpiller.id].map(id => {
+          const s = idTilSpiller[id];
+          return { id, navn: s?.navn ?? 'Ukjent', rating: s?.rating ?? STARTRATING };
+        }),
+      });
+    }
+  }
+
+  return {
+    baneOversikt: baneOversikt.sort((a, b) => a.baneNr - b.baneNr),
+    hviler,
+  };
 }
 
 /** Oppdaterer Mix-statistikk in-place etter en runde. */
@@ -690,6 +757,7 @@ export function lagMixABKampoppsett(
   statistikkA, statistikkB,
   antallBanerA, antallBanerB,
   runde, mp = 15,
+  ekstraBaneNrA = null, ekstraBaneNrB = null,
 ) {
   // Gruppe A — bane 1..antallBanerA
   const resA = lagMixKampoppsett(
@@ -702,9 +770,12 @@ export function lagMixABKampoppsett(
     antallBanerA,
     runde,
     mp,
+    ekstraBaneNrA,
   );
 
   // Gruppe B — bane (antallBanerA+1)..(antallBanerA+antallBanerB)
+  // ekstraBaneNrB er relativt til gruppe B (1-basert), konverteres til absolutt nedenfor
+  const ekstraBRelativ = ekstraBaneNrB != null ? ekstraBaneNrB - antallBanerA : null;
   const resB = lagMixKampoppsett(
     spillereB,
     statistikkB.playedWith      ?? {},
@@ -715,6 +786,7 @@ export function lagMixABKampoppsett(
     antallBanerB,
     runde,
     mp,
+    ekstraBRelativ,
   );
 
   // Renummer B-banene slik at de fortsetter etter A-banene

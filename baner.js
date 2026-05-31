@@ -1648,15 +1648,24 @@ window._lagreRedigerBaner = async function() {
       _redigerBaner.forEach(b => { b.maksPoeng = mp; });
     }
 
-    // Oppdater baneOversikt i treningsdokumentet
+    // Oppdater baneOversikt i treningsdokumentet.
+    // Hvis én bane har 5 spillere i Mix-modus, lagres baneNr som mixEkstraBane
+    // slik at bekreftNesteRunde() kan sende den videre til lagMixKampoppsett().
+    // Sett til null om ingen bane har 5 spillere (tilbake til tilfeldig fordeling).
+    const ekstraBane5 = erMixEllerKval()
+      ? (_redigerBaner.find(b => (b.spillere?.length ?? 0) === 5)?.baneNr ?? null)
+      : null;
+
     batch.update(doc(db, SAM.TRENINGER, app.treningId), {
       baneOversikt:         _redigerBaner,
       sisteAktivitetDato:   serverTimestamp(),
+      ...(erMixEllerKval() ? { mixEkstraBane: ekstraBane5 } : {}),
     });
 
     await batch.commit();
 
-    app.baneOversikt = _redigerBaner;
+    app.baneOversikt  = _redigerBaner;
+    if (erMixEllerKval()) app.mixEkstraBane = ekstraBane5;
     kampStatusCache  = {};
     if (spillereEndret) _startKampLytter();
     _lukkRedigerModal();
