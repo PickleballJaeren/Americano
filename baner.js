@@ -1656,10 +1656,102 @@ window._lagreRedigerBaner = async function() {
       ? (_redigerBaner.find(b => (b.spillere?.length ?? 0) === 5)?.baneNr ?? null)
       : null;
 
+    // ── Beregn gruppe-tildeling FØR batch.commit() ────────────────────────────
+    // Kritisk: gruppe-feltene må skrives i SAMME batch som baneOversikt.
+    // Tidligere ble dette gjort i en separat updateDoc() etterpå, noe som
+    // skapte et race condition der UI-et ble oppdatert før gruppene var skrevet.
+    // Resultat: resultattabellen leste utdaterte grupper og tildelte feil gruppe.
+    let gruppeOppdatering = {};
+    if (erMixEllerKval() && spillereEndret) {
+      try {
+        const tRef   = doc(db, SAM.TRENINGER, app.treningId);
+        const tSnap  = await getDoc(tRef);
+        if (tSnap.exists()) {
+          const td         = tSnap.data();
+          const erKvalModus = erKval();
+
+          const sitOutA    = { ...(erKvalModus ? (td.kvalSitOutCountA  ?? {}) : (td.mixAbSitOutCountA  ?? {})) };
+          const lastSitA   = { ...(erKvalModus ? (td.kvalLastSitOutRundeA ?? {}) : (td.mixAbLastSitOutRundeA ?? {})) };
+          const sitOutB    = { ...(erKvalModus ? (td.kvalSitOutCountB  ?? {}) : (td.mixAbSitOutCountB  ?? {})) };
+          const lastSitB   = { ...(erKvalModus ? (td.kvalLastSitOutRundeB ?? {}) : (td.mixAbLastSitOutRundeB ?? {})) };
+          const gruppeAIds = new Set(erKvalModus ? (td.kvalGruppeA ?? []) : (td.mixAbGruppeA ?? []));
+          const gruppeBIds = new Set(erKvalModus ? (td.kvalGruppeB ?? []) : (td.mixAbGruppeB ?? []));
+
+          // Nye spillere = de som ikke finnes i noen gruppe i Firestore ennå
+          const gamleIds = new Set([...gruppeAIds, ...gruppeBIds]);
+
+          const banerA = erKvalModus
+            ? (td.kvalBanerA ?? Math.ceil((app.baneOversikt ?? []).length / 2))
+            : (td.mixAbBanerA ?? app.mixAbBanerA ?? Math.ceil((app.baneOversikt ?? []).length / 2));
+
+          // Hvilken bane havnet hver ny spiller på?
+          const nySpillerBaneNr = {};
+          _redigerBaner.forEach(bane => {
+            (bane.spillere ?? []).forEach(s => {
+              if (!gamleIds.has(s.id)) nySpillerBaneNr[s.id] = bane.baneNr;
+            });
+          });
+
+          const snittSitOut = (obj) => {
+            const v = Object.values(obj);
+            return v.length ? Math.round(v.reduce((s, x) => s + x, 0) / v.length) : 1;
+          };
+
+          let endret = false;
+          _redigerBaner.flatMap(b => b.spillere ?? []).forEach(s => {
+            if (gamleIds.has(s.id)) return;
+            const baneNr = nySpillerBaneNr[s.id] ?? 999;
+            const tilA   = baneNr <= banerA;
+            if (tilA) {
+              gruppeAIds.add(s.id);
+              sitOutA[s.id]  = snittSitOut(sitOutA);
+              lastSitA[s.id] = app.runde;
+            } else {
+              gruppeBIds.add(s.id);
+              sitOutB[s.id]  = snittSitOut(sitOutB);
+              lastSitB[s.id] = app.runde;
+            }
+            endret = true;
+          });
+
+          if (endret) {
+            gruppeOppdatering = erKvalModus ? {
+              kvalGruppeA:          [...gruppeAIds],
+              kvalGruppeB:          [...gruppeBIds],
+              kvalSitOutCountA:     sitOutA,
+              kvalLastSitOutRundeA: lastSitA,
+              kvalSitOutCountB:     sitOutB,
+              kvalLastSitOutRundeB: lastSitB,
+            } : {
+              mixAbGruppeA:          [...gruppeAIds],
+              mixAbGruppeB:          [...gruppeBIds],
+              mixAbSitOutCountA:     sitOutA,
+              mixAbLastSitOutRundeA: lastSitA,
+              mixAbSitOutCountB:     sitOutB,
+              mixAbLastSitOutRundeB: lastSitB,
+            };
+
+            // Synkroniser minnet umiddelbart — onSnapshot kan komme senere
+            if (erKvalModus) {
+              app.kvalGruppeA = [...gruppeAIds];
+              app.kvalGruppeB = [...gruppeBIds];
+            } else {
+              app.mixAbGruppeA = [...gruppeAIds];
+              app.mixAbGruppeB = [...gruppeBIds];
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[redigerBaner] gruppe-beregning feilet:', e?.message ?? e);
+      }
+    }
+
+    // Alle feltene skrives i én atomisk batch — ingen race condition mulig
     batch.update(doc(db, SAM.TRENINGER, app.treningId), {
-      baneOversikt:         _redigerBaner,
-      sisteAktivitetDato:   serverTimestamp(),
+      baneOversikt:       _redigerBaner,
+      sisteAktivitetDato: serverTimestamp(),
       ...(erMixEllerKval() ? { mixEkstraBane: ekstraBane5 } : {}),
+      ...gruppeOppdatering,
     });
 
     await batch.commit();
@@ -1672,135 +1764,7 @@ window._lagreRedigerBaner = async function() {
     visBaner();
     visMelding('Banefordeling oppdatert ✓');
 
-    // ── FIX: Registrer «hvil» for nye spillere i Mix/Opprykk-modus ────────────
-    // Når en spiller legges direkte til via rediger-bane-modalen (ikke via
-    // venteliste + leggTilSpillerIOkt), vet ikke rotasjonsalgoritmen at spilleren
-    // sto over inneværende runde. sitOutCount for dem er 0, og neste runde vil
-    // algoritmen velge dem til å hvile igjen fordi alle andre har sitOutCount ≥ 1.
-    //
-    // Løsning: hent treningsdokumentet og skriv sitOutCount = 1 og
-    // lastSitOutRunde = gjeldende runde for spillere som er nye i baneoppsettet
-    // og mangler i statistikken. Kjøres etter batch.commit() for konsistens,
-    // men er ikke-kritisk (fanget av catch).
-    if (erMixEllerKval() && spillereEndret) {
-      try {
-        const tRef   = doc(db, SAM.TRENINGER, app.treningId);
-        const tSnap  = await getDoc(tRef);
-        if (tSnap.exists()) {
-          const td = tSnap.data();
-          const erKvalModus = erKval();
-
-          const sitOutA  = { ...(erKvalModus ? (td.kvalSitOutCountA  ?? {}) : (td.mixAbSitOutCountA  ?? {})) };
-          const lastSitA = { ...(erKvalModus ? (td.kvalLastSitOutRundeA ?? {}) : (td.mixAbLastSitOutRundeA ?? {})) };
-          const sitOutB  = { ...(erKvalModus ? (td.kvalSitOutCountB  ?? {}) : (td.mixAbSitOutCountB  ?? {})) };
-          const lastSitB = { ...(erKvalModus ? (td.kvalLastSitOutRundeB ?? {}) : (td.mixAbLastSitOutRundeB ?? {})) };
-          const gruppeAIds = new Set(erKvalModus ? (td.kvalGruppeA ?? []) : (td.mixAbGruppeA ?? []));
-          const gruppeBIds = new Set(erKvalModus ? (td.kvalGruppeB ?? []) : (td.mixAbGruppeB ?? []));
-
-          // Finn nye spillere: de som ikke er i noen gruppe i Firestore ennå.
-          // Bruker Firestore-gruppene (ikke gamleIds fra baneOversikt) fordi
-          // leggTilSpillerIOkt kan ha lagt spilleren til baneOversikt allerede,
-          // slik at han ville vært i gamleIds og ikke blitt behandlet som ny.
-          const gamleIds = new Set([...gruppeAIds, ...gruppeBIds]);
-
-          let endret = false;
-
-          // Bygg et oppslag: hvilken bane havnet hver ny spiller på?
-          // Brukes til å avgjøre gruppe A vs B basert på baneplassering,
-          // ikke på gruppestørrelse som ville gitt feil resultat ved likt antall.
-          const nySpillerBaneNr = {};
-          _redigerBaner.forEach(bane => {
-            (bane.spillere ?? []).forEach(s => {
-              if (!gamleIds.has(s.id)) nySpillerBaneNr[s.id] = bane.baneNr;
-            });
-          });
-          const banerA = erKvalModus
-            ? (td.kvalBanerA ?? Math.ceil((app.baneOversikt ?? []).length / 2))
-            : (td.mixAbBanerA ?? app.mixAbBanerA ?? Math.ceil((app.baneOversikt ?? []).length / 2));
-
-          _redigerBaner.flatMap(b => b.spillere ?? []).forEach(s => {
-            if (gamleIds.has(s.id)) return; // ikke ny — hopp over
-
-            // Beregn gruppegjennomsnitt for sitOutCount slik at den nye spilleren
-            // ikke systematisk velges til å hvile de neste rundene.
-            const snittSitOut = (sitOutObj) => {
-              const verdier = Object.values(sitOutObj);
-              if (!verdier.length) return 1;
-              return Math.round(verdier.reduce((s, v) => s + v, 0) / verdier.length);
-            };
-
-            // Bestem gruppe basert på hvilken bane spilleren ble plassert på.
-            // Bane 1..banerA = gruppe A, bane (banerA+1).. = gruppe B.
-            // Dette respekterer admin sitt valg fremfor å gjette fra gruppestørrelse.
-            const placertPaaBaneNr = nySpillerBaneNr[s.id] ?? 999;
-            const skalVaereIGruppeA = placertPaaBaneNr <= banerA;
-
-            if (gruppeAIds.has(s.id)) {
-              if (!(s.id in sitOutA)) {
-                sitOutA[s.id]  = snittSitOut(sitOutA);
-                lastSitA[s.id] = app.runde;
-                endret = true;
-              }
-            } else if (gruppeBIds.has(s.id)) {
-              if (!(s.id in sitOutB)) {
-                sitOutB[s.id]  = snittSitOut(sitOutB);
-                lastSitB[s.id] = app.runde;
-                endret = true;
-              }
-            } else {
-              // Spiller er ikke i noen gruppe ennå — tildel basert på bane.
-              if (skalVaereIGruppeA) {
-                gruppeAIds.add(s.id);
-                sitOutA[s.id]  = snittSitOut(sitOutA);
-                lastSitA[s.id] = app.runde;
-              } else {
-                gruppeBIds.add(s.id);
-                sitOutB[s.id]  = snittSitOut(sitOutB);
-                lastSitB[s.id] = app.runde;
-              }
-              endret = true;
-            }
-          });
-
-          if (endret) {
-            await updateDoc(tRef, erKvalModus ? {
-              kvalSitOutCountA:     sitOutA,
-              kvalLastSitOutRundeA: lastSitA,
-              kvalSitOutCountB:     sitOutB,
-              kvalLastSitOutRundeB: lastSitB,
-              kvalGruppeA:          [...gruppeAIds],
-              kvalGruppeB:          [...gruppeBIds],
-            } : {
-              mixAbSitOutCountA:     sitOutA,
-              mixAbLastSitOutRundeA: lastSitA,
-              mixAbSitOutCountB:     sitOutB,
-              mixAbLastSitOutRundeB: lastSitB,
-              mixAbGruppeA:          [...gruppeAIds],
-              mixAbGruppeB:          [...gruppeBIds],
-            });
-
-            // Synkroniser minnevariabler med Firestore — uten dette leser
-            // resultat.js og trening.js utdaterte grupper og tildeler ny
-            // spiller feil gruppe via fallback-logikken.
-            if (erKvalModus) {
-              app.kvalGruppeA = [...gruppeAIds];
-              app.kvalGruppeB = [...gruppeBIds];
-            } else {
-              app.mixAbGruppeA = [...gruppeAIds];
-              app.mixAbGruppeB = [...gruppeBIds];
-            }
-          }
-        }
-      } catch (statistikkFeil) {
-        // Ikke kritisk — rotasjonen fungerer uten dette, spilleren kan hvile én gang ekstra
-        console.warn('[redigerBaner] Kunne ikke oppdatere sit-out statistikk:', statistikkFeil?.message ?? statistikkFeil);
-      }
-    }
-
-    // ── FIX: Registrer sitOutCount for nye spillere i vanlig Mix-modus ────────
-    // Same problem som for Mix A/B og Opprykk, men for plain Mix:
-    // nye spillere har sitOutCount = 0 og blir systematisk valgt til å hvile.
-    // Løsning: sett til gjennomsnitt av eksisterende spillere i rotasjonen.
+    // ── Registrer sitOutCount for nye spillere i vanlig Mix-modus ────────────
     if (erMix() && !erKval() && spillereEndret) {
       const gamleIds = new Set(
         JSON.parse(spillereSomFor).flatMap(b => b.ids ?? [])
