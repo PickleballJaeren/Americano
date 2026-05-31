@@ -1683,12 +1683,6 @@ window._lagreRedigerBaner = async function() {
     // og mangler i statistikken. Kjøres etter batch.commit() for konsistens,
     // men er ikke-kritisk (fanget av catch).
     if (erMixEllerKval() && spillereEndret) {
-      // spillereSomFor er JSON-strengen med de opprinnelige spillerne (baneNr + ids[]).
-      // app.baneOversikt er nå = _redigerBaner (ny tilstand), så vi kan ikke bruke
-      // app.baneOversikt til å finne de gamle spillerne. Parse spillereSomFor i stedet.
-      const gamleIds = new Set(
-        JSON.parse(spillereSomFor).flatMap(b => b.ids ?? [])
-      );
       try {
         const tRef   = doc(db, SAM.TRENINGER, app.treningId);
         const tSnap  = await getDoc(tRef);
@@ -1702,6 +1696,12 @@ window._lagreRedigerBaner = async function() {
           const lastSitB = { ...(erKvalModus ? (td.kvalLastSitOutRundeB ?? {}) : (td.mixAbLastSitOutRundeB ?? {})) };
           const gruppeAIds = new Set(erKvalModus ? (td.kvalGruppeA ?? []) : (td.mixAbGruppeA ?? []));
           const gruppeBIds = new Set(erKvalModus ? (td.kvalGruppeB ?? []) : (td.mixAbGruppeB ?? []));
+
+          // Finn nye spillere: de som ikke er i noen gruppe i Firestore ennå.
+          // Bruker Firestore-gruppene (ikke gamleIds fra baneOversikt) fordi
+          // leggTilSpillerIOkt kan ha lagt spilleren til baneOversikt allerede,
+          // slik at han ville vært i gamleIds og ikke blitt behandlet som ny.
+          const gamleIds = new Set([...gruppeAIds, ...gruppeBIds]);
 
           let endret = false;
 

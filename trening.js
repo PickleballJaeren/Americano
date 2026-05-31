@@ -553,8 +553,8 @@ export async function bekreftNesteRunde() {
         .filter(b => (b.spillere?.length ?? 0) === 5)
         .map(b => b.spillere[4]).filter(Boolean);
       const forrigeHvilere = [...(app.venteliste ?? []), ...baneHvilere];
-      const baneOversiktA = gjeldBaneOversikt.filter((_, i) => i < banerA);
-      const baneOversiktB = gjeldBaneOversikt.filter((_, i) => i >= banerA);
+      const baneOversiktA = gjeldBaneOversikt.filter(b => b.baneNr <= banerA);
+      const baneOversiktB = gjeldBaneOversikt.filter(b => b.baneNr > banerA);
       const baneHvilereAB_A = baneOversiktA.filter(b => (b.spillere?.length ?? 0) === 5).map(b => b.spillere[4]).filter(Boolean);
       const baneHvilereAB_B = baneOversiktB.filter(b => (b.spillere?.length ?? 0) === 5).map(b => b.spillere[4]).filter(Boolean);
       const hvilerA = [...forrigeHvilere.filter(s => gruppeAIds.has(s.id)), ...baneHvilereAB_A];
@@ -818,8 +818,8 @@ export async function bekreftNesteRunde() {
       });
       const spillereA = alleSpillere.filter(s => gruppeAIds.has(s.id));
       const spillereB = alleSpillere.filter(s => gruppeBIds.has(s.id));
-      const baneOversiktA = (app.baneOversikt ?? []).filter((_, i) => i < banerA);
-      const baneOversiktB = (app.baneOversikt ?? []).filter((_, i) => i >= banerA);
+      const baneOversiktA = (app.baneOversikt ?? []).filter(b => b.baneNr <= banerA);
+      const baneOversiktB = (app.baneOversikt ?? []).filter(b => b.baneNr > banerA);
       const baneHvilereA = baneOversiktA.filter(b => (b.spillere?.length ?? 0) === 5).map(b => b.spillere[4]).filter(Boolean);
       const baneHvilereB = baneOversiktB.filter(b => (b.spillere?.length ?? 0) === 5).map(b => b.spillere[4]).filter(Boolean);
       const hvilerA = [...(app.venteliste ?? []).filter(s => gruppeAIds.has(s.id)), ...baneHvilereA];
@@ -884,8 +884,8 @@ export async function bekreftNesteRunde() {
       const spillereBunn = alleSpillere.filter(s => bunnIds.has(s.id));
       const banerA = Math.max(1, Math.round((app.baneOversikt ?? []).length * spillereTopp.length / (spillereTopp.length + spillereBunn.length)));
       const banerB = Math.max(1, (app.baneOversikt ?? []).length - banerA);
-      const baneOversiktA = (app.baneOversikt ?? []).filter((_, i) => i < banerA);
-      const baneOversiktB = (app.baneOversikt ?? []).filter((_, i) => i >= banerA);
+      const baneOversiktA = (app.baneOversikt ?? []).filter(b => b.baneNr <= banerA);
+      const baneOversiktB = (app.baneOversikt ?? []).filter(b => b.baneNr > banerA);
       const baneHvilereAS = baneOversiktA.filter(b => (b.spillere?.length ?? 0) === 5).map(b => b.spillere[4]).filter(Boolean);
       const baneHvilereBS = baneOversiktB.filter(b => (b.spillere?.length ?? 0) === 5).map(b => b.spillere[4]).filter(Boolean);
       const hvilerA = [...(app.venteliste ?? []).filter(s => toppIds.has(s.id)), ...baneHvilereAS];
