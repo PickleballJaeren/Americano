@@ -1937,6 +1937,7 @@ export async function triggerSluttfase(ekstraSpillerGruppe = 'topp') {
 
     const toppSpillere = [...toppFraA, ...toppFraB];
     const bunnSpillere = [...bunnFraA, ...bunnFraB];
+    console.log('[triggerSluttfase] toppSpillere:', toppSpillere.map(s=>s.navn), 'bunnSpillere:', bunnSpillere.map(s=>s.navn));
     const totalt   = toppSpillere.length + bunnSpillere.length;
     const mp       = app.poengPerKamp ?? 15;
     const nyRunde  = app.runde + 1;
