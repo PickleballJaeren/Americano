@@ -602,6 +602,7 @@ export async function bekreftNesteRunde() {
         mixAbGamesPlayedB:     statistikkB.gamesPlayed,
         mixAbSitOutCountB:     statistikkB.sitOutCount,
         mixAbLastSitOutRundeB: statistikkB.lastSitOutRunde,
+        mixAbGruppeA: [...gruppeAIds], mixAbGruppeB: [...gruppeBIds],
       });
       skrivMixKamper(batch, app.treningId, nyRunde, nyBaneOversikt, nyVenteliste);
       await batch.commit();
@@ -609,6 +610,8 @@ export async function bekreftNesteRunde() {
       app.runde        = nyRunde;
       app.baneOversikt = nyBaneOversikt;
       app.venteliste   = nyVenteliste;
+      app.mixAbGruppeA = [...gruppeAIds];
+      app.mixAbGruppeB = [...gruppeBIds];
       _setKampStatusCache({});
       _oppdaterRundeUI();
       _startKampLytter();
@@ -829,6 +832,7 @@ export async function bekreftNesteRunde() {
       const batch = writeBatch(db);
       batch.update(doc(db, SAM.TRENINGER, app.treningId), {
         gjeldendRunde: nyRunde, baneOversikt: nyBaneOversikt, venteliste: nyVenteliste, laast: false,
+        kvalGruppeA: [...gruppeAIds], kvalGruppeB: [...gruppeBIds],
         kvalPlayedWithA: statistikkA.playedWith, kvalPlayedAgainstA: statistikkA.playedAgainst,
         kvalGamesPlayedA: statistikkA.gamesPlayed, kvalSitOutCountA: statistikkA.sitOutCount,
         kvalLastSitOutRundeA: statistikkA.lastSitOutRunde,
@@ -839,6 +843,7 @@ export async function bekreftNesteRunde() {
       skrivMixKamper(batch, app.treningId, nyRunde, nyBaneOversikt, nyVenteliste);
       await batch.commit();
       app.runde = nyRunde; app.baneOversikt = nyBaneOversikt; app.venteliste = nyVenteliste;
+      app.kvalGruppeA = [...gruppeAIds]; app.kvalGruppeB = [...gruppeBIds];
       _setKampStatusCache({}); _oppdaterRundeUI(); _startKampLytter(); _naviger('baner');
       visMelding('Runde ' + nyRunde + ' startet — nye lag!');
       return;
@@ -890,6 +895,7 @@ export async function bekreftNesteRunde() {
       const batch = writeBatch(db);
       batch.update(doc(db, SAM.TRENINGER, app.treningId), {
         gjeldendRunde: nyRunde, baneOversikt: nyBaneOversikt, venteliste: nyVenteliste, laast: false,
+        kvalToppgruppe: [...toppIds], kvalBunngruppe: [...bunnIds],
         kvalPlayedWithA: statistikkA.playedWith, kvalPlayedAgainstA: statistikkA.playedAgainst,
         kvalGamesPlayedA: statistikkA.gamesPlayed, kvalSitOutCountA: statistikkA.sitOutCount,
         kvalLastSitOutRundeA: statistikkA.lastSitOutRunde,
@@ -900,6 +906,7 @@ export async function bekreftNesteRunde() {
       skrivMixKamper(batch, app.treningId, nyRunde, nyBaneOversikt, nyVenteliste);
       await batch.commit();
       app.runde = nyRunde; app.baneOversikt = nyBaneOversikt; app.venteliste = nyVenteliste;
+      app.kvalToppgruppe = [...toppIds]; app.kvalBunngruppe = [...bunnIds];
       _setKampStatusCache({}); _oppdaterRundeUI(); _startKampLytter(); _naviger('baner');
       visMelding('Runde ' + nyRunde + ' — opprykksrunde startet!');
       return;
