@@ -1107,9 +1107,9 @@ function _titelRad(ikon, tittel, vinner, beskrivelse) {
       <div class="lb-avatar" style="width:32px;height:32px;font-size:13px">${lagInitialer(vinner.navn)}</div>
       <div style="flex:1;min-width:0">
         <div style="font-size:14px;font-weight:600">${tittel}</div>
-        <div style="font-size:12px;color:var(--muted2)">${escHtml(vinner.navn)}</div>
+        <div style="font-size:12px;color:var(--muted2);margin-top:1px">${escHtml(vinner.navn)}</div>
+        <div style="font-size:13px;font-weight:600;color:var(--yellow);margin-top:2px">${beskrivelse(vinner)}</div>
       </div>
-      <div style="font-size:13px;font-weight:600;color:var(--yellow);text-align:right;flex-shrink:0">${beskrivelse(vinner)}</div>
     </div>`;
 }
 
