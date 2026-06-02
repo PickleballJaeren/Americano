@@ -376,9 +376,12 @@ function _renderNivådelteSeksjoner(spillere, kamper, historikkMap, periodeMs) {
   const nivåer = [NIVA.ELITE, NIVA.ETABLERT, NIVA.UTFORDRER];
   // Filtrer kamper til GOAT-perioden — Skarpskytter og Ustoppelig
   // skal kun gjelde inneværende sesong, ikke all-time.
-  const periodeKamper = periodeMs
+  const filtrerte = periodeMs
     ? kamper.filter(k => (k.dato?.toMillis?.() ?? 0) >= periodeMs)
     : kamper;
+  // Fallback til alle kamper om perioden ikke har nok data ennå
+  // (f.eks. ved sesongstart eller feil periodeStart i konfig)
+  const periodeKamper = filtrerte.length >= 3 ? filtrerte : kamper;
 
   return nivåer.map(niv => {
     const gruppe = spillere.filter(s => _nivåFor(s.rating).id === niv.id);
@@ -465,12 +468,18 @@ function _beregnUkuelig(spillere, kamper) {
   let beste = null;
   for (const s of spillere) {
     const res = resultater[s.id] ?? [];
+    // Beregn både nåværende (aktiv) streak og maks streak i perioden.
+    // Viser maks — men maks kan ikke være 0 om nåværende > 0.
+    // Fallback til all-time kamper for nåværende streak om periodeKamper er tom.
     let streak = 0, maks = 0;
     for (const vant of res) {
       if (vant) { streak++; maks = Math.max(maks, streak); }
       else streak = 0;
     }
-    if (!beste || maks > beste.streak) beste = { id: s.id, navn: s.navn, streak: maks };
+    // Bruk nåværende streak dersom ingen maks ble funnet i perioden
+    const effektiv = maks > 0 ? maks : streak;
+    if (effektiv > 0 && (!beste || effektiv > beste.streak))
+      beste = { id: s.id, navn: s.navn, streak: effektiv };
   }
   return beste;
 }
