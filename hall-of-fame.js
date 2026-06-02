@@ -928,13 +928,15 @@ async function _hentGoatKonfig(klubbId) {
 
 /** Lagrer GOAT-konfig til klubb-dokumentet. */
 async function _lagreGoatKonfig(klubbId, { periodeStart, kåringsDato, nestePeriodeStart }) {
-  await updateDoc(doc(db, 'klubber', klubbId), {
+  // setDoc med merge:true oppretter dokumentet hvis det ikke finnes ennå —
+  // updateDoc ville feilet hvis 'klubber'-samlingen mangler i Firestore.
+  await setDoc(doc(db, 'klubber', klubbId), {
     goatKonfig: {
       periodeStart:      periodeStart,
       kåringsDato:       kåringsDato,
       nestePeriodeStart: nestePeriodeStart ?? null,
     },
-  });
+  }, { merge: true });
 }
 
 /** Formatter Date til YYYY-MM-DD for input[type=date]. */
