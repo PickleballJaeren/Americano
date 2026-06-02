@@ -1446,9 +1446,9 @@ window.hofVisGOATInfo = async function() {
   const periode     = `${fmtDato(konfig.periodeStart)} – ${fmtDato(konfig.kåringsDato)}`;
 
   const titler = [
-    ['🐐', 'GOAT',    'var(--yellow)', '«Beiter på motstanderne og topper statistikken.»',                                        'Toppsjiktet (øverste 25% i rating ved periodens start). Beste totalpoeng vinner.'],
-    ['🎭', 'Jokeren', '#a78bfa',       '«Spilleren du aldri helt kan regne med – bortsett fra at han stadig overrasker.»',         'Midtsjiktet (midtre 50% i rating). Beste totalpoeng vinner.'],
-    ['⚔️', 'Krigeren','#fb923c',       '«Spilleren som møter opp, kjemper hver ball og nekter å la ratingen definere seg.»',       'Bunnsjiktet (laveste 25% i rating). Beste totalpoeng vinner.'],
+    ['🐐', 'GOAT',    'var(--yellow)', '«Beiter på motstanderne og topper statistikken.»',                                        'Spillere i øverste 25% av ratingen ved periodens start. Beste totalpoeng vinner.'],
+    ['🎭', 'Jokeren', '#a78bfa',       '«Spilleren du aldri helt kan regne med – bortsett fra at han stadig overrasker.»',         'Spillere i midtre 50% av ratingen ved periodens start. Beste totalpoeng vinner.'],
+    ['⚔️', 'Krigeren','#fb923c',       '«Spilleren som møter opp, kjemper hver ball og nekter å la ratingen definere seg.»',       'Spillere i nedre 25% av ratingen ved periodens start. Beste totalpoeng vinner.'],
   ];
 
   const komponenter = [
