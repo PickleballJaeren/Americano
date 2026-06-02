@@ -103,21 +103,41 @@ async function _hentAlleKamper(klubbId) {
   if (!spillerIds.size) return [];
 
   const gyldigeTreningIds = await _hentGyldigeTreningIds(klubbId);
+  const alleTreningIds    = await _hentAlleTreningIds(klubbId);
 
   const snap = await getDocs(query(
     collection(db, SAM.KAMPER),
     where('ferdig', '==', true)
   ));
-  const kamper = snap.docs
-    .map(d => ({ id: d.id, ...d.data() }))
-    .filter(k =>
-      k.lag1Poeng != null && k.lag2Poeng != null &&
-      gyldigeTreningIds.has(k.treningId) &&
-      spillerIds.has(k.lag1_s1) && spillerIds.has(k.lag2_s1)
-    );
+  const alleDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+  // Cache alle kamper inkl. mix separat — gjenbrukes av visHallOfFame
+  // for oppmøte-beregning uten ekstra Firestore-kall.
+  const alleInklMix = alleDocs.filter(k =>
+    k.lag1Poeng != null && k.lag2Poeng != null &&
+    alleTreningIds.has(k.treningId) &&
+    spillerIds.has(k.lag1_s1) && spillerIds.has(k.lag2_s1)
+  );
+  _cachet(`kamper_inkl_mix_${klubbId}`, alleInklMix);
+
+  const kamper = alleDocs.filter(k =>
+    k.lag1Poeng != null && k.lag2Poeng != null &&
+    gyldigeTreningIds.has(k.treningId) &&
+    spillerIds.has(k.lag1_s1) && spillerIds.has(k.lag2_s1)
+  );
 
   _cachet(nøkkel, kamper);
   return kamper;
+}
+
+/** Returnerer alle kamper inkl. mix fra cache (fylles av _hentAlleKamper). */
+async function _hentAlleKamperInklMix(klubbId) {
+  const nøkkel = `kamper_inkl_mix_${klubbId}`;
+  const cached = _fraCacheEllerNull(nøkkel);
+  if (cached) return cached;
+  // Fallback: kjør _hentAlleKamper som fyller cachen
+  await _hentAlleKamper(klubbId);
+  return _fraCacheEllerNull(nøkkel) ?? [];
 }
 
 /** Henter ratinghistorikk for én spiller. */
@@ -296,26 +316,14 @@ export async function visHallOfFame() {
   beholder.innerHTML = _lasterHTML('Laster Hall of Fame…');
 
   try {
-    const spillere   = _getSpillere();
-    const spillerIds = new Set(spillere.map(s => s.id));
-    const [kamper, historikkMap, alleTreningIds] = await Promise.all([
+    const spillere = _getSpillere();
+    // _hentAlleKamper fyller også kamper_inkl_mix-cachen i samme kall —
+    // ingen ekstra Firestore-runde for Mix-oppmøte-beregningen.
+    const [kamper, historikkMap, alleKamperInklMix] = await Promise.all([
       _hentAlleKamper(klubbId),
       _hentHistorikkForAlle(spillere),
-      _hentAlleTreningIds(klubbId),
+      _hentAlleKamperInklMix(klubbId),
     ]);
-
-    // Hent alle kamper inkl. mix for oppmøte-beregning (Mest lojale spiller)
-    const alleKamperSnap = await getDocs(query(
-      collection(db, SAM.KAMPER),
-      where('ferdig', '==', true)
-    ));
-    const alleKamperInklMix = alleKamperSnap.docs
-      .map(d => ({ id: d.id, ...d.data() }))
-      .filter(k =>
-        alleTreningIds.has(k.treningId) &&
-        k.lag1Poeng != null && k.lag2Poeng != null &&
-        spillerIds.has(k.lag1_s1) && spillerIds.has(k.lag2_s1)
-      );
 
     beholder.innerHTML = [
       _renderNivådelteSeksjoner(spillere, kamper, historikkMap),
