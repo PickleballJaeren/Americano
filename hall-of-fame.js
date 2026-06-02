@@ -1034,7 +1034,10 @@ function _renderGOATArkiv(klubbId) {
     <div class="kort" style="margin-bottom:14px">
       <div class="kort-innhold" style="text-align:center;padding:20px 16px">
         <div style="font-size:36px;margin-bottom:8px">🐐</div>
-        <div style="font-family:'Bebas Neue',cursive;font-size:22px;letter-spacing:1px;color:var(--yellow)">Halvårlig GOAT-kåring</div>
+        <div onclick="hofVisGOATInfo()" style="font-family:'Bebas Neue',cursive;font-size:22px;letter-spacing:1px;color:var(--yellow);cursor:pointer;display:inline-flex;align-items:center;gap:8px">
+          Halvårlig GOAT-kåring
+          <span style="font-size:16px;font-family:sans-serif;opacity:0.7">ℹ️</span>
+        </div>
         <div style="font-size:14px;color:var(--muted2);margin-top:6px;line-height:1.5">Kåres to ganger i året.<br>Vinnerne arkiveres her permanent.</div>
         ${window.getErAdmin?.() ? `<button class="knapp knapp-primaer" onclick="hofVisGOATBeregner()" style="margin-top:14px;font-family:'Bebas Neue',cursive;font-size:18px;letter-spacing:1px">🏆 BEREGN GOAT-VINNER</button>` : ''}
       </div>
@@ -1097,6 +1100,59 @@ window.hofVisGOATBeregner = async function() {
 window.hofLukkGOATModal = function() {
   const modal = document.getElementById('hof-goat-modal');
   if (modal) modal.style.display = 'none';
+};
+
+/** Viser info-modal med neste kåringsdato og komponentforklaring. */
+window.hofVisGOATInfo = function() {
+  const modal   = document.getElementById('hof-goat-modal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+  const innhold = document.getElementById('hof-goat-innhold');
+  if (!innhold) return;
+
+  const nå             = new Date();
+  const erFørstHalvår  = nå.getMonth() < 6;
+  const år             = nå.getFullYear();
+  const nesteKåring    = erFørstHalvår ? `30. juni ${år}` : `31. desember ${år}`;
+  const periode        = erFørstHalvår
+    ? `1. jan – 30. jun ${år}`
+    : `1. jul – 31. des ${år}`;
+
+  const komponenter = [
+    ['A', '30p', '📈 Ratingutvikling',     'Hvor mye ratingen din har økt i perioden'],
+    ['B', '25p', '🎯 Overprestasjonsrate', 'Vinner du mer enn Elo-ratingen din tilsier?'],
+    ['C', '20p', '📅 Oppmøte',             'Andel treninger deltatt (min. 40% kreves)'],
+    ['D', '15p', '🤝 Makkereffekt',        'Vinnrate som makker — løfter du laget?'],
+    ['E', '10p', '🔥 Lengste vinnstreak',  'Beste sammenhengende vinnrekke i perioden'],
+  ];
+
+  innhold.innerHTML = `
+    <div style="text-align:center;margin-bottom:20px">
+      <div style="font-size:36px;margin-bottom:6px">🐐</div>
+      <div style="font-family:'Bebas Neue',cursive;font-size:24px;letter-spacing:1px;color:var(--yellow)">GOAT-kåringen</div>
+    </div>
+
+    <div style="background:rgba(255,255,255,.05);border-radius:10px;padding:12px 14px;margin-bottom:16px">
+      <div style="font-size:12px;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Neste kåring</div>
+      <div style="font-size:16px;font-weight:700;color:var(--white)">📅 ${nesteKåring}</div>
+      <div style="font-size:13px;color:var(--muted2);margin-top:4px">Inneværende periode: ${periode}</div>
+    </div>
+
+    <div style="font-size:12px;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Slik beregnes poengsummen</div>
+    ${komponenter.map(([bokstav, maks, tittel, beskr], i, arr) => `
+      <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;${i < arr.length - 1 ? 'border-bottom:1px solid var(--border)' : ''}">
+        <div style="font-family:'Bebas Neue',cursive;font-size:18px;color:var(--yellow);width:16px;flex-shrink:0">${bokstav}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:600">${tittel}</div>
+          <div style="font-size:12px;color:var(--muted2);margin-top:2px;line-height:1.4">${escHtml(beskr)}</div>
+        </div>
+        <div style="font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:var(--white);flex-shrink:0">${maks}</div>
+      </div>`).join('')}
+
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:13px;color:var(--muted2)">Maks totalt</div>
+      <div style="font-family:'DM Mono',monospace;font-size:18px;font-weight:700;color:var(--yellow)">100p</div>
+    </div>`;
 };
 
 // ════════════════════════════════════════════════════════
