@@ -919,6 +919,17 @@ export async function beregnGOAT(klubbId, fra, til, ekskluderSpillerId = null) {
   const scorerMap = {};
   const totalTreninger = new Set(periodeKamper.map(k => k.treningId)).size;
 
+  // Bygg oppmøte-kart fra periodeKamper — samme kilde som totalTreninger,
+  // slik at oppmøte aldri kan overstige totalTreninger og gi > 20p.
+  const oppmøteMap = {}; // spillerId → Set<treningId>
+  for (const k of periodeKamper) {
+    if (!k.treningId) continue;
+    for (const id of [k.lag1_s1, k.lag1_s2, k.lag2_s1, k.lag2_s2].filter(Boolean)) {
+      if (!oppmøteMap[id]) oppmøteMap[id] = new Set();
+      oppmøteMap[id].add(k.treningId);
+    }
+  }
+
   // --- Komponent A: Ratingutvikling (30p) ---
   for (const s of spillere) {
     const hist = (historikkMap[s.id] ?? []).filter(h => {
@@ -926,12 +937,9 @@ export async function beregnGOAT(klubbId, fra, til, ekskluderSpillerId = null) {
       return d >= fraMs && d <= tilMs;
     });
     const delta = hist.reduce((sum, h) => sum + (h.endring ?? 0), 0);
-    // Tel unike treninger (én historikk-rad per kamp, ikke per trening)
-    const unikeTreninger = new Set(hist.map(h => h.treningId).filter(Boolean)).size
-      || new Set(hist.map(h => h.dato?.toMillis?.() ?? h.dato).filter(Boolean)).size;
     if (!scorerMap[s.id]) scorerMap[s.id] = { id: s.id, navn: s.navn, A: 0, B: 0, C: 0, D: 0, E: 0, oppmøte: 0 };
     scorerMap[s.id].A        = delta;
-    scorerMap[s.id].oppmøte  = unikeTreninger; // antall unike treninger i perioden
+    scorerMap[s.id].oppmøte  = oppmøteMap[s.id]?.size ?? 0; // antall unike treninger i perioden
   }
 
   // Normaliser A til 30p
