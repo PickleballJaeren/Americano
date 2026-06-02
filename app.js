@@ -806,6 +806,9 @@ async function init() {
     settAktivSpiller:  (id) => window.settAktivSpiller(id),
     getSpillere:       () => app.spillere ?? [],
   });
+
+  // Koble ui.js til app-spesifikk logikk
+  registrerNavigertHandler(skjerm => {
     if (skjerm === 'baner')    { app._oektAktiv = true; visBaner(); oppdaterTilskuerInnhold(); oppdaterMixLiveKnapp(); oppdaterMixRedigerKnapp(); }
     if (skjerm === 'slutt')    visSluttresultat();
     if (skjerm === 'spillere') { oppdaterGlobalLedertavle(); visHallOfFame(); oppdaterIdentitetsUI(); }
