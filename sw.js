@@ -10,7 +10,7 @@
 // Dette er alt som skal til for at alle mobiler automatisk
 // plukker opp ny versjon neste gang de åpner appen.
 // ════════════════════════════════════════════════════════
-const VERSJON    = 3;                        // ← øk denne ved hver deploy
+const VERSJON    = 4;                        // ← øk denne ved hver deploy
 const CACHE_NAVN = `pb-jaeren-v${VERSJON}`;
 
 const SHELL = [
