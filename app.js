@@ -101,6 +101,12 @@ import {
   visBracket as visTurneringBracket,
   visResultat as visTurneringResultat,
 } from './turnering-spill-ui.js';
+import {
+  hofInit,
+  visHallOfFame,
+  oppdaterIdentitetsUI,
+  tømHofCache,
+} from './hall-of-fame.js';
 // ════════════════════════════════════════════════════════
 // KLUBB-KONFIGURASJON
 // MERK: PIN-ene er synlige i klientkoden og gir ikke ekte
@@ -169,10 +175,21 @@ function byttKlubb(klubbId) {
 window.byttKlubb = byttKlubb;
 window._app = app;
 
-/** Lagrer hvilken spiller brukeren er — brukes i utfordrermodusen. */
+/** Nøkkel for aktivSpillerId i localStorage — klubb-prefiks hindrer blanding mellom klubber. */
+function _spillerNøkkel() {
+  return aktivKlubbId ? `pb_spiller_${aktivKlubbId}` : 'pb_spiller';
+}
+
+/** Lagrer hvilken spiller brukeren er — overlever lukket fane (localStorage). */
 window.settAktivSpiller = function(spillerId) {
-  if (spillerId) sessionStorage.setItem('aktivSpillerId', spillerId);
-  else           sessionStorage.removeItem('aktivSpillerId');
+  if (spillerId) localStorage.setItem(_spillerNøkkel(), spillerId);
+  else           localStorage.removeItem(_spillerNøkkel());
+  oppdaterIdentitetsUI();
+};
+
+/** Henter aktivt spillerId — brukes av utfordrer.js og hall-of-fame.js via deps-injeksjon. */
+window.getAktivSpillerId = function() {
+  return localStorage.getItem(_spillerNøkkel()) ?? null;
 };
 
 // ── Tilskuerskjerm-logikk ─────────────────────────────────────────────────
@@ -618,6 +635,8 @@ function lyttPaaSpillere() {
       visSpillere();
       oppdaterGlobalLedertavle();
       sjekkVentendeUtfordringer();
+      tømHofCache();
+      oppdaterIdentitetsUI();
       // Forhåndslast cache i bakgrunnen uten å åpne panelet
       lastSisteDeltakere();
     },
@@ -711,7 +730,7 @@ async function init() {
   // Koble utfordrer.js
   utfordrerInit({
     getAktivKlubbId:   () => aktivKlubbId,
-    getAktivSpillerId: () => sessionStorage.getItem('aktivSpillerId'),
+    getAktivSpillerId: () => window.getAktivSpillerId(),
     getSpillere:       () => app.spillere ?? [],
   });
 
@@ -779,13 +798,19 @@ async function init() {
     setSisteDeltakereCache: setSisteDeltakereCache,
   });
 
-  // Koble ui.js til app-spesifikk logikk
-  registrerNavigertHandler(skjerm => {
+  // Koble hall-of-fame.js
+  hofInit({
+    naviger,
+    getAktivKlubbId:   () => aktivKlubbId,
+    getAktivSpillerId: () => window.getAktivSpillerId(),
+    settAktivSpiller:  (id) => window.settAktivSpiller(id),
+    getSpillere:       () => app.spillere ?? [],
+  });
     if (skjerm === 'baner')    { app._oektAktiv = true; visBaner(); oppdaterTilskuerInnhold(); oppdaterMixLiveKnapp(); oppdaterMixRedigerKnapp(); }
     if (skjerm === 'slutt')    visSluttresultat();
-    if (skjerm === 'spillere') oppdaterGlobalLedertavle();
+    if (skjerm === 'spillere') { oppdaterGlobalLedertavle(); visHallOfFame(); oppdaterIdentitetsUI(); }
     if (skjerm === 'arkiv')    lastArkiv();
-    if (skjerm === 'hjem')     visHjemStatus();
+    if (skjerm === 'hjem')     { visHjemStatus(); oppdaterIdentitetsUI(); }
     // Start sanntidslytter på utfordrer-skjermen, stopp ved navigering bort
     if (skjerm === 'utfordrer') startUtfordrerLytter();
     else stoppUtfordrerLytter();

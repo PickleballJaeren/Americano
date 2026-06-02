@@ -13,6 +13,7 @@ import { visMelding, visFBFeil, escHtml } from './ui.js';
 import { lagInitialer } from './render-helpers.js';
 import { setAktivSlettSpillerId } from './spillere.js';
 import { visUtfordrerSeksjon } from './utfordrer.js';
+import { visRivalSeksjon, visMerker } from './hall-of-fame.js';
 
 // ── Avhengigheter injisert ───────────────────────────────
 let _naviger = () => {};
@@ -136,6 +137,7 @@ async function hentKampStatistikk(spillerId) {
   }
 
   const stat = beregnKampStatistikk(spillerId, kamper);
+  stat._alleKamper = kamper;
   kampStatCache.set(spillerId, { stat, hentetMs: Date.now() });
   return stat;
 }
@@ -401,7 +403,12 @@ export async function apneGlobalProfil(spillerId) {
   hentKampStatistikk(spillerId).then(stat => {
     const trendData = beregnTrend(historikk);
     visKampStatistikk(stat, trendData);
+    // Vis personlige merker med kampdata — kjøres etter at stat er hentet
+    visMerker(spillerId, stat._alleKamper ?? [], historikk);
   });
+
+  // Last rival-seksjon og utfordrer-seksjon parallelt
+  visRivalSeksjon(spillerId);
 
   if (db && spillerId) {
     try {

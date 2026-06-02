@@ -14,12 +14,12 @@ import { lagInitialer } from './render-helpers.js';
 
 // ── Avhengigheter injisert fra app.js ────────────────────
 let _getAktivKlubbId    = () => null;
-let _getAktivSpillerId  = () => sessionStorage.getItem('aktivSpillerId');
+let _getAktivSpillerId  = () => window.getAktivSpillerId?.() ?? null;
 let _getSpillere        = () => [];
 
 export function utfordrerInit(deps) {
   _getAktivKlubbId   = deps.getAktivKlubbId   ?? (() => null);
-  _getAktivSpillerId = deps.getAktivSpillerId  ?? (() => sessionStorage.getItem('aktivSpillerId'));
+  _getAktivSpillerId = deps.getAktivSpillerId  ?? (() => window.getAktivSpillerId?.() ?? null);
   _getSpillere       = deps.getSpillere        ?? (() => []);
 }
 
@@ -134,7 +134,7 @@ async function _sendUtfordring(utfordrerSpiller, motstanderSpiller, klubbId, for
 // BADGE OG TOAST
 // ════════════════════════════════════════════════════════
 export async function sjekkVentendeUtfordringer() {
-  const spillerId = sessionStorage.getItem('aktivSpillerId');
+  const spillerId = _getAktivSpillerId();
   const klubbId   = _getAktivKlubbId();
   const badge     = document.getElementById('utf-badge');
   if (!spillerId || !klubbId || !db || !badge) return;
@@ -250,7 +250,7 @@ export async function visUtfordrerSkjerm() {
   }
   spillere = spillere.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
 
-  const lagretId  = sessionStorage.getItem('aktivSpillerId');
+  const lagretId  = _getAktivSpillerId();
   const megVelger = document.getElementById('utf-meg-velger');
 
   if (megVelger) {
@@ -258,10 +258,10 @@ export async function visUtfordrerSkjerm() {
       spillere.map(s =>
         `<option value="${s.id}" ${s.id === lagretId ? 'selected' : ''}>${escHtml(s.navn ?? 'Ukjent')}</option>`
       ).join('');
-    if (megVelger.value) sessionStorage.setItem('aktivSpillerId', megVelger.value);
+    if (megVelger.value) window.settAktivSpiller(megVelger.value);
   }
 
-  _oppdaterMotstanderVelger(spillere, sessionStorage.getItem('aktivSpillerId'));
+  _oppdaterMotstanderVelger(spillere, _getAktivSpillerId());
   _visSingelRanking(spillere);
   await Promise.all([
     _lastAktiveUtfordringer(klubbId, spillere),
@@ -272,7 +272,7 @@ window.visUtfordrerSkjerm = visUtfordrerSkjerm;
 
 window.oppdaterUtfordrerVelger = function() {
   const spillere = [..._getSpillere()].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
-  _oppdaterMotstanderVelger(spillere, sessionStorage.getItem('aktivSpillerId'));
+  _oppdaterMotstanderVelger(spillere, _getAktivSpillerId());
   visUtfordrerSkjerm();
 };
 
@@ -293,7 +293,7 @@ window.sendUtfordringFraSkjerm = async function() {
   if (!megId) { visMelding('Velg deg selv først.', 'advarsel'); return; }
   if (!motId) { visMelding('Velg en motstander.', 'advarsel'); return; }
 
-  sessionStorage.setItem('aktivSpillerId', megId);
+  window.settAktivSpiller(megId);
   const klubbId = _getAktivKlubbId();
   if (!klubbId || !db) return;
 
@@ -319,7 +319,7 @@ window.sendUtfordringFraSkjerm = async function() {
 
 async function _lastAktiveUtfordringer(klubbId, spillere) {
   const el    = document.getElementById('utf-aktive-liste');
-  const megId = sessionStorage.getItem('aktivSpillerId');
+  const megId = _getAktivSpillerId();
   if (!db || !klubbId) return;
 
   try {
