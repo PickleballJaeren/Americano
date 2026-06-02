@@ -21,7 +21,7 @@
 import {
   db, SAM, STARTRATING,
   collection, doc, getDoc, getDocs, setDoc, updateDoc,
-  query, where, orderBy, Timestamp,
+  query, where, orderBy,
 } from './firebase.js';
 import { app }              from './state.js';
 import { escHtml }          from './ui.js';
@@ -926,9 +926,9 @@ async function _hentGoatKonfig(klubbId) {
 async function _lagreGoatKonfig(klubbId, { periodeStart, kåringsDato, nestePeriodeStart }) {
   await updateDoc(doc(db, 'klubber', klubbId), {
     goatKonfig: {
-      periodeStart:      Timestamp.fromDate(periodeStart),
-      kåringsDato:       Timestamp.fromDate(kåringsDato),
-      nestePeriodeStart: nestePeriodeStart ? Timestamp.fromDate(nestePeriodeStart) : null,
+      periodeStart:      periodeStart,
+      kåringsDato:       kåringsDato,
+      nestePeriodeStart: nestePeriodeStart ?? null,
     },
   });
 }
