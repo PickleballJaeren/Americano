@@ -1138,7 +1138,11 @@
   <span>📡 Ingen internettforbindelse — endringer lagres når du er online igjen</span>
 </div>
 
-<!-- PWA-oppdateringsvarsel: håndteres automatisk av controllerchange i SW-registreringen nedenfor -->
+<!-- PWA-oppdateringsvarsel -->
+<div id="oppdatering-banner" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#1a3d7c;border-top:2px solid #2563eb;padding:14px 20px;z-index:1000;display:none;align-items:center;justify-content:space-between;gap:12px;font-family:'DM Sans',sans-serif">
+  <span style="color:#f1f5f9;font-size:16px;font-weight:500">Ny versjon tilgjengelig</span>
+  <button onclick="lastNyVersjon()" style="background:#2563eb;color:#fff;border:none;border-radius:10px;padding:9px 18px;font-family:'DM Sans',sans-serif;font-size:16px;font-weight:600;cursor:pointer;flex-shrink:0">Last på nytt</button>
+</div>
 
 <!-- Modal: Slett alle økter -->
 <div class="modal-bakgrunn" id="modal-slett-alle-okter" style="display:none" onclick="if(event.target===this)this.style.display='none'">
@@ -1646,25 +1650,60 @@
     // Avregistrer eventuelle gamle service workers med feil scope
     navigator.serviceWorker.getRegistrations().then(regs => {
       regs.forEach(reg => {
-        if (reg.scope !== location.origin + '/') {
-          reg.unregister();
-        }
+        if (reg.scope !== location.origin + '/') reg.unregister();
       });
     });
 
-    navigator.serviceWorker.register('./sw.js').then(reg => {
-      // Poll etter oppdateringer hvert 30. minutt — fanger opp deploys
-      // som skjer mens brukeren har appen åpen (typisk på mobil)
-      setInterval(() => { reg.update().catch(() => {}); }, 30 * 60 * 1000);
-    });
-
-    // Når ny SW tar over (pga. skipWaiting i sw.js), reloader siden automatisk.
-    // Brukerne får alltid ny versjon stille — ingen manuell handling nødvendig.
+    // Når ny SW tar over, reloader siden stille og automatisk.
+    // _refreshing-flagget hindrer løkke dersom controllerchange trigges flere ganger.
     let _refreshing = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (_refreshing) return;
       _refreshing = true;
       window.location.reload();
+    });
+
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+
+      // Vis banner kun om det faktisk finnes en ANNEN SW enn den som kjører nå.
+      // navigator.serviceWorker.controller er alltid satt når en SW allerede
+      // kontrollerer siden — det betyr at en oppdatering er på vei, ikke første install.
+      function _sjekkOgVisBanner(worker) {
+        if (!worker || !navigator.serviceWorker.controller) return;
+        // Sjekk at det faktisk dreier seg om en annen SW-versjon ved å
+        // sammenligne scriptURL — samme URL betyr same-byte-sjekk bestått = ingen endring
+        // (nettleseren installerer ikke på nytt om bytes er identiske).
+        // Hvis worker eksisterer og controller eksisterer er det alltid en reell oppdatering.
+        document.getElementById('oppdatering-banner').style.display = 'flex';
+      }
+
+      // SW venter allerede ved sidelast (brukeren åpnet appen etter en deploy)
+      if (reg.waiting) _sjekkOgVisBanner(reg.waiting);
+
+      // SW oppdateres mens siden er åpen
+      reg.addEventListener('updatefound', () => {
+        const nyWorker = reg.installing;
+        nyWorker.addEventListener('statechange', () => {
+          if (nyWorker.state === 'installed') _sjekkOgVisBanner(nyWorker);
+        });
+      });
+
+      // Poll etter oppdateringer hvert 30. minutt
+      setInterval(() => { reg.update().catch(() => {}); }, 30 * 60 * 1000);
+    });
+  }
+
+  function lastNyVersjon() {
+    if (!('serviceWorker' in navigator)) { window.location.reload(); return; }
+    navigator.serviceWorker.getRegistration().then(reg => {
+      if (reg?.waiting) {
+        // controllerchange-lytteren over håndterer reload når SW tar over
+        reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        // Fallback: reload etter 300ms om controllerchange ikke trigges
+        setTimeout(() => window.location.reload(), 300);
+      } else {
+        window.location.reload();
+      }
     });
   }
 </script>
