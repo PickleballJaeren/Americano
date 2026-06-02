@@ -15,6 +15,7 @@ import {
 import { visMelding, visFBFeil, escHtml } from './ui.js';
 import { lagInitialer } from './render-helpers.js';
 import { beregnKampStatistikk } from './global-profil.js';
+import { hentGoatPeriode } from './hall-of-fame.js';
 
 // ── Avhengigheter injisert fra app.js ────────────────────
 let _krevAdmin        = () => {};
@@ -62,17 +63,58 @@ export async function oppdaterGlobalLedertavle(tvingOppdatering = false) {
       return;
     }
     if (liste) {
-      const erAdmin = window.getErAdmin?.() ?? false;
+      const erAdmin      = window.getErAdmin?.() ?? false;
+      const aktivKlubbId = _getAktivKlubbId();
+
+      // Hent sesongperiode og ratinghistorikk for å beregne sesong-delta
+      let sesongDeltaMap = {};
+      try {
+        if (aktivKlubbId) {
+          const { fra } = await hentGoatPeriode(aktivKlubbId);
+          const fraMs   = fra.getTime();
+          const histSnap = await getDocs(query(
+            collection(db, SAM.HISTORIKK),
+            where('klubbId', '==', aktivKlubbId)
+          ));
+          // For hver spiller: finn tidligste historikk-rad i perioden
+          // og beregn delta = nåværende rating − rating ved periodestart
+          const tidligst = {};
+          histSnap.docs.forEach(d => {
+            const h = d.data();
+            if (!h.spillerId || !h.dato) return;
+            const ms = h.dato.toMillis?.() ?? 0;
+            if (ms < fraMs) return;
+            if (!tidligst[h.spillerId] || ms < tidligst[h.spillerId].ms) {
+              tidligst[h.spillerId] = { ms, ratingFør: (h.ratingEtter ?? STARTRATING) - (h.endring ?? 0) };
+            }
+          });
+          spillere.forEach(s => {
+            if (tidligst[s.id]) {
+              sesongDeltaMap[s.id] = (s.rating ?? STARTRATING) - tidligst[s.id].ratingFør;
+            }
+          });
+        }
+      } catch (e) {
+        console.warn('[Ledertavle sesong-delta]', e?.message ?? e);
+      }
+
       liste.innerHTML = spillere.map((s, i) => {
-        const plass = i + 1;
-        const ini   = lagInitialer(s.navn);
-        const nivaaKlLB = getNivaaKlasse(s.rating ?? STARTRATING);
+        const plass      = i + 1;
+        const ini        = lagInitialer(s.navn);
+        const nivaaKlLB  = getNivaaKlasse(s.rating ?? STARTRATING);
+        const delta      = sesongDeltaMap[s.id];
+        const deltaHTML  = delta !== undefined
+          ? `<div style="font-size:12px;font-family:'DM Mono',monospace;color:${delta >= 0 ? 'var(--green2)' : 'var(--red2)'};text-align:right;line-height:1">${delta >= 0 ? '+' : ''}${delta} sesong</div>`
+          : '';
         return `<div class="lb-rad ${nivaaKlLB}" style="cursor:pointer">
           <div class="lb-plass${plass <= 3 ? ' topp3' : ''}" onclick="apneGlobalProfil('${s.id}')">${plass}</div>
           <div class="lb-avatar" onclick="apneGlobalProfil('${s.id}')">${ini}</div>
           <div class="lb-navn" onclick="apneGlobalProfil('${s.id}')">${s.navn ?? 'Ukjent'}</div>
           <div style="text-align:right;flex-shrink:0;display:flex;align-items:center;gap:8px">
-            ${getNivaaRatingHTML(s.rating ?? STARTRATING)}
+            <div onclick="apneGlobalProfil('${s.id}')">
+              ${getNivaaRatingHTML(s.rating ?? STARTRATING)}
+              ${deltaHTML}
+            </div>
             ${erAdmin ? `<button class="knapp-rediger-rating" onclick="startRedigerRating('${s.id}', ${s.rating ?? STARTRATING}, this)" title="Rediger rating" style="background:none;border:1px solid var(--border);border-radius:6px;padding:3px 8px;color:var(--muted2);font-size:13px;cursor:pointer">✏️</button>` : ''}
           </div>
         </div>`;
@@ -132,6 +174,20 @@ async function beregnSesongsKaaring(spillereListe) {
     spillereListe.forEach(s => { ratingMap[s.id] = s.rating ?? STARTRATING; });
     const klubbSpillerIds = new Set(Object.keys(ratingMap));
 
+    // Hent GOAT-periode — sesongkåringen bruker samme fra/til som GOAT
+    // slik at "Formspiller" og "Beste partner" alltid gjelder inneværende sesong.
+    let periodeMs  = 0;       // 0 = ingen nedre grense (fallback om henting feiler)
+    let periodeLabel = null;
+    if (aktivKlubbId) {
+      try {
+        const periode = await hentGoatPeriode(aktivKlubbId);
+        periodeMs    = periode.fra.getTime();
+        periodeLabel = periode.periodeLabel;
+      } catch (e) {
+        console.warn('[Sesongkåring] Kunne ikke hente GOAT-periode:', e?.message ?? e);
+      }
+    }
+
     // Hent trenings-IDer for aktiv klubb — kamp-dokumenter har ikke klubbId,
     // men har treningId. Filtrer kamper via treningId for å sikre riktig klubb.
     // Kun treninger med spillModus !== 'mix' tas med — Mix-kamper gir ikke
@@ -158,6 +214,8 @@ async function beregnSesongsKaaring(spillereListe) {
       .map(d => ({ id: d.id, ...d.data() }))
       .filter(k =>
         k.lag1Poeng != null && k.lag2Poeng != null &&
+        // Filtrer på GOAT-perioden — kun kamper i inneværende sesong
+        (periodeMs === 0 || (k.dato?.toMillis?.() ?? 0) >= periodeMs) &&
         // Filtrer på treningId for å sikre riktig klubb
         (gyldigeTreningIds == null || gyldigeTreningIds.has(k.treningId)) &&
         // Alle spillere må tilhøre aktiv klubb (dobbeltsjekk)
@@ -300,6 +358,14 @@ async function beregnSesongsKaaring(spillereListe) {
     }
 
     if (sesongBoks) {
+      // Legg til periodeoverskrift øverst i sesong-boksen
+      if (periodeLabel) {
+        const overskrift = document.getElementById('sesong-periode-label');
+        if (overskrift) {
+          overskrift.textContent = periodeLabel;
+          overskrift.style.display = 'block';
+        }
+      }
       sesongBoks.style.display = 'block';
       _sesongCache = { html: sesongBoks.innerHTML, hentetMs: Date.now(), klubbId: aktivKlubbId };
     }

@@ -693,14 +693,8 @@ export async function visRivalSeksjon(spillerId) {
     const alle     = Object.values(motstanderMap);
     const rival    = [...alle].sort((a, b) => b.kamper - a.kamper)[0];
     const kvalifiserte = alle.filter(m => m.kamper >= MIN_KAMPER_RIVAL);
-    // Bruk separate sorterte kopier — .sort() muterer in-place og ville ellers
-    // gi samme person i begge slots om det bare er én kvalifisert motstander.
-    // Nemesis: lavest winRate (taper mest mot dem)
-    // Dominerer: høyest winRate OG faktisk over 50% — uavgjort teller ikke
-    const nemesis   = [...kvalifiserte].sort((a, b) => a.winRate - b.winRate)[0] ?? null;
-    const dominerer = [...kvalifiserte]
-      .filter(m => m.winRate > 50)
-      .sort((a, b) => b.winRate - a.winRate)[0] ?? null;
+    const nemesis  = kvalifiserte.sort((a, b) => a.winRate - b.winRate)[0] ?? null;
+    const dominerer = kvalifiserte.sort((a, b) => b.winRate - a.winRate)[0] ?? null;
 
     beholder.innerHTML = `
       <div class="seksjon-etikett">⚔️ Dine rivaloppgjør</div>
@@ -908,6 +902,21 @@ function _fremgangsbar(nåværende, milepæler) {
  * Henter GOAT-konfig fra klubb-dokumentet.
  * Returnerer defaults (kalenderhalvår) hvis ikke konfigurert.
  */
+/**
+ * Henter gjeldende GOAT-periode (fra/til) for en klubb.
+ * Eksportert slik at ledertavle.js kan filtrere sesongkåringen
+ * på samme periode som GOAT bruker — ett konsistent sesongbegrep.
+ * @returns {{ fra: Date, til: Date, periodeLabel: string }}
+ */
+export async function hentGoatPeriode(klubbId) {
+  const konfig = await _hentGoatKonfig(klubbId);
+  const fra    = konfig.periodeStart;
+  const til    = konfig.kåringsDato;
+  const fraStr = fra.toLocaleDateString('no-NO', { day: 'numeric', month: 'short' });
+  const tilStr = til.toLocaleDateString('no-NO', { day: 'numeric', month: 'short', year: 'numeric' });
+  return { fra, til, periodeLabel: `${fraStr} – ${tilStr}` };
+}
+
 async function _hentGoatKonfig(klubbId) {
   try {
     const snap = await getDoc(doc(db, 'klubber', klubbId));

@@ -579,6 +579,9 @@
     </div>
     <div id="sesong-kaaring" style="display:none">
 
+      <!-- Periodeoverskrift — fylles av ledertavle.js med fra/til fra GOAT-konfig -->
+      <div id="sesong-periode-label" style="display:none;font-size:13px;color:var(--muted2);text-align:center;margin-bottom:12px;font-family:'DM Mono',monospace;letter-spacing:.5px"></div>
+
       <!-- Formspilleren -->
       <div class="kort" style="margin-bottom:10px">
         <div class="kort-hode">
@@ -1650,61 +1653,36 @@
     // Avregistrer eventuelle gamle service workers med feil scope
     navigator.serviceWorker.getRegistrations().then(regs => {
       regs.forEach(reg => {
-        if (reg.scope !== location.origin + '/') reg.unregister();
+        if (reg.scope !== location.origin + '/') {
+          reg.unregister();
+        }
       });
-    });
-
-    // Når ny SW tar over, reloader siden stille og automatisk.
-    // _refreshing-flagget hindrer løkke dersom controllerchange trigges flere ganger.
-    let _refreshing = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (_refreshing) return;
-      _refreshing = true;
-      window.location.reload();
     });
 
     navigator.serviceWorker.register('./sw.js').then(reg => {
-
-      // Vis banner kun om det faktisk finnes en ANNEN SW enn den som kjører nå.
-      // navigator.serviceWorker.controller er alltid satt når en SW allerede
-      // kontrollerer siden — det betyr at en oppdatering er på vei, ikke første install.
-      function _sjekkOgVisBanner(worker) {
-        if (!worker || !navigator.serviceWorker.controller) return;
-        // Sjekk at det faktisk dreier seg om en annen SW-versjon ved å
-        // sammenligne scriptURL — samme URL betyr same-byte-sjekk bestått = ingen endring
-        // (nettleseren installerer ikke på nytt om bytes er identiske).
-        // Hvis worker eksisterer og controller eksisterer er det alltid en reell oppdatering.
-        document.getElementById('oppdatering-banner').style.display = 'flex';
-      }
-
-      // SW venter allerede ved sidelast (brukeren åpnet appen etter en deploy)
-      if (reg.waiting) _sjekkOgVisBanner(reg.waiting);
-
-      // SW oppdateres mens siden er åpen
+      // Lytt etter ny service worker som venter på å aktiveres
       reg.addEventListener('updatefound', () => {
         const nyWorker = reg.installing;
         nyWorker.addEventListener('statechange', () => {
-          if (nyWorker.state === 'installed') _sjekkOgVisBanner(nyWorker);
+          if (nyWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            // Ny versjon er klar — vis banner
+            document.getElementById('oppdatering-banner').style.display = 'flex';
+          }
         });
       });
-
-      // Poll etter oppdateringer hvert 30. minutt
-      setInterval(() => { reg.update().catch(() => {}); }, 30 * 60 * 1000);
     });
   }
 
   function lastNyVersjon() {
-    if (!('serviceWorker' in navigator)) { window.location.reload(); return; }
-    navigator.serviceWorker.getRegistration().then(reg => {
-      if (reg?.waiting) {
-        // controllerchange-lytteren over håndterer reload når SW tar over
-        reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-        // Fallback: reload etter 300ms om controllerchange ikke trigges
-        setTimeout(() => window.location.reload(), 300);
-      } else {
-        window.location.reload();
-      }
-    });
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistration().then(reg => {
+        if (reg?.waiting) {
+          // Be den ventende service workeren ta over
+          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+      });
+    }
+    window.location.reload();
   }
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
