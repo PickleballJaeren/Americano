@@ -650,11 +650,6 @@
       <div id="sammenlign-resultat" style="display:none"></div>
     </div>
 
-    <button class="knapp" onclick="delResultater()"
-      style="width:100%;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:var(--green2);font-family:'Bebas Neue',cursive;font-size:22px;letter-spacing:1px;padding:14px;border-radius:12px;margin-bottom:10px">
-      📤 DEL RESULTATER
-    </button>
-
     <button class="knapp" onclick="naviger('utfordrer')"
       style="width:100%;background:rgba(37,99,235,.12);border:1px solid rgba(37,99,235,.3);color:var(--accent2);font-family:'Bebas Neue',cursive;font-size:22px;letter-spacing:1px;padding:14px;border-radius:12px;margin-bottom:14px">
       ⚔️ UTFORDRERMODUSEN
@@ -1672,22 +1667,6 @@
           }
         });
       });
-
-      // Sjekk etter oppdateringer hvert 30. minutt mens appen er åpen.
-      // Løser problemet med at mobil-PWA-er holdes åpne i dagevis
-      // uten å oppdage nye versjoner.
-      setInterval(() => reg.update(), 30 * 60 * 1000);
-
-      // Hvis en oppdatering allerede venter når appen åpnes — vis banner med én gang
-      if (reg.waiting) {
-        document.getElementById('oppdatering-banner').style.display = 'flex';
-      }
-    });
-
-    // Reload automatisk når ny service worker tar over kontrollen —
-    // slik at alle faner/vinduer får ny versjon samtidig
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      window.location.reload();
     });
   }
 
