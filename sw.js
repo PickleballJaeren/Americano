@@ -5,7 +5,7 @@
 // direkte til nett — aldri fra cache.
 // ════════════════════════════════════════════════════════
 
-const CACHE_NAVN = 'pb-jaeren-v10';
+const CACHE_NAVN = 'pb-jaeren-v1';
 
 const SHELL = [
   './',
