@@ -10,7 +10,7 @@
 // plukker opp ny versjon neste gang de åpner appen.
 // ════════════════════════════════════════════════════════
 
-const VERSJON     = 11;                        // ← øk denne ved hver deploy
+const VERSJON     = 12;                        // ← øk denne ved hver deploy
 const CACHE_NAVN  = `pb-jaeren-v${VERSJON}`;
 
 const SHELL = [
