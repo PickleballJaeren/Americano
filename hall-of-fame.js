@@ -546,23 +546,36 @@ function _beregnKlubbensRivaloppgjør(kamper) {
 
     for (const id1 of lag1) {
       for (const id2 of lag2) {
-        const nøkkel = [id1, id2].sort().join('_');
+        // Sorter alltid slik at nøkkelen er konsistent uavhengig av kampretning
+        const sortert   = [id1, id2].sort();
+        const nøkkel    = sortert.join('_');
+        const førstErId1 = sortert[0] === id1; // id1 (lag1-spiller) er først i sortert rekkefølge
+
         if (!møterMap[nøkkel]) møterMap[nøkkel] = {
-          id1, id2,
-          navn1: k.lag1_s1 === id1 ? k.lag1_s1_navn : k.lag1_s2_navn,
-          navn2: k.lag2_s1 === id2 ? k.lag2_s1_navn : k.lag2_s2_navn,
+          id1: sortert[0], id2: sortert[1],
+          navn1: null, navn2: null,
           møter: 0, seire1: 0, seire2: 0,
           kampIds: new Set(),
         };
 
-        // Tel kun én gang per kamp per par — unngår dobbelttelling i 2v2
-        if (møterMap[nøkkel].kampIds.has(k.id)) continue;
-        møterMap[nøkkel].kampIds.add(k.id);
-        møterMap[nøkkel].møter++;
+        // Lagre navn på riktig plass basert på sortert rekkefølge
+        const oppføring = møterMap[nøkkel];
+        if (!oppføring.navn1) oppføring.navn1 = førstErId1 ? k.lag1_s1_navn ?? k.lag1_s2_navn : k.lag2_s1_navn ?? k.lag2_s2_navn;
+        if (!oppføring.navn2) oppføring.navn2 = førstErId1 ? k.lag2_s1_navn ?? k.lag2_s2_navn : k.lag1_s1_navn ?? k.lag1_s2_navn;
 
-        // id1 er alltid på lag1-siden (slik nøkkelen er bygget)
-        if (lag1Vant) møterMap[nøkkel].seire1++;
-        else          møterMap[nøkkel].seire2++;
+        // Tel kun én gang per kamp per par
+        if (oppføring.kampIds.has(k.id)) continue;
+        oppføring.kampIds.add(k.id);
+        oppføring.møter++;
+
+        // seire1 = seire for sortert[0], seire2 = seire for sortert[1]
+        // id1 er på lag1-siden, så lag1Vant betyr id1 vant
+        const id1Vant = lag1Vant;
+        if (førstErId1) {
+          if (id1Vant) oppføring.seire1++; else oppføring.seire2++;
+        } else {
+          if (id1Vant) oppføring.seire2++; else oppføring.seire1++;
+        }
       }
     }
   }
