@@ -508,28 +508,7 @@ function _beregnMånedenSpiller(spillere, kamper) {
   // Henter tidligste (ratingEtter − endring) fra historikk i perioden.
   // Fallback til nåværende rating dersom ingen historikk finnes.
   const ratingMap = {};
-  for (const s of spillere) {
-    const hist = (historikkMap[s.id] ?? []).filter(h => {
-      const d = h.dato?.toMillis?.() ?? 0;
-      return d >= fraMs && d <= tilMs && h.type !== 'halvårsjustering';
-    });
-    if (hist.length) {
-      // Tidligste rad i perioden → ratingFør = ratingEtter − endring
-      const tidligst = hist.reduce((a, b) =>
-        (a.dato?.toMillis?.() ?? 0) <= (b.dato?.toMillis?.() ?? 0) ? a : b);
-      ratingMap[s.id] = (tidligst.ratingEtter ?? STARTRATING) - (tidligst.endring ?? 0);
-    } else {
-      ratingMap[s.id] = s.rating ?? STARTRATING;
-    }
-  }
-
-  // Beregn dynamiske sjiktgrenser (topp 25% / midtre 50% / bunn 25%)
-  // basert på startratingene — fast ved periodens start, endres ikke underveis.
-  const alleRatinger = Object.values(ratingMap).sort((a, b) => a - b);
-  const antall       = alleRatinger.length;
-  const grenseTopp   = alleRatinger[Math.floor(antall * 0.75)] ?? STARTRATING;
-  const grenseBunn   = alleRatinger[Math.floor(antall * 0.25)] ?? STARTRATING;
-  const _sjiktFor    = r => r >= grenseTopp ? 'topp' : r <= grenseBunn ? 'bunn' : 'midtre';
+  spillere.forEach(s => { ratingMap[s.id] = s.rating ?? STARTRATING; });
 
   const bidragMap = {};
   for (const k of månedKamper) {
@@ -937,8 +916,28 @@ export async function beregnGOAT(klubbId, fra, til, ekskluderSpillerId = null) {
     return d >= fraMs && d <= tilMs;
   });
 
+  // Bygg startrating-kart: ratingen spilleren HAD ved periodens start.
   const ratingMap = {};
-  spillere.forEach(s => { ratingMap[s.id] = s.rating ?? STARTRATING; });
+  for (const s of spillere) {
+    const hist = (historikkMap[s.id] ?? []).filter(h => {
+      const d = h.dato?.toMillis?.() ?? 0;
+      return d >= fraMs && d <= tilMs && h.type !== 'halvårsjustering';
+    });
+    if (hist.length) {
+      const tidligst = hist.reduce((a, b) =>
+        (a.dato?.toMillis?.() ?? 0) <= (b.dato?.toMillis?.() ?? 0) ? a : b);
+      ratingMap[s.id] = (tidligst.ratingEtter ?? STARTRATING) - (tidligst.endring ?? 0);
+    } else {
+      ratingMap[s.id] = s.rating ?? STARTRATING;
+    }
+  }
+
+  // Dynamiske sjiktgrenser basert på startratingene (topp 25% / midtre 50% / bunn 25%)
+  const alleRatinger = Object.values(ratingMap).sort((a, b) => a - b);
+  const antall       = alleRatinger.length;
+  const grenseTopp   = alleRatinger[Math.floor(antall * 0.75)] ?? STARTRATING;
+  const grenseBunn   = alleRatinger[Math.floor(antall * 0.25)] ?? STARTRATING;
+  const _sjiktFor    = r => r >= grenseTopp ? 'topp' : r <= grenseBunn ? 'bunn' : 'midtre';
 
   const scorerMap = {};
   const totalTreninger = new Set(periodeKamper.map(k => k.treningId)).size;
@@ -1172,7 +1171,7 @@ window.hofVisGOATBeregner = async function() {
             <div class="lb-avatar" style="width:32px;height:32px;font-size:13px">${lagInitialer(s.navn)}</div>
             <div style="flex:1">
               <div style="font-size:14px;font-weight:600">${escHtml(s.navn)}</div>
-              <div style="font-size:11px;color:var(--muted2);margin-top:2px">${s.sjikt === 'topp' ? '🐐' : s.sjikt === 'midtre' ? '🃏' : '⚔️'} Rating +${s.A}p · Form +${s.B}p · Oppmøte +${s.C}p · Makker +${s.D}p · Streak +${s.E}p</div>
+              <div style="font-size:11px;color:var(--muted2);margin-top:2px">${s.sjikt === 'topp' ? '🐐' : s.sjikt === 'midtre' ? '🎭' : '⚔️'} Rating +${s.A}p · Form +${s.B}p · Oppmøte +${s.C}p · Makker +${s.D}p · Streak +${s.E}p</div>
             </div>
             <div style="font-family:'DM Mono',monospace;font-size:18px;font-weight:700;color:${i === 0 ? 'var(--yellow)' : 'var(--white)'}">${s.total}</div>
           </div>`).join('')}
@@ -1184,7 +1183,7 @@ window.hofVisGOATBeregner = async function() {
         <div style="font-family:'Bebas Neue',cursive;font-size:24px;letter-spacing:1px;color:var(--yellow)">Halvårskåringen</div>
       </div>
       ${kåringsBlokk('🐐', 'GOAT', '«Beiter på motstanderne og topper statistikken.»', goat, 'var(--yellow)')}
-      ${kåringsBlokk('🃏', 'Jokeren', '«Spilleren du aldri helt kan regne med – bortsett fra at han stadig overrasker.»', jokeren, '#a78bfa')}
+      ${kåringsBlokk('🎭', 'Jokeren', '«Spilleren du aldri helt kan regne med – bortsett fra at han stadig overrasker.»', jokeren, '#a78bfa')}
       ${kåringsBlokk('⚔️', 'Krigeren', '«Spilleren som møter opp, kjemper hver ball og nekter å la ratingen definere seg.»', kriger, '#fb923c')}
       ${scoreboardHTML}`;
 
@@ -1217,7 +1216,7 @@ window.hofVisGOATInfo = function() {
 
   const titler = [
     ['🐐', 'GOAT',    'var(--yellow)', '«Beiter på motstanderne og topper statistikken.»',                                        'Toppsjiktet (øverste 25% i rating ved periodens start). Beste totalpoeng vinner.'],
-    ['🃏', 'Jokeren', '#a78bfa',       '«Spilleren du aldri helt kan regne med – bortsett fra at han stadig overrasker.»',         'Midtsjiktet (midtre 50% i rating). Beste totalpoeng vinner.'],
+    ['🎭', 'Jokeren', '#a78bfa',       '«Spilleren du aldri helt kan regne med – bortsett fra at han stadig overrasker.»',         'Midtsjiktet (midtre 50% i rating). Beste totalpoeng vinner.'],
     ['⚔️', 'Krigeren','#fb923c',       '«Spilleren som møter opp, kjemper hver ball og nekter å la ratingen definere seg.»',       'Bunnsjiktet (laveste 25% i rating). Beste totalpoeng vinner.'],
   ];
 
