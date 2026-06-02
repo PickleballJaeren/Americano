@@ -214,7 +214,10 @@ export function oppdaterIdentitetsUI() {
   // Chip på hjem-skjermen
   const chip = document.getElementById('hof-identitet-chip');
   if (chip) {
-    if (spiller) {
+    // Skjul helt hvis ingen klubb er valgt ennå
+    if (!spillere.length) {
+      chip.style.display = 'none';
+    } else if (spiller) {
       chip.innerHTML = `
         <span style="font-size:14px">👤</span>
         <span style="font-size:14px;font-weight:600;color:var(--white)">${escHtml(spiller.navn)}</span>
