@@ -1149,10 +1149,7 @@ window.hofVisGOATInfo = function() {
         <div style="font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:var(--white);flex-shrink:0">${maks}</div>
       </div>`).join('')}
 
-    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-      <div style="font-size:13px;color:var(--muted2)">Maks totalt</div>
-      <div style="font-family:'DM Mono',monospace;font-size:18px;font-weight:700;color:var(--yellow)">100p</div>
-    </div>`;
+  `;
 };
 
 // ════════════════════════════════════════════════════════
