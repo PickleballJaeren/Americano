@@ -202,26 +202,6 @@ async function _hentGyldigeTreningIds(klubbId) {
   return ids;
 }
 
-/**
- * Intern hjelper — henter og cacher ALLE trenings-IDer for én klubb,
- * inkludert mix og mix-ab. Brukes for oppmøte-tellingen i GOAT-kåringen
- * slik at Mix-deltakelse teller som lojalitet.
- */
-async function _hentAlleTreningIds(klubbId) {
-  if (!klubbId) return new Set();
-  const nøkkel = `alle_treningids_${klubbId}`;
-  const cached = _fraCacheEllerNull(nøkkel);
-  if (cached) return cached;
-
-  const snap = await getDocs(query(
-    collection(db, SAM.TRENINGER),
-    where('klubbId', '==', klubbId)
-  ));
-  const ids = new Set(snap.docs.map(d => d.id));
-  _cachet(nøkkel, ids);
-  return ids;
-}
-
 // ════════════════════════════════════════════════════════
 // 1. SPILLERIDENTITET
 // ════════════════════════════════════════════════════════
@@ -317,29 +297,14 @@ export async function visHallOfFame() {
 
   try {
     const spillere  = _getSpillere();
-    const spillerIds = new Set(spillere.map(s => s.id));
-    const [kamper, historikkMap, alleTreningIds] = await Promise.all([
+    const [kamper, historikkMap] = await Promise.all([
       _hentAlleKamper(klubbId),
       _hentHistorikkForAlle(spillere),
-      _hentAlleTreningIds(klubbId),
     ]);
-
-    // Hent alle kamper inkl. mix for oppmøte-beregning i felles rekorder
-    const alleKamperSnap = await getDocs(query(
-      collection(db, SAM.KAMPER),
-      where('ferdig', '==', true)
-    ));
-    const alleKamperInklMix = alleKamperSnap.docs
-      .map(d => ({ id: d.id, ...d.data() }))
-      .filter(k =>
-        alleTreningIds.has(k.treningId) &&
-        k.lag1Poeng != null && k.lag2Poeng != null &&
-        spillerIds.has(k.lag1_s1) && spillerIds.has(k.lag2_s1)
-      );
 
     beholder.innerHTML = [
       _renderNivådelteSeksjoner(spillere, kamper, historikkMap),
-      _renderFellesRekorder(spillere, kamper, historikkMap, alleKamperInklMix),
+      _renderFellesRekorder(spillere, kamper, historikkMap),
       '<div id="hof-live-stilling">' + _lasterHTML('Beregner live-stilling…') + '</div>',
       _renderGOATArkiv(klubbId),
     ].join('');
@@ -465,9 +430,9 @@ function _beregnUkuelig(spillere, kamper) {
 // 4. FELLES REKORDER
 // ════════════════════════════════════════════════════════
 
-function _renderFellesRekorder(spillere, kamper, historikkMap, alleKamperInklMix) {
+function _renderFellesRekorder(spillere, kamper, historikkMap) {
   const høyestRating   = _beregnHøyestRating(spillere, historikkMap);
-  const mestLoyal      = _beregnMestLoyal(spillere, historikkMap, alleKamperInklMix);
+  const mestLoyal      = _beregnMestLoyal(spillere, historikkMap);
   const drømmemakker   = _beregnDrømmemakker(kamper);
   const månedenSpiller = _beregnMånedenSpiller(spillere, kamper);
   const rivaloppgjør   = _beregnKlubbensRivaloppgjør(kamper);
@@ -496,20 +461,10 @@ function _beregnHøyestRating(spillere, historikkMap) {
   return beste;
 }
 
-function _beregnMestLoyal(spillere, historikkMap, alleKamperInklMix) {
-  // Bygg oppmøte-kart fra alle kamper (inkl. mix) — teller unike trenings-IDer per spiller
-  const treningSetMap = {};
-  for (const k of (alleKamperInklMix ?? [])) {
-    if (!k.treningId) continue;
-    for (const id of [k.lag1_s1, k.lag1_s2, k.lag2_s1, k.lag2_s2].filter(Boolean)) {
-      if (!treningSetMap[id]) treningSetMap[id] = new Set();
-      treningSetMap[id].add(k.treningId);
-    }
-  }
+function _beregnMestLoyal(spillere, historikkMap) {
   let beste = null;
   for (const s of spillere) {
-    // Bruk kamp-basert oppmøte (inkl. mix) om tilgjengelig, ellers fall tilbake på historikk
-    const antallTreninger = treningSetMap[s.id]?.size ?? (historikkMap[s.id] ?? []).length;
+    const antallTreninger = (historikkMap[s.id] ?? []).length;
     if (!beste || antallTreninger > beste.antallTreninger) beste = { id: s.id, navn: s.navn, antallTreninger };
   }
   return beste;
@@ -738,8 +693,14 @@ export async function visRivalSeksjon(spillerId) {
     const alle     = Object.values(motstanderMap);
     const rival    = [...alle].sort((a, b) => b.kamper - a.kamper)[0];
     const kvalifiserte = alle.filter(m => m.kamper >= MIN_KAMPER_RIVAL);
-    const nemesis  = kvalifiserte.sort((a, b) => a.winRate - b.winRate)[0] ?? null;
-    const dominerer = kvalifiserte.sort((a, b) => b.winRate - a.winRate)[0] ?? null;
+    // Bruk separate sorterte kopier — .sort() muterer in-place og ville ellers
+    // gi samme person i begge slots om det bare er én kvalifisert motstander.
+    // Nemesis: lavest winRate (taper mest mot dem)
+    // Dominerer: høyest winRate OG faktisk over 50% — uavgjort teller ikke
+    const nemesis   = [...kvalifiserte].sort((a, b) => a.winRate - b.winRate)[0] ?? null;
+    const dominerer = [...kvalifiserte]
+      .filter(m => m.winRate > 50)
+      .sort((a, b) => b.winRate - a.winRate)[0] ?? null;
 
     beholder.innerHTML = `
       <div class="seksjon-etikett">⚔️ Dine rivaloppgjør</div>
@@ -1007,10 +968,9 @@ export async function beregnGOAT(klubbId, fra, til, ekskluderSpillerId = null) {
   if (!db || !klubbId) return [];
 
   const spillere = _getSpillere();
-  const [alleKamper, historikkMap, alleTreningIds] = await Promise.all([
+  const [alleKamper, historikkMap] = await Promise.all([
     _hentAlleKamper(klubbId),
     _hentHistorikkForAlle(spillere),
-    _hentAlleTreningIds(klubbId),
   ]);
 
   const fraMs = fra.getTime();
@@ -1044,31 +1004,12 @@ export async function beregnGOAT(klubbId, fra, til, ekskluderSpillerId = null) {
   const _sjiktFor    = r => r >= grenseTopp ? 'topp' : r <= grenseBunn ? 'bunn' : 'midtre';
 
   const scorerMap = {};
+  const totalTreninger = new Set(periodeKamper.map(k => k.treningId)).size;
 
-  // Hent alle kamper inkl. mix for oppmøte-tellingen — brukes til å bygge
-  // oppmøteMap og totalTreninger slik at Mix-deltakelse teller som lojalitet (komponent C).
-  const alleKamperSnap = await getDocs(query(
-    collection(db, SAM.KAMPER),
-    where('ferdig', '==', true)
-  ));
-  const spillerIds = new Set(spillere.map(s => s.id));
-  const alleKamperInklMix = alleKamperSnap.docs
-    .map(d => ({ id: d.id, ...d.data() }))
-    .filter(k => {
-      const d = k.dato?.toMillis?.() ?? 0;
-      return d >= fraMs && d <= tilMs &&
-        alleTreningIds.has(k.treningId) &&
-        k.lag1Poeng != null && k.lag2Poeng != null &&
-        spillerIds.has(k.lag1_s1) && spillerIds.has(k.lag2_s1);
-    });
-
-  // totalTreninger = alle unike treninger i perioden (inkl. mix)
-  const totalTreninger = new Set(alleKamperInklMix.map(k => k.treningId)).size;
-
-  // Bygg oppmøte-kart fra alle kamper inkl. mix — samme kilde som totalTreninger,
+  // Bygg oppmøte-kart fra periodeKamper — samme kilde som totalTreninger,
   // slik at oppmøte aldri kan overstige totalTreninger og gi > 20p.
   const oppmøteMap = {}; // spillerId → Set<treningId>
-  for (const k of alleKamperInklMix) {
+  for (const k of periodeKamper) {
     if (!k.treningId) continue;
     for (const id of [k.lag1_s1, k.lag1_s2, k.lag2_s1, k.lag2_s2].filter(Boolean)) {
       if (!oppmøteMap[id]) oppmøteMap[id] = new Set();
