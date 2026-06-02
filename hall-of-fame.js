@@ -504,8 +504,32 @@ function _beregnMånedenSpiller(spillere, kamper) {
   const månedKamper = kamper.filter(k => (k.dato?.toMillis?.() ?? 0) >= grense);
   if (!månedKamper.length) return null;
 
+  // Bygg startrating-kart: ratingen spilleren HAD ved periodens start.
+  // Henter tidligste (ratingEtter − endring) fra historikk i perioden.
+  // Fallback til nåværende rating dersom ingen historikk finnes.
   const ratingMap = {};
-  spillere.forEach(s => { ratingMap[s.id] = s.rating ?? STARTRATING; });
+  for (const s of spillere) {
+    const hist = (historikkMap[s.id] ?? []).filter(h => {
+      const d = h.dato?.toMillis?.() ?? 0;
+      return d >= fraMs && d <= tilMs && h.type !== 'halvårsjustering';
+    });
+    if (hist.length) {
+      // Tidligste rad i perioden → ratingFør = ratingEtter − endring
+      const tidligst = hist.reduce((a, b) =>
+        (a.dato?.toMillis?.() ?? 0) <= (b.dato?.toMillis?.() ?? 0) ? a : b);
+      ratingMap[s.id] = (tidligst.ratingEtter ?? STARTRATING) - (tidligst.endring ?? 0);
+    } else {
+      ratingMap[s.id] = s.rating ?? STARTRATING;
+    }
+  }
+
+  // Beregn dynamiske sjiktgrenser (topp 25% / midtre 50% / bunn 25%)
+  // basert på startratingene — fast ved periodens start, endres ikke underveis.
+  const alleRatinger = Object.values(ratingMap).sort((a, b) => a - b);
+  const antall       = alleRatinger.length;
+  const grenseTopp   = alleRatinger[Math.floor(antall * 0.75)] ?? STARTRATING;
+  const grenseBunn   = alleRatinger[Math.floor(antall * 0.25)] ?? STARTRATING;
+  const _sjiktFor    = r => r >= grenseTopp ? 'topp' : r <= grenseBunn ? 'bunn' : 'midtre';
 
   const bidragMap = {};
   for (const k of månedKamper) {
@@ -937,7 +961,10 @@ export async function beregnGOAT(klubbId, fra, til, ekskluderSpillerId = null) {
       return d >= fraMs && d <= tilMs;
     });
     const delta = hist.reduce((sum, h) => sum + (h.endring ?? 0), 0);
-    if (!scorerMap[s.id]) scorerMap[s.id] = { id: s.id, navn: s.navn, A: 0, B: 0, C: 0, D: 0, E: 0, oppmøte: 0 };
+    if (!scorerMap[s.id]) scorerMap[s.id] = {
+      id: s.id, navn: s.navn, A: 0, B: 0, C: 0, D: 0, E: 0, oppmøte: 0,
+      sjikt: _sjiktFor(ratingMap[s.id] ?? STARTRATING),
+    };
     scorerMap[s.id].A        = delta;
     scorerMap[s.id].oppmøte  = oppmøteMap[s.id]?.size ?? 0; // antall unike treninger i perioden
   }
@@ -1041,6 +1068,33 @@ export async function beregnGOAT(klubbId, fra, til, ekskluderSpillerId = null) {
   return resultater;
 }
 
+/**
+ * Beregner alle tre halvårskåringer i én operasjon.
+ * Returnerer { goat, jokeren, kriger, scoreboard } der
+ * goat    = beste totalscore i toppsjiktet (25%)
+ * jokeren = beste totalscore i midtsjiktet (50%)
+ * kriger  = beste totalscore i bunnsjiktet (25%)
+ *
+ * @param {string} klubbId
+ * @param {Date}   fra
+ * @param {Date}   til
+ * @returns {Promise<{ goat, jokeren, kriger, scoreboard }>}
+ */
+export async function beregnKåringer(klubbId, fra, til) {
+  const alle = await beregnGOAT(klubbId, fra, til);
+
+  const topp   = alle.filter(s => s.sjikt === 'topp');
+  const midtre = alle.filter(s => s.sjikt === 'midtre');
+  const bunn   = alle.filter(s => s.sjikt === 'bunn');
+
+  return {
+    goat:       topp[0]   ?? null,
+    jokeren:    midtre[0] ?? null,
+    kriger:     bunn[0]   ?? null,
+    scoreboard: alle,          // hele listen for admin-visning
+  };
+}
+
 /** Rendrer GOAT-arkiv-seksjonen (tidligere vinnere). */
 function _renderGOATArkiv(klubbId) {
   // Arkivet lagres i en dedikert Firestore-samling eller som felt på klubb-dokumentet.
@@ -1078,35 +1132,61 @@ window.hofVisGOATBeregner = async function() {
 
   try {
     const klubbId  = _getAktivKlubbId();
-    const resultater = await beregnGOAT(klubbId, fra, til);
-    const topp5   = resultater.slice(0, 5);
+    const { goat, jokeren, kriger, scoreboard } = await beregnKåringer(klubbId, fra, til);
 
-    if (!topp5.length) {
+    if (!scoreboard.length) {
       if (innhold) innhold.innerHTML = _tomTilstand('Ikke nok data for inneværende halvår');
       return;
     }
 
-    const vinner = topp5[0];
-    if (innhold) innhold.innerHTML = `
-      <div style="text-align:center;margin-bottom:16px">
-        <div style="font-size:13px;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">GOAT — ${escHtml(periode)}</div>
-        <div style="font-size:36px;margin-bottom:4px">🐐</div>
-        <div style="font-family:'Bebas Neue',cursive;font-size:28px;letter-spacing:1px;color:var(--yellow)">${escHtml(vinner.navn)}</div>
-        <div style="font-family:'DM Mono',monospace;font-size:22px;font-weight:700;color:var(--white);margin-top:4px">${vinner.total} poeng</div>
-      </div>
-      <div style="margin-bottom:12px">
+    // Hjelpefunksjon: rendrer én kåringsblokk
+    const kåringsBlokk = (ikon, tittel, sitat, vinner, farge) => {
+      if (!vinner) return `
+        <div style="padding:14px 0;border-bottom:1px solid var(--border)">
+          <div style="font-size:12px;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">${ikon} ${tittel}</div>
+          <div style="font-size:13px;color:var(--muted2)">Ikke nok data i dette sjiktet</div>
+        </div>`;
+      return `
+        <div style="padding:14px 0;border-bottom:1px solid var(--border)">
+          <div style="font-size:12px;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">${ikon} ${tittel}</div>
+          <div style="font-size:12px;color:var(--muted2);font-style:italic;margin-bottom:8px;line-height:1.4">${sitat}</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="lb-avatar" style="width:36px;height:36px;font-size:14px">${lagInitialer(vinner.navn)}</div>
+            <div style="flex:1">
+              <div style="font-size:15px;font-weight:700;color:${farge}">${escHtml(vinner.navn)}</div>
+              <div style="font-size:11px;color:var(--muted2);margin-top:2px">Rating +${vinner.A}p · Form +${vinner.B}p · Oppmøte +${vinner.C}p · Makker +${vinner.D}p · Streak +${vinner.E}p</div>
+            </div>
+            <div style="font-family:'DM Mono',monospace;font-size:20px;font-weight:700;color:${farge}">${vinner.total}</div>
+          </div>
+        </div>`;
+    };
+
+    // Topp 5 scoreboard (hele feltet)
+    const topp5 = scoreboard.slice(0, 5);
+    const scoreboardHTML = `
+      <div style="margin-top:16px">
         <div style="font-size:12px;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Topp 5 — åpent scorekort</div>
         ${topp5.map((s, i) => `
-          <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)${i === topp5.length - 1 ? ';border:none' : ''}">
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 0;${i < topp5.length - 1 ? 'border-bottom:1px solid var(--border)' : ''}">
             <div style="font-family:'Bebas Neue',cursive;font-size:20px;color:var(--muted);width:20px">${i + 1}</div>
             <div class="lb-avatar" style="width:32px;height:32px;font-size:13px">${lagInitialer(s.navn)}</div>
             <div style="flex:1">
               <div style="font-size:14px;font-weight:600">${escHtml(s.navn)}</div>
-              <div style="font-size:11px;color:var(--muted2);margin-top:2px">Rating +${s.A}p · Form +${s.B}p · Oppmøte +${s.C}p · Makker +${s.D}p · Streak +${s.E}p</div>
+              <div style="font-size:11px;color:var(--muted2);margin-top:2px">${s.sjikt === 'topp' ? '🐐' : s.sjikt === 'midtre' ? '🃏' : '⚔️'} Rating +${s.A}p · Form +${s.B}p · Oppmøte +${s.C}p · Makker +${s.D}p · Streak +${s.E}p</div>
             </div>
             <div style="font-family:'DM Mono',monospace;font-size:18px;font-weight:700;color:${i === 0 ? 'var(--yellow)' : 'var(--white)'}">${s.total}</div>
           </div>`).join('')}
       </div>`;
+
+    if (innhold) innhold.innerHTML = `
+      <div style="text-align:center;margin-bottom:16px">
+        <div style="font-size:13px;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">${escHtml(periode)}</div>
+        <div style="font-family:'Bebas Neue',cursive;font-size:24px;letter-spacing:1px;color:var(--yellow)">Halvårskåringen</div>
+      </div>
+      ${kåringsBlokk('🐐', 'GOAT', '«Beiter på motstanderne og topper statistikken.»', goat, 'var(--yellow)')}
+      ${kåringsBlokk('🃏', 'Jokeren', '«Spilleren du aldri helt kan regne med – bortsett fra at han stadig overrasker.»', jokeren, '#a78bfa')}
+      ${kåringsBlokk('⚔️', 'Krigeren', '«Spilleren som møter opp, kjemper hver ball og nekter å la ratingen definere seg.»', kriger, '#fb923c')}
+      ${scoreboardHTML}`;
 
   } catch (e) {
     console.error('[HoF GOAT]', e);
@@ -1135,18 +1215,24 @@ window.hofVisGOATInfo = function() {
     ? `1. jan – 30. jun ${år}`
     : `1. jul – 31. des ${år}`;
 
+  const titler = [
+    ['🐐', 'GOAT',    'var(--yellow)', '«Beiter på motstanderne og topper statistikken.»',                                        'Toppsjiktet (øverste 25% i rating ved periodens start). Beste totalpoeng vinner.'],
+    ['🃏', 'Jokeren', '#a78bfa',       '«Spilleren du aldri helt kan regne med – bortsett fra at han stadig overrasker.»',         'Midtsjiktet (midtre 50% i rating). Beste totalpoeng vinner.'],
+    ['⚔️', 'Krigeren','#fb923c',       '«Spilleren som møter opp, kjemper hver ball og nekter å la ratingen definere seg.»',       'Bunnsjiktet (laveste 25% i rating). Beste totalpoeng vinner.'],
+  ];
+
   const komponenter = [
     ['A', '30p', '📈 Ratingutvikling',     'Hvor mye ratingen din har økt i perioden'],
     ['B', '25p', '🎯 Overprestasjonsrate', 'Vinner du mer enn Elo-ratingen din tilsier?'],
     ['C', '20p', '📅 Oppmøte',             'Andel treninger deltatt (min. 40% kreves)'],
-    ['D', '15p', '🤝 Makkereffekt',        'Vinnrate som makker — løfter du laget?'],
+    ['D', '15p', '🤝 Makkereffekt',        'Løfter laget ditt over Elo-forventningen?'],
     ['E', '10p', '🔥 Lengste vinnstreak',  'Beste sammenhengende vinnrekke i perioden'],
   ];
 
   innhold.innerHTML = `
     <div style="text-align:center;margin-bottom:20px">
-      <div style="font-size:36px;margin-bottom:6px">🐐</div>
-      <div style="font-family:'Bebas Neue',cursive;font-size:24px;letter-spacing:1px;color:var(--yellow)">GOAT-kåringen</div>
+      <div style="font-size:13px;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Halvårskåringen</div>
+      <div style="font-family:'Bebas Neue',cursive;font-size:24px;letter-spacing:1px;color:var(--yellow)">🐐 Jokeren ⚔️</div>
     </div>
 
     <div style="background:rgba(255,255,255,.05);border-radius:10px;padding:12px 14px;margin-bottom:16px">
@@ -1155,7 +1241,18 @@ window.hofVisGOATInfo = function() {
       <div style="font-size:13px;color:var(--muted2);margin-top:4px">Inneværende periode: ${periode}</div>
     </div>
 
-    <div style="font-size:12px;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Slik beregnes poengsummen</div>
+    <div style="font-size:12px;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Tre titler — én vinner per sjikt</div>
+    ${titler.map(([ikon, tittel, farge, sitat, forklaring], i, arr) => `
+      <div style="padding:10px 0;${i < arr.length - 1 ? 'border-bottom:1px solid var(--border)' : ''}">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span style="font-size:18px">${ikon}</span>
+          <div style="font-family:'Bebas Neue',cursive;font-size:18px;letter-spacing:1px;color:${farge}">${tittel}</div>
+        </div>
+        <div style="font-size:12px;color:var(--muted2);font-style:italic;margin-bottom:4px;line-height:1.4">${sitat}</div>
+        <div style="font-size:12px;color:var(--muted2);line-height:1.4">${forklaring}</div>
+      </div>`).join('')}
+
+    <div style="font-size:12px;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;margin:16px 0 8px">Slik beregnes poengsummen</div>
     ${komponenter.map(([bokstav, maks, tittel, beskr], i, arr) => `
       <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;${i < arr.length - 1 ? 'border-bottom:1px solid var(--border)' : ''}">
         <div style="font-family:'Bebas Neue',cursive;font-size:18px;color:var(--yellow);width:16px;flex-shrink:0">${bokstav}</div>
