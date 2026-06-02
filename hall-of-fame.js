@@ -305,8 +305,12 @@ export async function visHallOfFame() {
     beholder.innerHTML = [
       _renderNivådelteSeksjoner(spillere, kamper, historikkMap),
       _renderFellesRekorder(spillere, kamper, historikkMap),
+      '<div id="hof-live-stilling">' + _lasterHTML('Beregner live-stilling…') + '</div>',
       _renderGOATArkiv(klubbId),
     ].join('');
+
+    // Last live-stilling asynkront etter at resten er synlig
+    _renderLiveStilling(klubbId);
 
   } catch (e) {
     console.error('[HoF]', e);
@@ -1162,6 +1166,81 @@ export async function beregnKåringer(klubbId, fra, til) {
 }
 
 /** Rendrer GOAT-arkiv-seksjonen (tidligere vinnere). */
+async function _renderLiveStilling(klubbId) {
+  const el = document.getElementById('hof-live-stilling');
+  if (!el) return;
+
+  try {
+    const konfig = await _hentGoatKonfig(klubbId);
+    const nå     = new Date();
+
+    // Vis ingenting hvis perioden ikke har startet ennå
+    if (nå < konfig.periodeStart) {
+      el.innerHTML = '';
+      return;
+    }
+
+    // Bruk nå som til-dato for live-bilde, men ikke etter kåringsdatoen
+    const til = nå < konfig.kåringsDato ? nå : konfig.kåringsDato;
+    const { goat, jokeren, kriger, scoreboard, forFåTreninger, totalTreninger } = await beregnKåringer(klubbId, konfig.periodeStart, til);
+
+    const fmtDato = d => d.toLocaleDateString('no-NO', { day: 'numeric', month: 'short' });
+    const kåringsDatoStr = fmtDato(konfig.kåringsDato);
+
+    const lederKort = (ikon, tittel, farge, vinner) => {
+      if (!vinner) return `
+        <div style="flex:1;min-width:120px;background:rgba(255,255,255,.04);border-radius:10px;padding:10px 12px">
+          <div style="font-size:11px;color:var(--muted2);margin-bottom:4px">${ikon} ${tittel}</div>
+          <div style="font-size:12px;color:var(--muted2)">Ikke nok data</div>
+        </div>`;
+      return `
+        <div style="flex:1;min-width:120px;background:rgba(255,255,255,.04);border-radius:10px;padding:10px 12px">
+          <div style="font-size:11px;color:var(--muted2);margin-bottom:6px">${ikon} ${tittel}</div>
+          <div style="font-size:13px;font-weight:600;color:${farge};margin-bottom:2px">${escHtml(vinner.navn)}</div>
+          <div style="font-family:'DM Mono',monospace;font-size:18px;font-weight:700;color:${farge}">${vinner.total}p</div>
+          <div style="font-size:10px;color:var(--muted2);margin-top:3px">A${vinner.A} B${vinner.B} C${vinner.C} D${vinner.D} E${vinner.E}</div>
+        </div>`;
+    };
+
+    const toppHTML = forFåTreninger
+      ? `<div style="font-size:13px;color:var(--muted2);text-align:center;padding:8px 0">
+           ${totalTreninger} av ${MIN_TRENINGER_GOAT} treninger gjennomført — stilling tilgjengelig fra trening ${MIN_TRENINGER_GOAT}
+         </div>`
+      : `<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+           ${lederKort('🐐', 'GOAT', 'var(--yellow)', goat)}
+           ${lederKort('🎭', 'Jokeren', '#a78bfa', jokeren)}
+           ${lederKort('⚔️', 'Krigeren', '#fb923c', kriger)}
+         </div>
+         <div style="font-size:11px;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Alle spillere</div>
+         <div>
+           ${scoreboard.slice(0, 8).map((s, i) => `
+             <div style="display:flex;align-items:center;gap:8px;padding:6px 0;${i < Math.min(scoreboard.length, 8) - 1 ? 'border-bottom:1px solid rgba(255,255,255,.06)' : ''}">
+               <div style="font-size:13px;color:var(--muted2);width:16px;text-align:right">${i + 1}</div>
+               <div style="font-size:14px">${s.sjikt === 'topp' ? '🐐' : s.sjikt === 'midtre' ? '🎭' : '⚔️'}</div>
+               <div style="flex:1;font-size:13px;font-weight:600">${escHtml(s.navn)}</div>
+               <div style="font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:${i === 0 ? 'var(--yellow)' : 'var(--white)'}">${s.total}</div>
+             </div>`).join('')}
+         </div>`;
+
+    el.innerHTML = `
+      <div class="seksjon-etikett">📊 Live-stilling</div>
+      <div class="kort" style="margin-bottom:14px">
+        <div class="kort-innhold">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <div style="font-size:13px;color:var(--muted2)">Foreløpig — oppdateres løpende</div>
+            <div style="font-size:12px;color:var(--muted2)">Kåres ${kåringsDatoStr}</div>
+          </div>
+          ${toppHTML}
+        </div>
+      </div>`;
+
+  } catch (e) {
+    console.error('[HoF live]', e);
+    const el2 = document.getElementById('hof-live-stilling');
+    if (el2) el2.innerHTML = '';
+  }
+}
+
 function _renderGOATArkiv(klubbId) {
   // Arkivet lagres i en dedikert Firestore-samling eller som felt på klubb-dokumentet.
   // Versjon 1: vises kun dersom admin har lagret tidligere resultater.
