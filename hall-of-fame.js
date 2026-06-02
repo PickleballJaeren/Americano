@@ -20,8 +20,8 @@
 
 import {
   db, SAM, STARTRATING,
-  collection, doc, getDoc, getDocs,
-  query, where, orderBy,
+  collection, doc, getDoc, getDocs, setDoc, updateDoc,
+  query, where, orderBy, Timestamp,
 } from './firebase.js';
 import { app }              from './state.js';
 import { escHtml }          from './ui.js';
@@ -56,6 +56,7 @@ const KAMP_MERKER  = [25, 50, 100, 250, 500];
 const RATING_MERKER = [1050, 1100, 1150, 1200];
 
 const MIN_KAMPER_TITTEL  = 15;   // Skarpskytter
+const MIN_TRENINGER_GOAT = 8;    // Minimum treninger før GOAT kan kåres
 const MIN_KAMPER_RIVAL   = 5;    // Nemesis / Du dominerer
 const MIN_KAMPER_MAKKER  = 10;   // Drømmemakkerlaget
 const MIN_KAMPER_GOAT    = 8;    // GOAT-kvalifisering
@@ -894,6 +895,57 @@ function _fremgangsbar(nåværende, milepæler) {
 // ════════════════════════════════════════════════════════
 
 /**
+ * Henter GOAT-konfig fra klubb-dokumentet.
+ * Returnerer defaults (kalenderhalvår) hvis ikke konfigurert.
+ */
+async function _hentGoatKonfig(klubbId) {
+  try {
+    const snap = await getDoc(doc(db, 'klubber', klubbId));
+    const konfig = snap.data()?.goatKonfig ?? {};
+    const nå = new Date();
+    const erFørste = nå.getMonth() < 6;
+    const år = nå.getFullYear();
+    return {
+      periodeStart:      konfig.periodeStart?.toDate?.() ?? (erFørste ? new Date(år, 0, 1) : new Date(år, 6, 1)),
+      kåringsDato:       konfig.kåringsDato?.toDate?.()  ?? (erFørste ? new Date(år, 5, 30, 23, 59) : new Date(år, 11, 31, 23, 59)),
+      nestePeriodeStart: konfig.nestePeriodeStart?.toDate?.() ?? null,
+    };
+  } catch {
+    const nå = new Date();
+    const erFørste = nå.getMonth() < 6;
+    const år = nå.getFullYear();
+    return {
+      periodeStart:      erFørste ? new Date(år, 0, 1) : new Date(år, 6, 1),
+      kåringsDato:       erFørste ? new Date(år, 5, 30, 23, 59) : new Date(år, 11, 31, 23, 59),
+      nestePeriodeStart: null,
+    };
+  }
+}
+
+/** Lagrer GOAT-konfig til klubb-dokumentet. */
+async function _lagreGoatKonfig(klubbId, { periodeStart, kåringsDato, nestePeriodeStart }) {
+  await updateDoc(doc(db, 'klubber', klubbId), {
+    goatKonfig: {
+      periodeStart:      Timestamp.fromDate(periodeStart),
+      kåringsDato:       Timestamp.fromDate(kåringsDato),
+      nestePeriodeStart: nestePeriodeStart ? Timestamp.fromDate(nestePeriodeStart) : null,
+    },
+  });
+}
+
+/** Formatter Date til YYYY-MM-DD for input[type=date]. */
+function _tilDatoInput(d) {
+  return d ? d.toISOString().slice(0, 10) : '';
+}
+
+/** Parser YYYY-MM-DD streng til Date (lokal midnatt). */
+function _fraDatoInput(s) {
+  if (!s) return null;
+  const [år, mnd, dag] = s.split('-').map(Number);
+  return new Date(år, mnd - 1, dag);
+}
+
+/**
  * Beregner GOAT-poengsummen for ett halvår.
  * @param {string} klubbId
  * @param {Date}   fra
@@ -1082,6 +1134,19 @@ export async function beregnGOAT(klubbId, fra, til, ekskluderSpillerId = null) {
 export async function beregnKåringer(klubbId, fra, til) {
   const alle = await beregnGOAT(klubbId, fra, til);
 
+  // Sjekk minimum antall treninger
+  const alleKamper = await _hentAlleKamper(klubbId);
+  const fraMs = fra.getTime(), tilMs = til.getTime();
+  const periodeKamper = alleKamper.filter(k => {
+    const d = k.dato?.toMillis?.() ?? 0;
+    return d >= fraMs && d <= tilMs;
+  });
+  const totalTreninger = new Set(periodeKamper.map(k => k.treningId).filter(Boolean)).size;
+
+  if (totalTreninger < MIN_TRENINGER_GOAT) {
+    return { goat: null, jokeren: null, kriger: null, scoreboard: [], forFåTreninger: true, totalTreninger };
+  }
+
   const topp   = alle.filter(s => s.sjikt === 'topp');
   const midtre = alle.filter(s => s.sjikt === 'midtre');
   const bunn   = alle.filter(s => s.sjikt === 'bunn');
@@ -1090,7 +1155,9 @@ export async function beregnKåringer(klubbId, fra, til) {
     goat:       topp[0]   ?? null,
     jokeren:    midtre[0] ?? null,
     kriger:     bunn[0]   ?? null,
-    scoreboard: alle,          // hele listen for admin-visning
+    scoreboard: alle,
+    forFåTreninger: false,
+    totalTreninger,
   };
 }
 
@@ -1109,7 +1176,10 @@ function _renderGOATArkiv(klubbId) {
           <span style="font-size:16px;font-family:sans-serif;opacity:0.7">ℹ️</span>
         </div>
         <div style="font-size:14px;color:var(--muted2);margin-top:6px;line-height:1.5">Kåres to ganger i året.<br>Vinnerne arkiveres her permanent.</div>
-        ${window.getErAdmin?.() ? `<button class="knapp knapp-primaer" onclick="hofVisGOATBeregner()" style="margin-top:14px;font-family:'Bebas Neue',cursive;font-size:18px;letter-spacing:1px">🏆 BEREGN GOAT-VINNER</button>` : ''}
+        ${window.getErAdmin?.() ? `
+          <button class="knapp knapp-primaer" onclick="hofVisGOATBeregner()" style="margin-top:14px;font-family:'Bebas Neue',cursive;font-size:18px;letter-spacing:1px">🏆 BEREGN GOAT-VINNER</button>
+          <button class="knapp" onclick="hofVisGOATKonfig()" style="margin-top:8px;font-size:14px;color:var(--muted2)">⚙️ Konfigurer periode</button>
+        ` : ''}
       </div>
     </div>`;
 }
@@ -1122,19 +1192,22 @@ window.hofVisGOATBeregner = async function() {
   const innhold = document.getElementById('hof-goat-innhold');
   if (innhold) innhold.innerHTML = _lasterHTML('Beregner GOAT-poeng…');
 
-  const nå        = new Date();
-  const erFørstHalvår = nå.getMonth() < 6;
-  const år        = nå.getFullYear();
-  const fra       = erFørstHalvår ? new Date(år, 0, 1) : new Date(år, 6, 1);
-  const til       = erFørstHalvår ? new Date(år, 5, 30, 23, 59) : new Date(år, 11, 31, 23, 59);
-  const periode   = erFørstHalvår ? `${år} — 1. halvår` : `${år} — 2. halvår`;
-
   try {
     const klubbId  = _getAktivKlubbId();
-    const { goat, jokeren, kriger, scoreboard } = await beregnKåringer(klubbId, fra, til);
+    const konfig   = await _hentGoatKonfig(klubbId);
+    const fra      = konfig.periodeStart;
+    const til      = konfig.kåringsDato;
+    const fmtDato  = d => d.toLocaleDateString('no-NO', { day: 'numeric', month: 'short', year: 'numeric' });
+    const periode  = `${fmtDato(fra)} – ${fmtDato(til)}`;
 
+    const { goat, jokeren, kriger, scoreboard, forFåTreninger, totalTreninger } = await beregnKåringer(klubbId, fra, til);
+
+    if (forFåTreninger) {
+      if (innhold) innhold.innerHTML = _tomTilstand(`Kun ${totalTreninger} av ${MIN_TRENINGER_GOAT} nødvendige treninger er gjennomført. Kom tilbake senere!`);
+      return;
+    }
     if (!scoreboard.length) {
-      if (innhold) innhold.innerHTML = _tomTilstand('Ikke nok data for inneværende halvår');
+      if (innhold) innhold.innerHTML = _tomTilstand('Ikke nok data for inneværende periode');
       return;
     }
 
@@ -1198,21 +1271,98 @@ window.hofLukkGOATModal = function() {
   if (modal) modal.style.display = 'none';
 };
 
+/** Admin: viser skjema for å sette periodestart, kåringsdato og neste periodestart. */
+window.hofVisGOATKonfig = async function() {
+  const modal = document.getElementById('hof-goat-modal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+  const innhold = document.getElementById('hof-goat-innhold');
+  if (innhold) innhold.innerHTML = _lasterHTML('Henter konfigurasjon…');
+
+  const klubbId = _getAktivKlubbId();
+  const konfig  = await _hentGoatKonfig(klubbId);
+
+  if (!innhold) return;
+  innhold.innerHTML = `
+    <div style="margin-bottom:16px">
+      <div style="font-size:13px;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Admin</div>
+      <div style="font-family:'Bebas Neue',cursive;font-size:22px;letter-spacing:1px;color:var(--yellow)">Kåringskonfigurasjon</div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:20px">
+      <div>
+        <div style="font-size:12px;color:var(--muted2);margin-bottom:6px">Periodens startdato</div>
+        <input type="date" id="goat-fra" value="${_tilDatoInput(konfig.periodeStart)}"
+          style="width:100%;padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid var(--border);border-radius:8px;color:var(--white);font-size:14px">
+        <div style="font-size:11px;color:var(--muted2);margin-top:4px">Kamper og treninger fra denne datoen teller med.</div>
+      </div>
+      <div>
+        <div style="font-size:12px;color:var(--muted2);margin-bottom:6px">Kåringsdato (periodens slutt)</div>
+        <input type="date" id="goat-til" value="${_tilDatoInput(konfig.kåringsDato)}"
+          style="width:100%;padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid var(--border);border-radius:8px;color:var(--white);font-size:14px">
+        <div style="font-size:11px;color:var(--muted2);margin-top:4px">Datoen kåringen gjennomføres og vinneren kåres.</div>
+      </div>
+      <div>
+        <div style="font-size:12px;color:var(--muted2);margin-bottom:6px">Neste periodes startdato</div>
+        <input type="date" id="goat-neste" value="${_tilDatoInput(konfig.nestePeriodeStart ?? null)}"
+          style="width:100%;padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid var(--border);border-radius:8px;color:var(--white);font-size:14px">
+        <div style="font-size:11px;color:var(--muted2);margin-top:4px">Valgfritt. Ny periode starter automatisk denne datoen.</div>
+      </div>
+    </div>
+
+    <div id="goat-konfig-feil" style="display:none;font-size:13px;color:#f87171;margin-bottom:12px"></div>
+
+    <button onclick="hofLagreGOATKonfig()"
+      style="width:100%;padding:12px;background:var(--yellow);color:#000;border:none;border-radius:10px;font-family:'Bebas Neue',cursive;font-size:18px;letter-spacing:1px;cursor:pointer">
+      💾 Lagre konfigurasjon
+    </button>`;
+};
+
+window.hofLagreGOATKonfig = async function() {
+  const fra   = _fraDatoInput(document.getElementById('goat-fra')?.value);
+  const til   = _fraDatoInput(document.getElementById('goat-til')?.value);
+  const neste = _fraDatoInput(document.getElementById('goat-neste')?.value);
+  const feilEl = document.getElementById('goat-konfig-feil');
+
+  if (!fra || !til) {
+    if (feilEl) { feilEl.textContent = 'Startdato og kåringsdato er påkrevd.'; feilEl.style.display = 'block'; }
+    return;
+  }
+  if (til <= fra) {
+    if (feilEl) { feilEl.textContent = 'Kåringsdato må være etter startdato.'; feilEl.style.display = 'block'; }
+    return;
+  }
+  if (neste && neste <= til) {
+    if (feilEl) { feilEl.textContent = 'Neste periodestart må være etter kåringsdato.'; feilEl.style.display = 'block'; }
+    return;
+  }
+  if (feilEl) feilEl.style.display = 'none';
+
+  try {
+    const klubbId = _getAktivKlubbId();
+    // Sett kåringsdato til slutten av dagen
+    til.setHours(23, 59, 59);
+    await _lagreGoatKonfig(klubbId, { periodeStart: fra, kåringsDato: til, nestePeriodeStart: neste });
+    window.hofLukkGOATModal();
+  } catch (e) {
+    console.error('[HoF konfig]', e);
+    if (feilEl) { feilEl.textContent = 'Kunne ikke lagre. Prøv igjen.'; feilEl.style.display = 'block'; }
+  }
+};
+
 /** Viser info-modal med neste kåringsdato og komponentforklaring. */
-window.hofVisGOATInfo = function() {
+window.hofVisGOATInfo = async function() {
   const modal   = document.getElementById('hof-goat-modal');
   if (!modal) return;
   modal.style.display = 'flex';
   const innhold = document.getElementById('hof-goat-innhold');
   if (!innhold) return;
 
-  const nå             = new Date();
-  const erFørstHalvår  = nå.getMonth() < 6;
-  const år             = nå.getFullYear();
-  const nesteKåring    = erFørstHalvår ? `30. juni ${år}` : `31. desember ${år}`;
-  const periode        = erFørstHalvår
-    ? `1. jan – 30. jun ${år}`
-    : `1. jul – 31. des ${år}`;
+  const klubbId   = _getAktivKlubbId();
+  const konfig    = await _hentGoatKonfig(klubbId);
+  const fmtDato   = d => d ? d.toLocaleDateString('no-NO', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+  const nesteKåring = fmtDato(konfig.kåringsDato);
+  const periode     = `${fmtDato(konfig.periodeStart)} – ${fmtDato(konfig.kåringsDato)}`;
 
   const titler = [
     ['🐐', 'GOAT',    'var(--yellow)', '«Beiter på motstanderne og topper statistikken.»',                                        'Toppsjiktet (øverste 25% i rating ved periodens start). Beste totalpoeng vinner.'],
