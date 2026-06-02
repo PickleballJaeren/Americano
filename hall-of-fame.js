@@ -335,14 +335,16 @@ export async function visHallOfFame() {
     const spillere = _getSpillere();
     // _hentAlleKamper fyller også kamper_inkl_mix-cachen i samme kall —
     // ingen ekstra Firestore-runde for Mix-oppmøte-beregningen.
-    const [kamper, historikkMap, alleKamperInklMix] = await Promise.all([
+    const [kamper, historikkMap, alleKamperInklMix, goatPeriode] = await Promise.all([
       _hentAlleKamper(klubbId),
       _hentHistorikkForAlle(spillere),
       _hentAlleKamperInklMix(klubbId),
+      _hentGoatKonfig(klubbId),
     ]);
+    const periodeMs = goatPeriode.periodeStart.getTime();
 
     beholder.innerHTML = [
-      _renderNivådelteSeksjoner(spillere, kamper, historikkMap),
+      _renderNivådelteSeksjoner(spillere, kamper, historikkMap, periodeMs),
       _renderFellesRekorder(spillere, kamper, historikkMap, alleKamperInklMix),
       '<div id="hof-live-stilling">' + _lasterHTML('Beregner live-stilling…') + '</div>',
       _renderGOATArkiv(klubbId),
@@ -370,15 +372,21 @@ async function _hentHistorikkForAlle(spillere) {
 // 3. NIVÅDELTE TITLER
 // ════════════════════════════════════════════════════════
 
-function _renderNivådelteSeksjoner(spillere, kamper, historikkMap) {
+function _renderNivådelteSeksjoner(spillere, kamper, historikkMap, periodeMs) {
   const nivåer = [NIVA.ELITE, NIVA.ETABLERT, NIVA.UTFORDRER];
+  // Filtrer kamper til GOAT-perioden — Skarpskytter og Ustoppelig
+  // skal kun gjelde inneværende sesong, ikke all-time.
+  const periodeKamper = periodeMs
+    ? kamper.filter(k => (k.dato?.toMillis?.() ?? 0) >= periodeMs)
+    : kamper;
+
   return nivåer.map(niv => {
     const gruppe = spillere.filter(s => _nivåFor(s.rating).id === niv.id);
     if (!gruppe.length) return '';
 
-    const fremgang  = _beregnFremgangskonge(gruppe, historikkMap);
-    const skarp     = _beregnSkarpskytter(gruppe, kamper);
-    const ukuelig   = _beregnUkuelig(gruppe, kamper);
+    const fremgang  = _beregnFremgangskonge(gruppe, historikkMap, periodeMs);
+    const skarp     = _beregnSkarpskytter(gruppe, periodeKamper);
+    const ukuelig   = _beregnUkuelig(gruppe, periodeKamper);
 
     return `
       <div class="seksjon-etikett">${niv.ikon} ${niv.label}</div>
@@ -392,8 +400,9 @@ function _renderNivådelteSeksjoner(spillere, kamper, historikkMap) {
   }).join('');
 }
 
-function _beregnFremgangskonge(spillere, historikkMap) {
-  const grense = Date.now() - 60 * 24 * 60 * 60 * 1000;
+function _beregnFremgangskonge(spillere, historikkMap, periodeMs) {
+  // Bruk GOAT-periodens startdato som grense — fallback til 60 dager
+  const grense = periodeMs ?? (Date.now() - 60 * 24 * 60 * 60 * 1000);
   let beste = null;
 
   for (const s of spillere) {
