@@ -296,21 +296,37 @@ export async function visHallOfFame() {
   beholder.innerHTML = _lasterHTML('Laster Hall of Fame…');
 
   try {
-    const spillere  = _getSpillere();
-    const [kamper, historikkMap] = await Promise.all([
+    const spillere   = _getSpillere();
+    const spillerIds = new Set(spillere.map(s => s.id));
+    const [kamper, historikkMap, alleTreningIds] = await Promise.all([
       _hentAlleKamper(klubbId),
       _hentHistorikkForAlle(spillere),
+      _hentAlleTreningIds(klubbId),
     ]);
+
+    // Hent alle kamper inkl. mix for oppmøte-beregning (Mest lojale spiller)
+    const alleKamperSnap = await getDocs(query(
+      collection(db, SAM.KAMPER),
+      where('ferdig', '==', true)
+    ));
+    const alleKamperInklMix = alleKamperSnap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(k =>
+        alleTreningIds.has(k.treningId) &&
+        k.lag1Poeng != null && k.lag2Poeng != null &&
+        spillerIds.has(k.lag1_s1) && spillerIds.has(k.lag2_s1)
+      );
 
     beholder.innerHTML = [
       _renderNivådelteSeksjoner(spillere, kamper, historikkMap),
-      _renderFellesRekorder(spillere, kamper, historikkMap),
+      _renderFellesRekorder(spillere, kamper, historikkMap, alleKamperInklMix),
       '<div id="hof-live-stilling">' + _lasterHTML('Beregner live-stilling…') + '</div>',
       _renderGOATArkiv(klubbId),
     ].join('');
 
-    // Last live-stilling asynkront etter at resten er synlig
+    // Last asynkrone seksjoner etter at resten er synlig
     _renderLiveStilling(klubbId);
+    _renderMånedenSpiller(klubbId, spillere, kamper);
 
   } catch (e) {
     console.error('[HoF]', e);
@@ -430,13 +446,13 @@ function _beregnUkuelig(spillere, kamper) {
 // 4. FELLES REKORDER
 // ════════════════════════════════════════════════════════
 
-function _renderFellesRekorder(spillere, kamper, historikkMap) {
+function _renderFellesRekorder(spillere, kamper, historikkMap, alleKamperInklMix) {
   const høyestRating   = _beregnHøyestRating(spillere, historikkMap);
-  const mestLoyal      = _beregnMestLoyal(spillere, historikkMap);
+  const mestLoyal      = _beregnMestLoyal(spillere, historikkMap, alleKamperInklMix);
   const drømmemakker   = _beregnDrømmemakker(kamper);
-  const månedenSpiller = _beregnMånedenSpiller(spillere, kamper);
   const rivaloppgjør   = _beregnKlubbensRivaloppgjør(kamper);
 
+  // Månedens spiller rendres med placeholder — fylles asynkront av _renderMånedenSpiller()
   return `
     <div class="seksjon-etikett">🌍 Felles rekorder</div>
     <div class="kort" style="margin-bottom:14px">
@@ -444,10 +460,61 @@ function _renderFellesRekorder(spillere, kamper, historikkMap) {
         ${_titelRad('👑', 'Høyest rating noensinne', høyestRating, v => `${v.toppRating} rating`)}
         ${_titelRad('🏅', 'Mest lojale spiller', mestLoyal, v => `${v.antallTreninger} treninger`)}
         ${_titelRad('🤝', 'Drømmemakkerlaget', drømmemakker, v => `${v.winRate}% winrate · ${v.kamper} kamper`)}
-        ${_titelRad('⚡', 'Månedens spiller', månedenSpiller, v => `+${v.overperfPst}% over forventet`)}
+        <div id="hof-maneden-rad"><div style="padding:12px 16px;color:var(--muted2);font-size:14px">⚡ Laster månedens spiller…</div></div>
       </div>
     </div>
     ${rivaloppgjør ? _renderRivaloppgjørKort(rivaloppgjør) : ''}`;
+}
+
+/**
+ * Rendrer Månedens spiller-raden asynkront og injiserer i DOM.
+ * Viser siste arkiverte vinner + live-kandidat for inneværende måned.
+ */
+async function _renderMånedenSpiller(klubbId, spillere, kamper) {
+  const beholder = document.getElementById('hof-maneden-rad');
+  if (!beholder) return;
+
+  try {
+    const { siste, live } = await _hentMånedenSpillerData(klubbId, spillere, kamper);
+    const nå = new Date();
+    const månedLabel = new Date(nå.getFullYear(), nå.getMonth(), 1)
+      .toLocaleDateString('no-NO', { month: 'long', year: 'numeric' });
+
+    // Live-rad for inneværende måned
+    const liveHTML = live
+      ? `<div style="display:flex;align-items:center;gap:12px;padding:10px 16px">
+          <div style="font-size:22px">⚡</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:600;color:var(--white)">${escHtml(live.navn)}</div>
+            <div style="font-size:12px;color:var(--muted2);margin-top:2px">${månedLabel} (pågår) · ${live.kamper} kamper</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:var(--green2)">+${live.overperfPst}%</div>
+            <div style="font-size:11px;color:var(--muted2)">over forventet</div>
+          </div>
+        </div>`
+      : `<div style="padding:12px 16px;font-size:13px;color:var(--muted2)">⚡ Månedens spiller — ikke nok data ennå (min. 3 kamper)</div>`;
+
+    // Siste arkiverte vinner (forrige måned)
+    const sisteHTML = siste
+      ? `<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-top:1px solid var(--border);opacity:.65">
+          <div style="font-size:18px">🏆</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600;color:var(--white)">${escHtml(siste.navn)}</div>
+            <div style="font-size:12px;color:var(--muted2);margin-top:1px">${_formatMånedNøkkel(siste.måned)} · ${siste.kamper} kamper</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-family:'DM Mono',monospace;font-size:14px;font-weight:600;color:var(--muted2)">+${siste.overperfPst}%</div>
+          </div>
+        </div>`
+      : '';
+
+    beholder.innerHTML = liveHTML + sisteHTML;
+  } catch (e) {
+    console.warn('[MånedenSpiller]', e?.message ?? e);
+    const el = document.getElementById('hof-maneden-rad');
+    if (el) el.innerHTML = '<div style="padding:12px 16px;color:var(--muted2);font-size:13px">⚡ Månedens spiller — kunne ikke laste</div>';
+  }
 }
 
 function _beregnHøyestRating(spillere, historikkMap) {
@@ -461,10 +528,20 @@ function _beregnHøyestRating(spillere, historikkMap) {
   return beste;
 }
 
-function _beregnMestLoyal(spillere, historikkMap) {
+function _beregnMestLoyal(spillere, historikkMap, alleKamperInklMix) {
+  // Bygg oppmøte-kart fra alle kamper (inkl. mix) — teller unike trenings-IDer per spiller
+  const treningSetMap = {};
+  for (const k of (alleKamperInklMix ?? [])) {
+    if (!k.treningId) continue;
+    for (const id of [k.lag1_s1, k.lag1_s2, k.lag2_s1, k.lag2_s2].filter(Boolean)) {
+      if (!treningSetMap[id]) treningSetMap[id] = new Set();
+      treningSetMap[id].add(k.treningId);
+    }
+  }
   let beste = null;
   for (const s of spillere) {
-    const antallTreninger = (historikkMap[s.id] ?? []).length;
+    // Bruk kamp-basert oppmøte (inkl. mix) om tilgjengelig, ellers fall tilbake på historikk
+    const antallTreninger = treningSetMap[s.id]?.size ?? (historikkMap[s.id] ?? []).length;
     if (!beste || antallTreninger > beste.antallTreninger) beste = { id: s.id, navn: s.navn, antallTreninger };
   }
   return beste;
@@ -504,21 +581,22 @@ function _beregnDrømmemakker(kamper) {
   return beste;
 }
 
-function _beregnMånedenSpiller(spillere, kamper) {
-  const grense    = Date.now() - 30 * 24 * 60 * 60 * 1000;
-  const månedKamper = kamper.filter(k => (k.dato?.toMillis?.() ?? 0) >= grense);
-  if (!månedKamper.length) return null;
+// ════════════════════════════════════════════════════════
+// MÅNEDENS SPILLER — arkivert månedlig
+// ════════════════════════════════════════════════════════
 
-  // Bygg startrating-kart: ratingen spilleren HAD ved periodens start.
-  // Henter tidligste (ratingEtter − endring) fra historikk i perioden.
-  // Fallback til nåværende rating dersom ingen historikk finnes.
+/**
+ * Beregner overperformance for én spiller over en liste kamper.
+ * Returnerer { id, navn, overperfPst, kamper } eller null.
+ */
+function _beregnMånedsVinner(spillere, kamper) {
   const ratingMap = {};
   spillere.forEach(s => { ratingMap[s.id] = s.rating ?? STARTRATING; });
 
   const bidragMap = {};
-  for (const k of månedKamper) {
-    const rA = (ratingMap[k.lag1_s1] + (ratingMap[k.lag1_s2] ?? STARTRATING)) / (k.lag1_s2 ? 2 : 1);
-    const rB = (ratingMap[k.lag2_s1] + (ratingMap[k.lag2_s2] ?? STARTRATING)) / (k.lag2_s2 ? 2 : 1);
+  for (const k of kamper) {
+    const rA = (ratingMap[k.lag1_s1] ?? STARTRATING + (ratingMap[k.lag1_s2] ?? STARTRATING)) / (k.lag1_s2 ? 2 : 1);
+    const rB = (ratingMap[k.lag2_s1] ?? STARTRATING + (ratingMap[k.lag2_s2] ?? STARTRATING)) / (k.lag2_s2 ? 2 : 1);
     const forventetA = eloForventet(rA, rB);
     const faktiskA   = k.lag1Poeng > k.lag2Poeng ? 1 : k.lag1Poeng < k.lag2Poeng ? 0 : 0.5;
 
@@ -529,8 +607,8 @@ function _beregnMånedenSpiller(spillere, kamper) {
       bidragMap[id].kamper++;
     };
 
-    registrer(k.lag1_s1, k.lag1_s1_navn, faktiskA, forventetA);
-    registrer(k.lag1_s2, k.lag1_s2_navn, faktiskA, forventetA);
+    registrer(k.lag1_s1, k.lag1_s1_navn, faktiskA,     forventetA);
+    registrer(k.lag1_s2, k.lag1_s2_navn, faktiskA,     forventetA);
     registrer(k.lag2_s1, k.lag2_s1_navn, 1 - faktiskA, 1 - forventetA);
     registrer(k.lag2_s2, k.lag2_s2_navn, 1 - faktiskA, 1 - forventetA);
   }
@@ -542,6 +620,90 @@ function _beregnMånedenSpiller(spillere, kamper) {
     if (!beste || overperfPst > beste.overperfPst) beste = { id, navn: b.navn, overperfPst, kamper: b.kamper };
   }
   return beste;
+}
+
+/**
+ * Henter månedArkiv fra klubb-dokumentet.
+ * Returnerer array sortert med nyeste først.
+ */
+async function _hentMånedArkiv(klubbId) {
+  try {
+    const snap = await getDoc(doc(db, 'klubber', klubbId));
+    return (snap.data()?.månedArkiv ?? []).sort((a, b) => b.måned.localeCompare(a.måned));
+  } catch { return []; }
+}
+
+/**
+ * Arkiverer månedens vinner for forrige måned dersom det ikke allerede
+ * er gjort. Kalles automatisk ved lasting av Hall of Fame.
+ * Bruker setDoc med merge:true — trygt å kalle flere ganger.
+ */
+async function _arkiverForrigeMånedHvisNødvendig(klubbId, spillere, kamper) {
+  const nå         = new Date();
+  const forrigeMnd = new Date(nå.getFullYear(), nå.getMonth() - 1, 1);
+  const månedNøkkel = `${forrigeMnd.getFullYear()}-${String(forrigeMnd.getMonth() + 1).padStart(2, '0')}`;
+
+  // Sjekk om allerede arkivert
+  const arkiv = await _hentMånedArkiv(klubbId);
+  if (arkiv.some(a => a.måned === månedNøkkel)) return; // allerede gjort
+
+  // Filtrer kamper for forrige kalendermåned
+  const fraMs = forrigeMnd.getTime();
+  const tilMs = new Date(nå.getFullYear(), nå.getMonth(), 1).getTime();
+  const månedKamper = kamper.filter(k => {
+    const d = k.dato?.toMillis?.() ?? 0;
+    return d >= fraMs && d < tilMs;
+  });
+
+  const vinner = _beregnMånedsVinner(spillere, månedKamper);
+  if (!vinner) return; // ikke nok data — arkiver ikke
+
+  const nyPost = {
+    måned:       månedNøkkel,
+    spillerId:   vinner.id,
+    navn:        vinner.navn,
+    overperfPst: vinner.overperfPst,
+    kamper:      vinner.kamper,
+    kåretDato:   new Date().toISOString(),
+  };
+
+  // Legg til i arkivet (maks 24 måneder — ca. 2 år)
+  const oppdatert = [nyPost, ...arkiv].slice(0, 24);
+  await setDoc(doc(db, 'klubber', klubbId), { månedArkiv: oppdatert }, { merge: true });
+}
+
+/**
+ * Henter live-kandidat for inneværende måned (ikke arkivert ennå).
+ */
+function _beregnLiveMånedKandidat(spillere, kamper) {
+  const nå   = new Date();
+  const fraMs = new Date(nå.getFullYear(), nå.getMonth(), 1).getTime();
+  const månedKamper = kamper.filter(k => (k.dato?.toMillis?.() ?? 0) >= fraMs);
+  return _beregnMånedsVinner(spillere, månedKamper);
+}
+
+/**
+ * Erstatter gammel _beregnMånedenSpiller — returnerer { arkiv, live }
+ * der arkiv er siste arkiverte vinner og live er inneværende måneds kandidat.
+ * Arkivering av forrige måned skjer som sideeffekt asynkront.
+ */
+async function _hentMånedenSpillerData(klubbId, spillere, kamper) {
+  // Arkiver forrige måned i bakgrunnen (ingen await — blokkerer ikke UI)
+  _arkiverForrigeMånedHvisNødvendig(klubbId, spillere, kamper).catch(e =>
+    console.warn('[MånedArkiv]', e?.message ?? e)
+  );
+
+  const arkiv = await _hentMånedArkiv(klubbId);
+  const live  = _beregnLiveMånedKandidat(spillere, kamper);
+  return { siste: arkiv[0] ?? null, live };
+}
+
+/** Formaterer månednøkkel "2025-06" til "Juni 2025" */
+function _formatMånedNøkkel(nøkkel) {
+  if (!nøkkel) return '';
+  const [år, mnd] = nøkkel.split('-');
+  return new Date(Number(år), Number(mnd) - 1, 1)
+    .toLocaleDateString('no-NO', { month: 'long', year: 'numeric' });
 }
 
 function _beregnKlubbensRivaloppgjør(kamper) {
@@ -693,8 +855,13 @@ export async function visRivalSeksjon(spillerId) {
     const alle     = Object.values(motstanderMap);
     const rival    = [...alle].sort((a, b) => b.kamper - a.kamper)[0];
     const kvalifiserte = alle.filter(m => m.kamper >= MIN_KAMPER_RIVAL);
-    const nemesis  = kvalifiserte.sort((a, b) => a.winRate - b.winRate)[0] ?? null;
-    const dominerer = kvalifiserte.sort((a, b) => b.winRate - a.winRate)[0] ?? null;
+    // Bruk separate sorterte kopier — .sort() muterer in-place og ville ellers
+    // gi samme person i begge slots om det bare er én kvalifisert motstander.
+    // Nemesis: lavest winRate. Dominerer: høyest winRate OG faktisk over 50%.
+    const nemesis   = [...kvalifiserte].sort((a, b) => a.winRate - b.winRate)[0] ?? null;
+    const dominerer = [...kvalifiserte]
+      .filter(m => m.winRate > 50)
+      .sort((a, b) => b.winRate - a.winRate)[0] ?? null;
 
     beholder.innerHTML = `
       <div class="seksjon-etikett">⚔️ Dine rivaloppgjør</div>
