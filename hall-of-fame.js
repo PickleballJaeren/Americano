@@ -412,11 +412,11 @@ function _beregnUkuelig(spillere, kamper) {
   for (const s of spillere) {
     const res = resultater[s.id] ?? [];
     let streak = 0, maks = 0;
-    for (const vant of [...res].reverse()) {
+    for (const vant of res) {
       if (vant) { streak++; maks = Math.max(maks, streak); }
-      else break; // aktiv streak — stopper ved første tap
+      else streak = 0;
     }
-    if (!beste || streak > beste.streak) beste = { id: s.id, navn: s.navn, streak };
+    if (!beste || maks > beste.streak) beste = { id: s.id, navn: s.navn, streak: maks };
   }
   return beste;
 }
@@ -926,9 +926,12 @@ export async function beregnGOAT(klubbId, fra, til, ekskluderSpillerId = null) {
       return d >= fraMs && d <= tilMs;
     });
     const delta = hist.reduce((sum, h) => sum + (h.endring ?? 0), 0);
+    // Tel unike treninger (én historikk-rad per kamp, ikke per trening)
+    const unikeTreninger = new Set(hist.map(h => h.treningId).filter(Boolean)).size
+      || new Set(hist.map(h => h.dato?.toMillis?.() ?? h.dato).filter(Boolean)).size;
     if (!scorerMap[s.id]) scorerMap[s.id] = { id: s.id, navn: s.navn, A: 0, B: 0, C: 0, D: 0, E: 0, oppmøte: 0 };
     scorerMap[s.id].A        = delta;
-    scorerMap[s.id].oppmøte  = hist.length; // antall treninger i perioden
+    scorerMap[s.id].oppmøte  = unikeTreninger; // antall unike treninger i perioden
   }
 
   // Normaliser A til 30p
@@ -938,8 +941,8 @@ export async function beregnGOAT(klubbId, fra, til, ekskluderSpillerId = null) {
   // --- Komponent B: Overprestasjonsrate (25p) ---
   const bidragMap = {};
   for (const k of periodeKamper) {
-    const rA       = (ratingMap[k.lag1_s1] ?? STARTRATING + (ratingMap[k.lag1_s2] ?? STARTRATING)) / (k.lag1_s2 ? 2 : 1);
-    const rB       = (ratingMap[k.lag2_s1] ?? STARTRATING + (ratingMap[k.lag2_s2] ?? STARTRATING)) / (k.lag2_s2 ? 2 : 1);
+    const rA       = ((ratingMap[k.lag1_s1] ?? STARTRATING) + (ratingMap[k.lag1_s2] ?? STARTRATING)) / (k.lag1_s2 ? 2 : 1);
+    const rB       = ((ratingMap[k.lag2_s1] ?? STARTRATING) + (ratingMap[k.lag2_s2] ?? STARTRATING)) / (k.lag2_s2 ? 2 : 1);
     const forventet = eloForventet(rA, rB);
     const faktisk   = k.lag1Poeng > k.lag2Poeng ? 1 : k.lag1Poeng < k.lag2Poeng ? 0 : 0.5;
 
@@ -968,21 +971,27 @@ export async function beregnGOAT(klubbId, fra, til, ekskluderSpillerId = null) {
   }
 
   // --- Komponent D: Makkereffekt (15p) ---
+  // Måler om du løfter laget utover hva Elo-ratingen tilsier.
+  // Per kamp: faktisk resultat − Elo-forventet(eget lag vs motstander).
   const makkerMap = {};
   for (const k of periodeKamper) {
-    const regMakker = (id, makker, vant) => {
+    const rL1 = ((ratingMap[k.lag1_s1] ?? STARTRATING) + (ratingMap[k.lag1_s2] ?? STARTRATING)) / (k.lag1_s2 ? 2 : 1);
+    const rL2 = ((ratingMap[k.lag2_s1] ?? STARTRATING) + (ratingMap[k.lag2_s2] ?? STARTRATING)) / (k.lag2_s2 ? 2 : 1);
+    const fv1  = eloForventet(rL1, rL2); // forventet for lag 1
+    const fv2  = 1 - fv1;               // forventet for lag 2
+    const f1   = k.lag1Poeng > k.lag2Poeng ? 1 : k.lag1Poeng < k.lag2Poeng ? 0 : 0.5;
+    const f2   = 1 - f1;
+
+    const regMakker = (id, makker, faktisk, forventet) => {
       if (!id || !makker || !ratingMap[id]) return;
       if (!makkerMap[id]) makkerMap[id] = { sum: 0, kamper: 0 };
-      const rA     = ratingMap[id] ?? STARTRATING;
-      const rMakker = ratingMap[makker] ?? STARTRATING;
-      const delta   = vant ? 1 : 0;
-      makkerMap[id].sum    += delta;
+      makkerMap[id].sum    += (faktisk - forventet);
       makkerMap[id].kamper++;
     };
-    regMakker(k.lag1_s1, k.lag1_s2, k.lag1Poeng > k.lag2Poeng);
-    regMakker(k.lag1_s2, k.lag1_s1, k.lag1Poeng > k.lag2Poeng);
-    regMakker(k.lag2_s1, k.lag2_s2, k.lag2Poeng > k.lag1Poeng);
-    regMakker(k.lag2_s2, k.lag2_s1, k.lag2Poeng > k.lag1Poeng);
+    regMakker(k.lag1_s1, k.lag1_s2, f1, fv1);
+    regMakker(k.lag1_s2, k.lag1_s1, f1, fv1);
+    regMakker(k.lag2_s1, k.lag2_s2, f2, fv2);
+    regMakker(k.lag2_s2, k.lag2_s1, f2, fv2);
   }
   for (const s of Object.values(scorerMap)) {
     const m = makkerMap[s.id];
