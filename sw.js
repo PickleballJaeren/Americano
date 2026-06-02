@@ -3,9 +3,15 @@
 // Cache-shell strategi: cacher app-skallet (HTML, CSS, JS)
 // for rask oppstart. Firebase/Firestore-kall går alltid
 // direkte til nett — aldri fra cache.
+//
+// ── VIKTIG VED DEPLOY ───────────────────────────────────
+// Øk VERSJON med 1 hver gang du pusher endringer til GitHub.
+// Dette er alt som skal til for at alle mobiler automatisk
+// plukker opp ny versjon neste gang de åpner appen.
 // ════════════════════════════════════════════════════════
 
-const CACHE_NAVN = 'pb-jaeren-v6';
+const VERSJON     = 11;                        // ← øk denne ved hver deploy
+const CACHE_NAVN  = `pb-jaeren-v${VERSJON}`;
 
 const SHELL = [
   './',
@@ -52,8 +58,11 @@ self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE_NAVN).then(cache => cache.addAll(SHELL))
   );
-  // Ikke skipWaiting() automatisk — vent til brukeren godkjenner
-  // via oppdateringsbannneret i index.html
+  // skipWaiting() umiddelbart: ny SW tar over så snart den er ferdig
+  // installert, uten å vente på at alle faner lukkes. Siden vi bruker
+  // network-first i fetch-handleren er det trygt — brukerne får alltid
+  // ferske filer fra nett når de er online, og oppdatert cache når de er offline.
+  self.skipWaiting();
 });
 
 // ── MESSAGE — brukeren trykket "Last på nytt" ───────────

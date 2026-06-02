@@ -1139,9 +1139,12 @@
 </div>
 
 <!-- PWA-oppdateringsvarsel -->
-<div id="oppdatering-banner" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#1a3d7c;border-top:2px solid #2563eb;padding:14px 20px;z-index:1000;display:none;align-items:center;justify-content:space-between;gap:12px;font-family:'DM Sans',sans-serif">
-  <span style="color:#f1f5f9;font-size:16px;font-weight:500">Ny versjon tilgjengelig</span>
-  <button onclick="lastNyVersjon()" style="background:#2563eb;color:#fff;border:none;border-radius:10px;padding:9px 18px;font-family:'DM Sans',sans-serif;font-size:16px;font-weight:600;cursor:pointer;flex-shrink:0">Last på nytt</button>
+<div id="oppdatering-banner" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#1a3d7c;border-top:2px solid #2563eb;padding:14px 20px;z-index:1000;align-items:center;justify-content:space-between;gap:12px;font-family:'DM Sans',sans-serif">
+  <span style="color:#f1f5f9;font-size:16px;font-weight:500">🔄 Ny versjon tilgjengelig</span>
+  <div style="display:flex;gap:8px;flex-shrink:0">
+    <button onclick="document.getElementById('oppdatering-banner').style.display='none'" style="background:transparent;color:#94a3b8;border:1px solid #334155;border-radius:10px;padding:9px 14px;font-family:'DM Sans',sans-serif;font-size:15px;cursor:pointer">Senere</button>
+    <button onclick="lastNyVersjon()" style="background:#2563eb;color:#fff;border:none;border-radius:10px;padding:9px 18px;font-family:'DM Sans',sans-serif;font-size:16px;font-weight:600;cursor:pointer">Last på nytt</button>
+  </div>
 </div>
 
 <!-- Modal: Slett alle økter -->
@@ -1656,26 +1659,66 @@
       });
     });
 
+    let _swReg = null;
+
+    function _visOppdateringsBanner() {
+      document.getElementById('oppdatering-banner').style.display = 'flex';
+    }
+
     navigator.serviceWorker.register('./sw.js').then(reg => {
-      // Lytt etter ny service worker som venter på å aktiveres
+      _swReg = reg;
+
+      // Lytt etter ny SW som installeres mens siden er åpen
       reg.addEventListener('updatefound', () => {
         const nyWorker = reg.installing;
         nyWorker.addEventListener('statechange', () => {
-          if (nyWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            // Ny versjon er klar — vis banner
-            document.getElementById('oppdatering-banner').style.display = 'flex';
+          // 'installed' + controller finnes = erstatning av gammel SW
+          // Siden vi nå bruker skipWaiting() i SW, vil ny SW hoppe rett
+          // til 'activating' uten å vente — vi lytter også på 'activated'
+          if (
+            (nyWorker.state === 'installed' || nyWorker.state === 'activated') &&
+            navigator.serviceWorker.controller
+          ) {
+            _visOppdateringsBanner();
           }
         });
       });
+
+      // Vis banner umiddelbart om en ny SW allerede venter (f.eks. brukeren
+      // åpnet appen mens en oppdatering var ferdig lastet ned)
+      if (reg.waiting && navigator.serviceWorker.controller) {
+        _visOppdateringsBanner();
+      }
+
+      // Poll etter oppdateringer hvert 30. minutt — fanger opp deploys
+      // som skjer mens brukeren har appen åpen (typisk på mobil)
+      setInterval(() => {
+        reg.update().catch(() => {});
+      }, 30 * 60 * 1000);
+    });
+
+    // Lytt etter at ny SW tar over — reload automatisk for å sikre at
+    // alle moduler lastes fra den nye cachen (unngår halvt-oppdatert tilstand)
+    let _refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (_refreshing) return;
+      _refreshing = true;
+      window.location.reload();
     });
   }
 
   function lastNyVersjon() {
+    // Tvinger nettleseren til å hente ny sw.js fra nett nå
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistration().then(reg => {
-        if (reg?.waiting) {
-          // Be den ventende service workeren ta over
-          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        if (reg) {
+          // Be ventende SW ta over (om skipWaiting ikke allerede har gjort det)
+          if (reg.waiting) {
+            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+          }
+          // Tving en fersk sjekk — nyttig om brukeren trykker "Last på nytt"
+          // lenge etter at banneret dukket opp
+          reg.update().catch(() => {});
         }
       });
     }
