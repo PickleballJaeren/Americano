@@ -222,6 +222,22 @@ async function _hentGyldigeTreningIds(klubbId) {
   return ids;
 }
 
+/** Henter og cacher ALLE trenings-IDer inkl. mix og mix-ab for én klubb. */
+async function _hentAlleTreningIds(klubbId) {
+  if (!klubbId) return new Set();
+  const nøkkel = `alle_treningids_${klubbId}`;
+  const cached = _fraCacheEllerNull(nøkkel);
+  if (cached) return cached;
+
+  const snap = await getDocs(query(
+    collection(db, SAM.TRENINGER),
+    where('klubbId', '==', klubbId)
+  ));
+  const ids = new Set(snap.docs.map(d => d.id));
+  _cachet(nøkkel, ids);
+  return ids;
+}
+
 // ════════════════════════════════════════════════════════
 // 1. SPILLERIDENTITET
 // ════════════════════════════════════════════════════════
