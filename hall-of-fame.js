@@ -542,21 +542,27 @@ function _beregnKlubbensRivaloppgjør(kamper) {
   for (const k of kamper) {
     const lag1 = [k.lag1_s1, k.lag1_s2].filter(Boolean);
     const lag2 = [k.lag2_s1, k.lag2_s2].filter(Boolean);
+    const lag1Vant = k.lag1Poeng > k.lag2Poeng;
+
     for (const id1 of lag1) {
       for (const id2 of lag2) {
         const nøkkel = [id1, id2].sort().join('_');
         if (!møterMap[nøkkel]) møterMap[nøkkel] = {
           id1, id2,
-          navn1: lag1.includes(id1) ? (k.lag1_s1 === id1 ? k.lag1_s1_navn : k.lag1_s2_navn) : null,
-          navn2: lag2.includes(id2) ? (k.lag2_s1 === id2 ? k.lag2_s1_navn : k.lag2_s2_navn) : null,
+          navn1: k.lag1_s1 === id1 ? k.lag1_s1_navn : k.lag1_s2_navn,
+          navn2: k.lag2_s1 === id2 ? k.lag2_s1_navn : k.lag2_s2_navn,
           møter: 0, seire1: 0, seire2: 0,
+          kampIds: new Set(),
         };
+
+        // Tel kun én gang per kamp per par — unngår dobbelttelling i 2v2
+        if (møterMap[nøkkel].kampIds.has(k.id)) continue;
+        møterMap[nøkkel].kampIds.add(k.id);
         møterMap[nøkkel].møter++;
-        const id1ErLag1 = lag1.includes(id1);
-        if (id1ErLag1 && k.lag1Poeng > k.lag2Poeng)  møterMap[nøkkel].seire1++;
-        if (!id1ErLag1 && k.lag2Poeng > k.lag1Poeng) møterMap[nøkkel].seire1++;
-        else if (id1ErLag1 && k.lag2Poeng > k.lag1Poeng)  møterMap[nøkkel].seire2++;
-        else if (!id1ErLag1 && k.lag1Poeng > k.lag2Poeng) møterMap[nøkkel].seire2++;
+
+        // id1 er alltid på lag1-siden (slik nøkkelen er bygget)
+        if (lag1Vant) møterMap[nøkkel].seire1++;
+        else          møterMap[nøkkel].seire2++;
       }
     }
   }
@@ -626,27 +632,35 @@ export async function visRivalSeksjon(spillerId) {
     if (!kamper.length) { beholder.innerHTML = ''; return; }
 
     const motstanderMap = {};
+
     for (const k of kamper) {
       const erLag1 = k.lag1_s1 === spillerId || k.lag1_s2 === spillerId;
-      const motId   = erLag1
-        ? (k.lag2_s1 !== spillerId ? k.lag2_s1 : k.lag2_s2)
-        : (k.lag1_s1 !== spillerId ? k.lag1_s1 : k.lag1_s2);
-      const motNavn = erLag1
-        ? (k.lag2_s1 !== spillerId ? k.lag2_s1_navn : k.lag2_s2_navn)
-        : (k.lag1_s1 !== spillerId ? k.lag1_s1_navn : k.lag1_s2_navn);
+      const vant   = erLag1 ? k.lag1Poeng > k.lag2Poeng : k.lag2Poeng > k.lag1Poeng;
+      const dato   = k.dato?.toMillis?.() ?? 0;
 
-      if (!motId) continue;
-      if (!motstanderMap[motId]) motstanderMap[motId] = { id: motId, navn: motNavn ?? 'Ukjent', seire: 0, kamper: 0, sisteDato: null, siste5: [] };
+      // Hent alle motstandere i denne kampen (1 eller 2)
+      const motstandere = erLag1
+        ? [{ id: k.lag2_s1, navn: k.lag2_s1_navn }, { id: k.lag2_s2, navn: k.lag2_s2_navn }]
+        : [{ id: k.lag1_s1, navn: k.lag1_s1_navn }, { id: k.lag1_s2, navn: k.lag1_s2_navn }];
 
-      const vant = erLag1 ? k.lag1Poeng > k.lag2Poeng : k.lag2Poeng > k.lag1Poeng;
-      motstanderMap[motId].kamper++;
-      if (vant) motstanderMap[motId].seire++;
+      for (const mot of motstandere.filter(m => m.id)) {
+        if (!motstanderMap[mot.id]) motstanderMap[mot.id] = {
+          id: mot.id, navn: mot.navn ?? 'Ukjent',
+          seire: 0, kamper: 0, sisteDato: null, siste5: [],
+          kampIds: new Set(),
+        };
 
-      const dato = k.dato?.toMillis?.() ?? 0;
-      if (!motstanderMap[motId].sisteDato || dato > motstanderMap[motId].sisteDato) {
-        motstanderMap[motId].sisteDato = dato;
+        // Tel kun én gang per kamp per motstander — unngår dobbelttelling
+        if (motstanderMap[mot.id].kampIds.has(k.id)) continue;
+        motstanderMap[mot.id].kampIds.add(k.id);
+        motstanderMap[mot.id].kamper++;
+        if (vant) motstanderMap[mot.id].seire++;
+
+        if (!motstanderMap[mot.id].sisteDato || dato > motstanderMap[mot.id].sisteDato) {
+          motstanderMap[mot.id].sisteDato = dato;
+        }
+        motstanderMap[mot.id].siste5.push({ vant, dato });
       }
-      motstanderMap[motId].siste5.push({ vant, dato });
     }
 
     // Sorter siste 5 kronologisk og behold de 5 siste
@@ -774,11 +788,11 @@ export async function visMerker(spillerId, alleKamper, historikk) {
           </div>
 
           <div>
-            <div style="font-size:13px;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Milepæler</div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
-              ${_merkePill(stat.harFørsteSeier, '🌟', 'Første seier')}
-              ${_merkePill(stat.harVærtEtablert, '🥈', 'Rykket opp til Etablert')}
-              ${_merkePill(stat.harVærtElite,    '🥇', 'Rykket opp til Elite')}
+            <div style="font-size:13px;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Milepæler</div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              ${_milepælKort(stat.harFørsteSeier,   '🌟', 'Første seier',        'Du har vunnet din første kamp')}
+              ${_milepælKort(stat.harVærtEtablert,  '🥈', 'Etablert spiller',    'Du har nådd 950 i rating — over snittet i klubben')}
+              ${_milepælKort(stat.harVærtElite,     '🥇', 'Elite spiller',       'Du har nådd 1050 i rating — blant klubbens beste')}
             </div>
           </div>
 
@@ -822,6 +836,27 @@ function _merkePill(oppnådd, kortNavn, tittel) {
     color:${oppnådd ? 'var(--yellow)' : 'var(--muted)'}">
     ${oppnådd ? '🏅' : '🔒'} ${escHtml(kortNavn)}
   </div>`;
+}
+
+/**
+ * Større kort-variant for milepæler — viser ikon, tittel og forklaringstekst.
+ * Låste merker viser hva som kreves; oppnådde merker viser hva du oppnådde.
+ */
+function _milepælKort(oppnådd, ikon, tittel, forklaring) {
+  const bg     = oppnådd ? 'rgba(234,179,8,0.08)'   : 'rgba(255,255,255,0.02)';
+  const border = oppnådd ? '1px solid rgba(234,179,8,0.4)' : '1px solid var(--border)';
+  const farge  = oppnådd ? 'var(--yellow)'  : 'var(--muted)';
+  const sub    = oppnådd ? 'var(--muted2)'  : 'var(--muted)';
+
+  return `
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:12px;background:${bg};border:${border}">
+      <div style="font-size:24px;flex-shrink:0;opacity:${oppnådd ? '1' : '0.35'}">${oppnådd ? ikon : '🔒'}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600;color:${farge}">${escHtml(tittel)}</div>
+        <div style="font-size:12px;color:${sub};margin-top:2px;line-height:1.4">${escHtml(forklaring)}</div>
+      </div>
+      ${oppnådd ? `<div style="font-size:18px">✓</div>` : ''}
+    </div>`;
 }
 
 function _fremgangsbar(nåværende, milepæler) {

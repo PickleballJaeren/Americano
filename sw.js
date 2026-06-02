@@ -5,7 +5,7 @@
 // direkte til nett — aldri fra cache.
 // ════════════════════════════════════════════════════════
 
-const CACHE_NAVN = 'pb-jaeren-v9';
+const CACHE_NAVN = 'pb-jaeren-v10';
 
 const SHELL = [
   './',
@@ -33,6 +33,7 @@ const SHELL = [
   './ledertavle.js',
   './arkiv.js',
   './utfordrer.js',
+  './hall-of-fame.js',
   './turnering.js',
   './turnering-logikk.js',
   './turnering-ui.js',

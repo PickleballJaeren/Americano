@@ -1672,6 +1672,22 @@
           }
         });
       });
+
+      // Sjekk etter oppdateringer hvert 30. minutt mens appen er åpen.
+      // Løser problemet med at mobil-PWA-er holdes åpne i dagevis
+      // uten å oppdage nye versjoner.
+      setInterval(() => reg.update(), 30 * 60 * 1000);
+
+      // Hvis en oppdatering allerede venter når appen åpnes — vis banner med én gang
+      if (reg.waiting) {
+        document.getElementById('oppdatering-banner').style.display = 'flex';
+      }
+    });
+
+    // Reload automatisk når ny service worker tar over kontrollen —
+    // slik at alle faner/vinduer får ny versjon samtidig
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      window.location.reload();
     });
   }
 
