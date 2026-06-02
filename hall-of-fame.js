@@ -4,7 +4,7 @@
 // Innhold:
 //   1. Spilleridentitet  — localStorage, «Hvem er du?»
 //   2. Nivåinndeling     — Utfordrer / Etablert / Elite
-//   3. Nivådelte titler  — Fremgangskonge, Skarpskytter, Ukuelig
+//   3. Nivådelte titler  — Klatrer, Skarpskytter, Ustoppelig
 //   4. Felles rekorder   — Høyest rating, Mest lojal,
 //                          Drømmemakkerlaget, Månedens spiller,
 //                          Klubbens rivaloppgjør
@@ -339,9 +339,9 @@ function _renderNivådelteSeksjoner(spillere, kamper, historikkMap) {
       <div class="seksjon-etikett">${niv.ikon} ${niv.label}</div>
       <div class="kort" style="margin-bottom:14px">
         <div class="kort-innhold" style="padding:0">
-          ${_titelRad('📈', 'Fremgangskonge', fremgang, v => `+${v.delta} rating siste 60 dager`)}
+          ${_titelRad('📈', 'Klatrer', fremgang, v => `+${v.delta} rating siste 60 dager`)}
           ${_titelRad('🎯', 'Skarpskytter', skarp, v => `${v.winRate}% winrate · ${v.kamper} kamper`)}
-          ${_titelRad('🔥', 'Ukuelig', ukuelig, v => `${v.streak} seire på rad`)}
+          ${_titelRad('🔥', 'Ustoppelig', ukuelig, v => `${v.streak} seire på rad`)}
         </div>
       </div>`;
   }).join('');
