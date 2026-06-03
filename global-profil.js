@@ -139,12 +139,30 @@ async function hentKampStatistikk(spillerId) {
     ]);
     const sett = new Map();
     for (const snap of [s1, s2, s3, s4]) snap.docs.forEach(d => sett.set(d.id, { id: d.id, ...d.data() }));
-    // Sorter på rundeNr → kampNr → dato.
-    // dato settes av serverTimestamp() og kan være identisk for kamper
-    // i samme batch. rundeNr er alltid satt og er den pålitelige primærnøkkelen
-    // for å skille runder. dato brukes som tiebreaker for fremtidige kamper
-    // som får dato satt ved poengregistrering (poeng.js).
+
+    // Hent avsluttetDato for alle unike treninger — brukes som primærnøkkel
+    // for å sortere kamper på tvers av treninger korrekt.
+    // rundeNr er kun unik innad i én trening (alle starter på 1, 2, 3...).
+    const treningIds = [...new Set([...sett.values()].map(k => k.treningId).filter(Boolean))];
+    const treningDatoMap = {};
+    if (treningIds.length) {
+      const treningSnaps = await Promise.all(
+        treningIds.map(id => getDoc(doc(db, SAM.TRENINGER, id)))
+      );
+      treningSnaps.forEach(snap => {
+        if (snap.exists()) {
+          const d = snap.data();
+          treningDatoMap[snap.id] = (d.avsluttetDato ?? d.opprettetDato)?.toMillis?.() ?? 0;
+        }
+      });
+    }
+
+    // Sorter: treningDato → rundeNr → kampNr → dato
+    // Dette sikrer korrekt kronologisk rekkefølge på tvers av alle treninger.
     kamper = [...sett.values()].sort((a, b) => {
+      const tA = treningDatoMap[a.treningId] ?? 0;
+      const tB = treningDatoMap[b.treningId] ?? 0;
+      if (tA !== tB) return tA - tB;
       if ((a.rundeNr ?? 0) !== (b.rundeNr ?? 0)) return (a.rundeNr ?? 0) - (b.rundeNr ?? 0);
       if ((a.kampNr ?? 0) !== (b.kampNr ?? 0)) return (a.kampNr ?? 0) - (b.kampNr ?? 0);
       return (a.dato?.toMillis?.() ?? 0) - (b.dato?.toMillis?.() ?? 0);
