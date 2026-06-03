@@ -379,7 +379,7 @@ function _renderNivådelteSeksjoner(spillere, kamper, historikkMap, periodeMs) {
   const filtrerte = periodeMs
     ? kamper.filter(k => (k.dato?.toMillis?.() ?? 0) >= periodeMs)
     : kamper;
-  // Fallback til alle kamper om perioden har for lite data (f.eks. ved sesongstart)
+  // Fallback til alle kamper om perioden ikke har nok data ennå
   const periodeKamper = filtrerte.length >= 3 ? filtrerte : kamper;
 
   return nivåer.map(niv => {
@@ -403,7 +403,6 @@ function _renderNivådelteSeksjoner(spillere, kamper, historikkMap, periodeMs) {
 }
 
 function _beregnFremgangskonge(spillere, historikkMap, periodeMs) {
-  // Bruk GOAT-periodens startdato som grense — fallback til 60 dager
   const grense = periodeMs ?? (Date.now() - 60 * 24 * 60 * 60 * 1000);
   let beste = null;
 
@@ -472,9 +471,7 @@ function _beregnUkuelig(spillere, kamper) {
       if (vant) { streak++; maks = Math.max(maks, streak); }
       else streak = 0;
     }
-    const effektiv = maks > 0 ? maks : streak;
-    if (effektiv > 0 && (!beste || effektiv > beste.streak))
-      beste = { id: s.id, navn: s.navn, streak: effektiv };
+    if (!beste || maks > beste.streak) beste = { id: s.id, navn: s.navn, streak: maks };
   }
   return beste;
 }
@@ -1193,8 +1190,23 @@ export async function beregnGOAT(klubbId, fra, til, ekskluderSpillerId = null) {
 
   const fraMs = fra.getTime();
   const tilMs = til.getTime();
+
+  // Hent avsluttetDato fra treningsdokumentene — kamp-dokumenter mangler dato
+  // på eldre kamper (serverTimestamp ble ikke satt ved poenglagring).
+  const alleTreningIdsGOAT = [...new Set(alleKamper.map(k => k.treningId).filter(Boolean))];
+  const treningDatoMapGOAT = {};
+  if (alleTreningIdsGOAT.length) {
+    const snaps = await Promise.all(alleTreningIdsGOAT.map(id => getDoc(doc(db, SAM.TRENINGER, id))));
+    snaps.forEach(snap => {
+      if (snap.exists()) {
+        const d = snap.data();
+        treningDatoMapGOAT[snap.id] = (d.avsluttetDato ?? d.opprettetDato)?.toMillis?.() ?? 0;
+      }
+    });
+  }
+
   const periodeKamper = alleKamper.filter(k => {
-    const d = k.dato?.toMillis?.() ?? 0;
+    const d = treningDatoMapGOAT[k.treningId] ?? k.dato?.toMillis?.() ?? 0;
     return d >= fraMs && d <= tilMs;
   });
 
@@ -1365,10 +1377,27 @@ export async function beregnKåringer(klubbId, fra, til) {
   const alle = await beregnGOAT(klubbId, fra, til);
 
   // Sjekk minimum antall treninger
+  // Bruker avsluttetDato fra treningsdokumentet — kamp-dokumenter har ikke
+  // dato satt (serverTimestamp ble ikke skrevet ved poenglagring i eldre kamper).
   const alleKamper = await _hentAlleKamper(klubbId);
   const fraMs = fra.getTime(), tilMs = til.getTime();
+
+  // Hent avsluttetDato for alle unike trenings-IDer i kamp-listen
+  const alleTreningIds = [...new Set(alleKamper.map(k => k.treningId).filter(Boolean))];
+  const treningDatoMap = {};
+  if (alleTreningIds.length) {
+    const snaps = await Promise.all(alleTreningIds.map(id => getDoc(doc(db, SAM.TRENINGER, id))));
+    snaps.forEach(snap => {
+      if (snap.exists()) {
+        const d = snap.data();
+        treningDatoMap[snap.id] = (d.avsluttetDato ?? d.opprettetDato)?.toMillis?.() ?? 0;
+      }
+    });
+  }
+
+  // Filtrer kamper basert på treningens dato, ikke kamp-dokumentets dato
   const periodeKamper = alleKamper.filter(k => {
-    const d = k.dato?.toMillis?.() ?? 0;
+    const d = treningDatoMap[k.treningId] ?? k.dato?.toMillis?.() ?? 0;
     return d >= fraMs && d <= tilMs;
   });
   const totalTreninger = new Set(periodeKamper.map(k => k.treningId).filter(Boolean)).size;
