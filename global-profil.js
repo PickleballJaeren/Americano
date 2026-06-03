@@ -100,6 +100,10 @@ export function beregnKampStatistikk(spillerId, kamper) {
 
   const winRate   = Math.round((seire / antallKamper) * 100);
   const avgPoints = Math.round((totaltPoeng / antallKamper) * 10) / 10;
+  // Sorter kronologisk (eldste først) før slice — sikrer at de siste 5
+  // kampene faktisk er de 5 nyeste, uavhengig av Firestore-rekkefølge.
+  // Reverse til slutt så nyeste vises først (venstre) i form-rekken.
+  alleResultater.sort((a, b) => (a.dato?.toMillis?.() ?? 0) - (b.dato?.toMillis?.() ?? 0));
   const form      = alleResultater.slice(-5).reverse().map(r => r.vant ? 'W' : 'L');
 
   let bestPartner = null, bestWR = -1;
@@ -130,7 +134,7 @@ async function hentKampStatistikk(spillerId) {
     ]);
     const sett = new Map();
     for (const snap of [s1, s2, s3, s4]) snap.docs.forEach(d => sett.set(d.id, { id: d.id, ...d.data() }));
-    kamper = [...sett.values()];
+    kamper = [...sett.values()].sort((a, b) => (a.dato?.toMillis?.() ?? 0) - (b.dato?.toMillis?.() ?? 0));
   } catch (e) {
     console.warn('[KampStat] Henting feilet:', e?.message ?? e);
     return { winRate: null, avgPoints: null, bestPartner: null };
@@ -185,6 +189,9 @@ function visKampStatistikk(stat, trendData = null) {
         <div style="flex:1;display:flex;align-items:center;padding-left:8px;font-size:14px;color:var(--muted2)">
           ${stat.totalKamper} kamp${stat.totalKamper === 1 ? '' : 'er'} totalt
         </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted2);margin-top:3px;padding:0 2px">
+        <span>← Eldre</span><span>Nyere →</span>
       </div>`;
   }
 
