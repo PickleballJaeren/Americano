@@ -4,7 +4,7 @@
 import {
   db, SAM,
   collection, doc,
-  query, where, getDocs, writeBatch,
+  query, where, getDocs, writeBatch, serverTimestamp,
 } from './firebase.js';
 import { app, erMix, erKval } from './state.js';
 import { getParter, erSingelBane } from './rotasjon.js';
@@ -142,7 +142,7 @@ export async function autolagreKamp(i, l1, l2) {
     const kampId = await hentKampDokId(`bane${baneNr}`, par.nr);
     if (!kampId) { settKampStatus(i, 'feil-status', '✗ Fant ikke kamp'); return; }
 
-    const oppdatering = { lag1Poeng: l1, lag2Poeng: l2, ferdig: true };
+    const oppdatering = { lag1Poeng: l1, lag2Poeng: l2, ferdig: true, dato: serverTimestamp() };
     if (!erSingelLagre && par.hviler != null && bane?.spillere?.[par.hviler]) {
       oppdatering.hvilerPoeng = Math.ceil((l1 + l2) / 2);
     }

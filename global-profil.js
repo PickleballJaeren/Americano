@@ -103,14 +103,11 @@ export function beregnKampStatistikk(spillerId, kamper) {
   // Sorter kronologisk (eldste først) før slice — sikrer at de siste 5
   // kampene faktisk er de 5 nyeste, uavhengig av Firestore-rekkefølge.
   // Reverse til slutt så nyeste vises først (venstre) i form-rekken.
-  // Sorter på dato, deretter rundeNr og kampNr — kamper i samme runde
-  // kan ha identisk serverTimestamp og må skilles på runde/kampnummer.
+  // Sorter på rundeNr → kampNr → dato (samme logikk som i hentKampStatistikk).
   alleResultater.sort((a, b) => {
-    const dA = a.dato?.toMillis?.() ?? 0;
-    const dB = b.dato?.toMillis?.() ?? 0;
-    if (dA !== dB) return dA - dB;
     if ((a.rundeNr ?? 0) !== (b.rundeNr ?? 0)) return (a.rundeNr ?? 0) - (b.rundeNr ?? 0);
-    return (a.kampNr ?? 0) - (b.kampNr ?? 0);
+    if ((a.kampNr ?? 0) !== (b.kampNr ?? 0)) return (a.kampNr ?? 0) - (b.kampNr ?? 0);
+    return (a.dato?.toMillis?.() ?? 0) - (b.dato?.toMillis?.() ?? 0);
   });
   const form      = alleResultater.slice(-5).reverse().map(r => r.vant ? 'W' : 'L');
 
@@ -142,15 +139,15 @@ async function hentKampStatistikk(spillerId) {
     ]);
     const sett = new Map();
     for (const snap of [s1, s2, s3, s4]) snap.docs.forEach(d => sett.set(d.id, { id: d.id, ...d.data() }));
-    // Sorter kronologisk: primært på dato, sekundært på rundeNr og kampNr.
-    // Kamper i samme runde skrives i batch og kan ha identisk dato (serverTimestamp),
-    // så rundeNr + kampNr sikrer korrekt rekkefølge innad i runden.
+    // Sorter på rundeNr → kampNr → dato.
+    // dato settes av serverTimestamp() og kan være identisk for kamper
+    // i samme batch. rundeNr er alltid satt og er den pålitelige primærnøkkelen
+    // for å skille runder. dato brukes som tiebreaker for fremtidige kamper
+    // som får dato satt ved poengregistrering (poeng.js).
     kamper = [...sett.values()].sort((a, b) => {
-      const dA = a.dato?.toMillis?.() ?? 0;
-      const dB = b.dato?.toMillis?.() ?? 0;
-      if (dA !== dB) return dA - dB;
       if ((a.rundeNr ?? 0) !== (b.rundeNr ?? 0)) return (a.rundeNr ?? 0) - (b.rundeNr ?? 0);
-      return (a.kampNr ?? 0) - (b.kampNr ?? 0);
+      if ((a.kampNr ?? 0) !== (b.kampNr ?? 0)) return (a.kampNr ?? 0) - (b.kampNr ?? 0);
+      return (a.dato?.toMillis?.() ?? 0) - (b.dato?.toMillis?.() ?? 0);
     });
   } catch (e) {
     console.warn('[KampStat] Henting feilet:', e?.message ?? e);
