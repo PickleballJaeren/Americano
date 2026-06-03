@@ -100,16 +100,11 @@ export function beregnKampStatistikk(spillerId, kamper) {
 
   const winRate   = Math.round((seire / antallKamper) * 100);
   const avgPoints = Math.round((totaltPoeng / antallKamper) * 10) / 10;
-  // Sorter kronologisk (eldste først) før slice — sikrer at de siste 5
-  // kampene faktisk er de 5 nyeste, uavhengig av Firestore-rekkefølge.
-  // Reverse til slutt så nyeste vises først (venstre) i form-rekken.
-  // Sorter på rundeNr → kampNr → dato (samme logikk som i hentKampStatistikk).
-  alleResultater.sort((a, b) => {
-    if ((a.rundeNr ?? 0) !== (b.rundeNr ?? 0)) return (a.rundeNr ?? 0) - (b.rundeNr ?? 0);
-    if ((a.kampNr ?? 0) !== (b.kampNr ?? 0)) return (a.kampNr ?? 0) - (b.kampNr ?? 0);
-    return (a.dato?.toMillis?.() ?? 0) - (b.dato?.toMillis?.() ?? 0);
-  });
-  const form      = alleResultater.slice(-5).reverse().map(r => r.vant ? 'W' : 'L');
+  // Ikke re-sorter alleResultater — kamper kommer allerede korrekt sortert
+  // fra hentKampStatistikk (treningDato → rundeNr → kampNr → dato).
+  // Re-sortering på bare rundeNr ville blande kamper fra ulike treninger.
+  // Eldste til venstre, nyeste til høyre — ingen reverse.
+  const form      = alleResultater.slice(-5).map(r => r.vant ? 'W' : 'L');
 
   let bestPartner = null, bestWR = -1;
   for (const [id, p] of Object.entries(partnerMap)) {
