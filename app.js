@@ -117,6 +117,8 @@ import {
 const KLUBBER = {
   'pickleball-jaeren': { navn: 'Pickleball Jæren', pin: '9436', demo: false },
   'fokus-pickleball':  { navn: 'Fokus Pickleball',  pin: '4350', demo: false },
+  'tsi-pickleball':    { navn: 'TSI Pickleball',    pin: '9299', demo: false },
+  'loten-pickleball':  { navn: 'Løten Tennisklubb', pin: '2341', demo: false },
   'demo':              { navn: 'Demo',               pin: null,   demo: true  },
 };
 
