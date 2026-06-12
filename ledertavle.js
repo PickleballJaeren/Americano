@@ -112,7 +112,7 @@ export async function oppdaterGlobalLedertavle(tvingOppdatering = false) {
           <div class="lb-navn" onclick="apneGlobalProfil('${s.id}')">${s.navn ?? 'Ukjent'}</div>
           <div style="text-align:right;flex-shrink:0;display:flex;align-items:center;gap:8px">
             <div onclick="apneGlobalProfil('${s.id}')">
-              ${getNivaaRatingHTML(s.rating ?? STARTRATING)}
+              ${getNivaaRatingHTML(s.rating ?? STARTRATING, false)}
               ${deltaHTML}
             </div>
             ${erAdmin ? `<button class="knapp-rediger-rating" onclick="startRedigerRating('${s.id}', ${s.rating ?? STARTRATING}, this)" title="Rediger rating" style="background:none;border:1px solid var(--border);border-radius:6px;padding:3px 8px;color:var(--muted2);font-size:13px;cursor:pointer">✏️</button>` : ''}
