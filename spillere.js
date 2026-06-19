@@ -494,6 +494,9 @@ async function leggTilSpiller() {
       if (pil)   pil.style.transform = 'rotate(180deg)';
     }
     oppdaterSisteDeltakereInPlace();
+    // Oppdater telleren "X valgt — Y aktive" etter at ny spiller er lagt til
+    const _st = _beregnSpillerStatus();
+    _oppdaterSpillerTellere(_st.min, _st.er6Format);
     visMelding(navn + ' lagt til!');
   } catch (e) {
     visFBFeil('Kunne ikke legge til spiller: ' + (e?.message ?? e));
