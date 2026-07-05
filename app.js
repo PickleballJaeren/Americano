@@ -95,6 +95,7 @@ import {
   turneringUIInit,
   visTurneringOversikt,
   visOppsett as visTurneringOppsett,
+  apneTurneringFraLenke,
 } from './turnering-ui.js';
 import {
   visPulje as visTurneringPulje,
@@ -851,6 +852,21 @@ async function init() {
   if (!db) {
     visFBFeil('Firebase er ikke konfigurert. Oppdater FB_CONFIG øverst i skriptet.');
     return;
+  }
+
+  // Spillerlenke til en turnering — ?klubb=X&turnering=Y (generert av delTurneringLenke()).
+  // Kobler automatisk til riktig klubb og åpner turneringen direkte, uten manuelt klubbvalg.
+  try {
+    const urlParams    = new URLSearchParams(location.search);
+    const urlKlubbId    = urlParams.get('klubb');
+    const urlTurneringId = urlParams.get('turnering');
+    if (urlKlubbId && urlTurneringId && KLUBBER[urlKlubbId]) {
+      byttKlubb(urlKlubbId);
+      await apneTurneringFraLenke(urlTurneringId);
+      return;
+    }
+  } catch (e) {
+    console.warn('Kunne ikke åpne turnering fra lenke:', e?.message ?? e);
   }
 
   // Vis hjemskjerm alltid ved oppstart — bruker velger klubb der

@@ -290,7 +290,7 @@ async function _apneTurneringKjerne(id, settUrl = true) {
 
 window.apneTurnering = (id) => _apneTurneringKjerne(id, true);
 
-async function apneTurneringFraLenke(id) {
+export async function apneTurneringFraLenke(id) {
   await _apneTurneringKjerne(id, false);
 }
 
