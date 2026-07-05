@@ -33,6 +33,7 @@ import {
   beregnLagspill,
   validerLagspillDelspill,
   genererLagspillDelspill,
+  erMixedByttet,
 } from './turnering.js';
 import {
   getAktivTurneringId,
@@ -267,6 +268,7 @@ let _aktivGame     = 0;                  // 0-indeksert
 let _tAktivLag     = 1;
 let _tMaxPoeng     = 15;
 let _lagspillDelspill = null; // [{par, navn1, navn2}, ...] — kun satt når _modalFormat.type === 'lagspill'
+let _lagspillByttMixed = false; // true = A1+B2/A2+B1 spiller sammen i stedet for A1+B1/A2+B2
 
 // ════════════════════════════════════════════════════════
 // ÅPNE / LUKK
@@ -287,7 +289,6 @@ window.apneResultatModal = function(puljeEllerNivaa, kampId, lag1Id, lag2Id, erS
     _modalFormat = hentFormatForRunde(kamp?.runde ?? '', t?.konfig ?? {}, kamp?.format ?? null);
   } else if (erLagspill) {
     _modalFormat = t?.konfig?.kampformatLagspill;
-    _lagspillDelspill = genererLagspillDelspill(lagMap[lag1Id], lagMap[lag2Id]);
   } else {
     _modalFormat = t?.konfig?.kampformatPulje ?? STANDARD_KAMPFORMAT;
   }
@@ -306,6 +307,11 @@ window.apneResultatModal = function(puljeEllerNivaa, kampId, lag1Id, lag2Id, erS
       eksisterendeL1 = kamp.lag1Poeng; eksisterendeL2 = kamp.lag2Poeng;
       if (erLagspill && kamp.games?.length) eksisterendeGames = kamp.games;
     }
+  }
+
+  if (erLagspill) {
+    _lagspillByttMixed = erMixedByttet(eksisterendeGames);
+    _lagspillDelspill  = genererLagspillDelspill(lagMap[lag1Id], lagMap[lag2Id], _lagspillByttMixed);
   }
 
   // Nullstill game-state
@@ -341,6 +347,13 @@ window.apneResultatModal = function(puljeEllerNivaa, kampId, lag1Id, lag2Id, erS
     _games = [...eksisterendeGames, null, null, null, null].slice(0, 5);
   } else if (eksisterendeL1 != null && eksisterendeL2 != null && _modalFormat?.type !== 'best_of_3' && !erLagspill) {
     _games[0] = { l1: eksisterendeL1, l2: eksisterendeL2 };
+  }
+
+  // Lagspill: start på det første delspillet som ikke er fylt ut ennå (i stedet for alltid #1),
+  // siden delspillene spilles samtidig på ulike baner, ikke i rekkefølge.
+  if (erLagspill) {
+    const forsteTomme = _games.slice(0, 4).findIndex(g => !g || g.l1 == null || g.l2 == null);
+    _aktivGame = forsteTomme === -1 ? 0 : forsteTomme;
   }
 
   document.getElementById('modal-resultat').style.display = 'flex';
@@ -381,6 +394,24 @@ function _tOppdaterModalUI() {
         : `Delspill ${_aktivGame + 1} av 4 · Til ${_modalFormat.points_to_win} · maks ${_modalFormat.max_points}`;
     }
     _tMaxPoeng = erDreambreaker ? 25 : (_modalFormat.max_points ?? 25);
+
+    // Mixed-par-bytte — kun relevant/synlig før delspill 3 og 4 er fylt ut,
+    // og kan endres fritt siden delspillene ofte spilles samtidig på ulike baner.
+    let byttEl = document.getElementById('t-lagspill-bytt-mixed');
+    if (!byttEl) {
+      byttEl = document.createElement('div');
+      byttEl.id = 't-lagspill-bytt-mixed';
+      byttEl.style.cssText = 'text-align:center;font-size:13px;color:var(--accent2);cursor:pointer;margin-bottom:8px;text-decoration:underline';
+      document.getElementById('modal-resultat-format')?.insertAdjacentElement('afterend', byttEl);
+    }
+    const mixLabel = _lagspillByttMixed
+      ? 'Mixed-par: A1+B2 · A2+B1 — bytt tilbake'
+      : 'Mixed-par: A1+B1 · A2+B2 — bytt om';
+    byttEl.textContent = mixLabel;
+    byttEl.onclick = () => window.tByttMixedPar();
+    byttEl.style.display = erDreambreaker ? 'none' : 'block';
+  } else {
+    document.getElementById('t-lagspill-bytt-mixed')?.remove();
   }
 
   // Game-indikatorer
@@ -407,12 +438,14 @@ function _tOppdaterModalUI() {
       const stilling = beregnLagspill(_games);
       const antallSirkler = stilling.trengerDreambreaker ? 5 : 4;
       indEl.style.display = 'flex';
+      // Klikkbare sirkler — delspillene spilles samtidig på ulike baner, så
+      // registrering kan skje i vilkårlig rekkefølge (i motsetning til best av 3).
       indEl.innerHTML = Array.from({ length: antallSirkler }, (_, i) => {
         const g = _games[i];
         let klasse = 'game-sirkel';
         if (g?.l1 != null && g?.l2 != null) klasse += g.l1 > g.l2 ? ' game-vunnet-lag1' : ' game-vunnet-lag2';
         else if (i === _aktivGame) klasse += ' game-aktiv';
-        return `<span class="${klasse}"></span>`;
+        return `<span class="${klasse}" style="cursor:pointer" onclick="window.tHopTilDelspill(${i})"></span>`;
       }).join('');
 
       const stEl = document.getElementById('t-game-stilling');
@@ -479,6 +512,29 @@ function _tBygPickerGrid(felt, maks) {
     picker.appendChild(el);
   }
 }
+
+// Lagspill — hopp direkte til et valgt delspill (fri rekkefølge, siden de
+// 4 delspillene ofte spilles samtidig på ulike baner).
+window.tHopTilDelspill = function(i) {
+  if (_modalFormat?.type !== 'lagspill') return;
+  if (i === 4) {
+    const stilling = beregnLagspill(_games);
+    if (!stilling.trengerDreambreaker) return; // dreambreaker ikke aktuell ennå
+  }
+  _aktivGame = i;
+  _tAktivLag = 1;
+  _tOppdaterModalUI();
+};
+
+// Lagspill — bytt om hvem som spiller mixed-parene (delspill 3–4):
+// A1+B1/A2+B2 (standard) ↔ A1+B2/A2+B1.
+window.tByttMixedPar = function() {
+  _lagspillByttMixed = !_lagspillByttMixed;
+  const t = app.aktivTurnering;
+  const lagMap = Object.fromEntries((t?.lag ?? []).map(l => [l.id, l]));
+  _lagspillDelspill = genererLagspillDelspill(lagMap[_modalLag1Id], lagMap[_modalLag2Id], _lagspillByttMixed);
+  _tOppdaterModalUI();
+};
 
 window.tApnePicker = function(felt) {
   const annet  = felt === 'l1' ? 'l2' : 'l1';
@@ -597,11 +653,15 @@ window.tVelgPoeng = function(verdi) {
         _aktivGame = 4;
         _tAktivLag = 1;
         _tOppdaterModalUI();
-      } else if (_aktivGame < 3) {
-        // Gå til neste av de 4 ordinære delspillene
-        _aktivGame = _aktivGame + 1;
-        _tAktivLag = 1;
-        _tOppdaterModalUI();
+      } else if (_aktivGame < 4) {
+        // Gå til neste TOMME delspill (ikke nødvendigvis det påfølgende —
+        // delspillene spilles ofte samtidig på ulike baner)
+        const nesteTomme = _games.slice(0, 4).findIndex(g => !g || g.l1 == null || g.l2 == null);
+        if (nesteTomme !== -1) {
+          _aktivGame = nesteTomme;
+          _tAktivLag = 1;
+          _tOppdaterModalUI();
+        }
       }
     } else {
       // Single game — bytt til lag 2 hvis lag 1 nettopp valgte

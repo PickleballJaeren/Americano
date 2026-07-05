@@ -63,6 +63,14 @@ const LAGSPILL_PAR_REKKEFOLGE = [
   { par: 'A2B2', p1: 'A2', p2: 'B2' },
 ];
 
+/** Alternativ rekkefølge for delspill 3–4 når mixed-parene byttes om. */
+const LAGSPILL_PAR_REKKEFOLGE_BYTTET = [
+  { par: 'A1A2', p1: 'A1', p2: 'A2' },
+  { par: 'B1B2', p1: 'B1', p2: 'B2' },
+  { par: 'A1B2', p1: 'A1', p2: 'B2' },
+  { par: 'A2B1', p1: 'A2', p2: 'B1' },
+];
+
 /**
  * Bygg kampformat for Lagspill-delspill fra valgt poengsystem.
  * @param {'rally'|'sideout'} poengsystem
@@ -74,19 +82,28 @@ export function lagLagspillKampformat(poengsystem = 'rally') {
 /**
  * Genererer de 4 faste delspillene for en Lagspill-kamp, med spillernavn
  * hentet automatisk fra lagenes faste A1/A2/B1/B2-oppstilling.
- * Brukeren velger aldri par selv — rekkefølgen er alltid A1A2 → B1B2 → A1B1 → A2B2.
+ * De to første parene (A1A2, B1B2) er alltid faste. De to siste
+ * ("mixed"-parene, A og B sammen) kan byttes om med byttMixed=true,
+ * slik at A1+B2 og A2+B1 spiller sammen i stedet for A1+B1 og A2+B2.
  * @param {{spillere: {A1,A2,B1,B2}}} lag1
  * @param {{spillere: {A1,A2,B1,B2}}} lag2
+ * @param {boolean} byttMixed
  * @returns {Array<{par, navn1, navn2}>}
  */
-export function genererLagspillDelspill(lag1, lag2) {
+export function genererLagspillDelspill(lag1, lag2, byttMixed = false) {
   const s1 = lag1?.spillere ?? {};
   const s2 = lag2?.spillere ?? {};
-  return LAGSPILL_PAR_REKKEFOLGE.map(({ par, p1, p2 }) => ({
+  const rekkefolge = byttMixed ? LAGSPILL_PAR_REKKEFOLGE_BYTTET : LAGSPILL_PAR_REKKEFOLGE;
+  return rekkefolge.map(({ par, p1, p2 }) => ({
     par,
     navn1: `${s1[p1] ?? '?'} / ${s1[p2] ?? '?'}`,
     navn2: `${s2[p1] ?? '?'} / ${s2[p2] ?? '?'}`,
   }));
+}
+
+/** Avgjør om en lagret kamp brukte byttet mixed-parring, basert på par-etiketten i games[2]. */
+export function erMixedByttet(games) {
+  return games?.[2]?.par === 'A1B2';
 }
 
 /**

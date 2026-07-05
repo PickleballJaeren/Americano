@@ -39,6 +39,7 @@ import {
   beregnLagspill,
   validerLagspillDelspill,
   genererLagspillPulje,
+  erMixedByttet,
 } from './turnering-logikk.js';
 
 // Re-eksporter logikk-funksjoner slik at eksisterende import-setninger
@@ -72,6 +73,7 @@ export {
   beregnLagspill,
   validerLagspillDelspill,
   genererLagspillPulje,
+  erMixedByttet,
 };
 
 // ── Avhengigheter injisert fra app.js ────────────────────
