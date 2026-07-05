@@ -474,12 +474,17 @@ function _tOppdaterModalUI() {
   _tFremhevValgte();
   _tLukkAllePickere();
 
-  // Åpne picker for neste lag automatisk (etter kort forsinkelse)
-  const game = _games[_aktivGame] ?? {};
-  if (game.l1 == null) {
-    setTimeout(() => window.tApnePicker('l1'), 60);
-  } else if (game.l2 == null) {
-    setTimeout(() => window.tApnePicker('l2'), 60);
+  // Åpne picker for neste lag automatisk (etter kort forsinkelse) — kun for
+  // best av 3 / standard, der rekkefølgen uansett er sekvensiell. For Lagspill
+  // ville dette forstyrre fri rekkefølge og gjøre det vanskelig å forlate
+  // kampen (poeng-velgeren popper opp igjen rett før man rekker å trykke Avbryt).
+  if (!erLagspill) {
+    const game = _games[_aktivGame] ?? {};
+    if (game.l1 == null) {
+      setTimeout(() => window.tApnePicker('l1'), 60);
+    } else if (game.l2 == null) {
+      setTimeout(() => window.tApnePicker('l2'), 60);
+    }
   }
 
   // LAGRE-knapp — synlig kun når kampen er ferdig
