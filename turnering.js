@@ -497,6 +497,33 @@ export async function startPuljespill(turneringId) {
   return puljeMedKamper;
 }
 
+/**
+ * Lagrer DELVIS fremgang i en Lagspill-kamp — brukes til autolagring mens
+ * admin registrerer delspill etter hvert (siden de ofte spilles samtidig
+ * på ulike baner, og man må kunne forlate kampen og komme tilbake senere).
+ * Setter aldri ferdig:true — det gjør kun registrerPuljeresultat() ved
+ * endelig bekreftelse.
+ */
+export async function lagreLagspillFremgang(turneringId, puljeId, kampId, games) {
+  const t = await hentTurnering(turneringId);
+  if (t.status !== T_STATUS.GROUP_PLAY) return; // stille no-op — ikke kritisk å feile her
+  if (t.konfig?.spillformat !== 'lagspill') return;
+
+  const format = t.konfig?.kampformatLagspill ?? lagLagspillKampformat();
+  for (let i = 0; i < games.length; i++) {
+    const g = games[i];
+    if (!g || g.l1 == null || g.l2 == null) continue;
+    const val = validerLagspillDelspill(g.l1, g.l2, i === 4, format);
+    if (!val.ok) throw new Error(`Delspill ${i + 1}: ${val.feil}`);
+  }
+
+  const nyePuljer = t.puljer.map(p => p.id !== puljeId ? p : ({
+    ...p,
+    kamper: (p.kamper ?? []).map(k => k.id !== kampId ? k : { ...k, games, ferdig: false }),
+  }));
+  await updateDoc(doc(db, TS.TURNERINGER, turneringId), { puljer: nyePuljer });
+}
+
 export async function registrerPuljeresultat(turneringId, puljeId, kampId, lag1Poeng, lag2Poeng, games = null) {
   const t = await hentTurnering(turneringId);
   if (t.status !== T_STATUS.GROUP_PLAY) throw new Error('Puljespill er ikke aktivt.');

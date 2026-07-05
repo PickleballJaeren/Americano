@@ -16,6 +16,7 @@ import {
   hentFormatForRunde,
   hentTurnering,
   registrerPuljeresultat,
+  lagreLagspillFremgang,
   registrerWalkover,
   flyttLag,
   beregnPuljetabell,
@@ -269,6 +270,7 @@ let _tAktivLag     = 1;
 let _tMaxPoeng     = 15;
 let _lagspillDelspill = null; // [{par, navn1, navn2}, ...] — kun satt når _modalFormat.type === 'lagspill'
 let _lagspillByttMixed = false; // true = A1+B2/A2+B1 spiller sammen i stedet for A1+B1/A2+B2
+let _lagspillAutolagreAktiv = false; // true = lagre delvis fremgang automatisk i bakgrunnen
 
 // ════════════════════════════════════════════════════════
 // ÅPNE / LUKK
@@ -306,7 +308,14 @@ window.apneResultatModal = function(puljeEllerNivaa, kampId, lag1Id, lag2Id, erS
     if (kamp?.ferdig) {
       eksisterendeL1 = kamp.lag1Poeng; eksisterendeL2 = kamp.lag2Poeng;
       if (erLagspill && kamp.games?.length) eksisterendeGames = kamp.games;
+    } else if (erLagspill && kamp?.games?.length) {
+      // Delvis fremgang lagret tidligere (autolagret) — last inn selv om kampen ikke er ferdig ennå
+      eksisterendeGames = kamp.games;
     }
+    // Autolagring skal kun skje for kamper som IKKE allerede var ferdigspilt da modalen ble åpnet.
+    // Redigering av et allerede lagret resultat (PIN-beskyttet) skal ikke kunne "avferdigstille"
+    // en kamp som andre enheter ser live, før man eksplisitt trykker LAGRE på nytt.
+    _lagspillAutolagreAktiv = erLagspill && !kamp?.ferdig;
   }
 
   if (erLagspill) {
@@ -363,6 +372,7 @@ window.apneResultatModal = function(puljeEllerNivaa, kampId, lag1Id, lag2Id, erS
 window.lukkResultatModal = function() {
   _tLukkAllePickere();
   document.getElementById('modal-resultat').style.display = 'none';
+  _lagspillFlushAutolagre();
 };
 
 // ════════════════════════════════════════════════════════
@@ -536,6 +546,28 @@ window.tByttMixedPar = function() {
   _tOppdaterModalUI();
 };
 
+// Lagspill — autolagrer delvis fremgang i bakgrunnen (stille, ikke-blokkerende).
+// Gjør at man kan lukke en kamp midt i registreringen og fortsette senere,
+// eller registrere delspill i flere kamper om hverandre.
+let _lagspillAutolagreTimer = null;
+
+async function _lagspillFlushAutolagre() {
+  if (!_lagspillAutolagreAktiv || !_modalPuljeId || !_modalKampId) return;
+  clearTimeout(_lagspillAutolagreTimer);
+  const snapshot = _games.map(g => g ? { ...g } : null);
+  try {
+    await lagreLagspillFremgang(_aktivTurneringId, _modalPuljeId, _modalKampId, snapshot);
+  } catch (e) {
+    console.warn('[Lagspill] Autolagring feilet:', e?.message ?? e);
+  }
+}
+
+function _lagspillAutolagre() {
+  if (!_lagspillAutolagreAktiv || !_modalPuljeId || !_modalKampId) return;
+  clearTimeout(_lagspillAutolagreTimer);
+  _lagspillAutolagreTimer = setTimeout(_lagspillFlushAutolagre, 400);
+}
+
 window.tApnePicker = function(felt) {
   const annet  = felt === 'l1' ? 'l2' : 'l1';
   // Lukk den andre pickeren
@@ -643,6 +675,10 @@ window.tVelgPoeng = function(verdi) {
         return;
       }
       document.getElementById('modal-resultat-feil').textContent = '';
+
+      // Autolagre delvis fremgang i bakgrunnen — slik at man kan lukke kampen
+      // og fortsette på en annen kamp uten å miste det som allerede er registrert.
+      _lagspillAutolagre();
 
       const stilling = beregnLagspill(_games);
       if (stilling.ferdig) {
