@@ -832,9 +832,25 @@ function oppdaterPuljePreview(t) {
   }
 }
 
+// Navigerer fra puljespill-skjermen til lag-/oppstillingsskjermen — brukes til å
+// endre Lagspill-oppstilling (A1/A2/B1/B2) mens turneringen pågår, siden det
+// ellers ikke finnes noen vei tilbake til den skjermen etter at puljespillet er startet.
+window.apneLagListeFraPulje = async function() {
+  const t = app.aktivTurnering ?? await hentTurnering(_aktivTurneringId);
+  if (!t) return;
+  _navigerFremover('turnering-pulje', 'turnering-oppsett');
+  await visOppsett(t);
+};
+
 function oppdaterOppsettKnapper(t) {
   const startBtn = document.getElementById('start-puljespill-knapp');
   if (!startBtn) return;
+  if (t.status !== T_STATUS.SETUP) {
+    // Turneringen er allerede startet — knappen er ikke lenger relevant på denne skjermen.
+    startBtn.style.display = 'none';
+    return;
+  }
+  startBtn.style.display = '';
   const erLagspill = t.konfig?.spillformat === 'lagspill';
   const antall = erLagspill ? 1 : (t.konfig?.antallPuljer ?? 2);
   const nok    = erLagspill ? (t.lag?.length ?? 0) >= 2 : (t.lag?.length ?? 0) >= antall * 2;
