@@ -560,11 +560,12 @@ async function _lagspillFlushAutolagre() {
   if (!_lagspillAutolagreAktiv || !_modalPuljeId || !_modalKampId) return;
   clearTimeout(_lagspillAutolagreTimer);
   const snapshot = _games.map(g => g ? { ...g } : null);
+  const turneringId = getAktivTurneringId();
   try {
-    await lagreLagspillFremgang(_aktivTurneringId, _modalPuljeId, _modalKampId, snapshot);
+    await lagreLagspillFremgang(turneringId, _modalPuljeId, _modalKampId, snapshot);
     // Viktig: oppdater den lokale kopien av turneringen, ellers vil apneResultatModal
     // lese utdaterte data (uten det nettopp lagrede delspillet) neste gang en kamp åpnes.
-    const oppdatert = await hentTurnering(_aktivTurneringId);
+    const oppdatert = await hentTurnering(turneringId);
     app.aktivTurnering = oppdatert;
   } catch (e) {
     console.warn('[Lagspill] Autolagring feilet:', e?.message ?? e);
