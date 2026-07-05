@@ -734,7 +734,12 @@ function oppdaterLagListe(t) {
 // ════════════════════════════════════════════════════════
 // LAGSPILL — endre oppstilling (A1/A2/B1/B2) mellom runder
 // Bygger en enkel modal dynamisk — ingen ny statisk markup nødvendig.
+// Dra ett navn oppå et annet for å bytte plass (Pointer Events —
+// fungerer likt med finger på mobil og mus på desktop).
 // ════════════════════════════════════════════════════════
+let _eoPosisjoner = null; // { A1, A2, B1, B2 } — arbeidskopi mens modalen er åpen
+let _eoLagId      = null;
+
 window.apneEndreOppstillingModal = function(lagId) {
   const lag = app.aktivTurnering?.lag?.find(l => l.id === lagId);
   if (!lag?.spillere) return;
@@ -742,13 +747,8 @@ window.apneEndreOppstillingModal = function(lagId) {
   const gammel = document.getElementById('modal-endre-oppstilling');
   if (gammel) gammel.remove();
 
-  const sp = lag.spillere;
-  const felt = (pos, verdi) => `
-    <div style="margin-bottom:10px">
-      <div style="font-size:12px;color:var(--muted2);margin-bottom:4px">${pos}</div>
-      <input id="eo-${pos}" value="${escHtml(verdi ?? '')}"
-        style="width:100%;background:var(--navy3);border:1px solid var(--border2);border-radius:9px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:16px;outline:none"/>
-    </div>`;
+  _eoLagId = lagId;
+  _eoPosisjoner = { A1: lag.spillere.A1, A2: lag.spillere.A2, B1: lag.spillere.B1, B2: lag.spillere.B2 };
 
   const div = document.createElement('div');
   div.id = 'modal-endre-oppstilling';
@@ -758,8 +758,12 @@ window.apneEndreOppstillingModal = function(lagId) {
   div.innerHTML = `
     <div class="modal" style="border-radius:22px 22px 0 0">
       <div class="modal-tittel">Endre oppstilling — ${escHtml(lag.navn ?? '')}</div>
-      ${felt('A1', sp.A1)}${felt('A2', sp.A2)}${felt('B1', sp.B1)}${felt('B2', sp.B2)}
-      <div id="eo-feil" style="color:var(--red2);font-size:14px;min-height:18px;margin-bottom:6px"></div>
+      <div style="font-size:14px;color:var(--muted2);margin-bottom:14px">Dra et navn oppå et annet for å bytte plass.</div>
+      <div id="eo-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px;touch-action:none"></div>
+      <div id="eo-feil" style="color:var(--red2);font-size:14px;min-height:18px;margin:8px 0 6px;text-align:center"></div>
+      <div style="text-align:center;margin-bottom:10px">
+        <a href="#" onclick="event.preventDefault();apneEndreOppstillingTekstmodus()" style="font-size:13px;color:var(--accent2);text-decoration:underline">Rediger navn direkte i stedet</a>
+      </div>
       <div class="modal-knapper">
         <button class="knapp knapp-omriss" style="flex:1" onclick="document.getElementById('modal-endre-oppstilling').remove()">Avbryt</button>
         <button class="knapp knapp-gronn" style="flex:2;font-family:'Bebas Neue',cursive;font-size:22px;letter-spacing:1px"
@@ -767,19 +771,117 @@ window.apneEndreOppstillingModal = function(lagId) {
       </div>
     </div>`;
   document.body.appendChild(div);
-  setTimeout(() => document.getElementById('eo-A1')?.focus(), 200);
+  _eoRenderGrid();
+};
+
+function _eoRenderGrid() {
+  const grid = document.getElementById('eo-grid');
+  if (!grid) return;
+  const posisjoner = ['A1', 'A2', 'B1', 'B2'];
+  grid.innerHTML = posisjoner.map(pos => `
+    <div class="eo-chip" data-pos="${pos}" style="background:var(--navy3);border:2px solid var(--border2);border-radius:11px;padding:12px;cursor:grab;user-select:none;transition:border-color .12s,transform .12s">
+      <div style="font-size:11px;color:var(--muted2);letter-spacing:.5px">${pos}</div>
+      <div class="eo-chip-navn" style="font-size:16px;font-weight:500;margin-top:2px">${escHtml(_eoPosisjoner[pos] ?? '')}</div>
+    </div>`).join('');
+
+  grid.querySelectorAll('.eo-chip').forEach(chip => {
+    chip.addEventListener('pointerdown', _eoPaDragStart);
+  });
+}
+
+// ── Drag-tilstand ─────────────────────────────────────────
+let _eoDragKilde  = null; // chip-element som dras
+let _eoGhost      = null; // flytende visuell kopi som følger pekeren
+let _eoOffsetX    = 0;
+let _eoOffsetY    = 0;
+
+function _eoPaDragStart(e) {
+  const chip = e.currentTarget;
+  _eoDragKilde = chip;
+  chip.setPointerCapture(e.pointerId);
+
+  const rect = chip.getBoundingClientRect();
+  _eoOffsetX = e.clientX - rect.left;
+  _eoOffsetY = e.clientY - rect.top;
+
+  _eoGhost = chip.cloneNode(true);
+  _eoGhost.style.position = 'fixed';
+  _eoGhost.style.left     = rect.left + 'px';
+  _eoGhost.style.top      = rect.top + 'px';
+  _eoGhost.style.width    = rect.width + 'px';
+  _eoGhost.style.zIndex   = '9999';
+  _eoGhost.style.pointerEvents = 'none';
+  _eoGhost.style.opacity  = '0.9';
+  _eoGhost.style.boxShadow = '0 8px 24px rgba(0,0,0,.4)';
+  _eoGhost.style.borderColor = 'var(--accent)';
+  document.body.appendChild(_eoGhost);
+
+  chip.style.opacity = '0.35';
+
+  chip.addEventListener('pointermove', _eoPaDragMove);
+  chip.addEventListener('pointerup',   _eoPaDragEnd);
+  chip.addEventListener('pointercancel', _eoPaDragEnd);
+}
+
+function _eoPaDragMove(e) {
+  if (!_eoGhost) return;
+  _eoGhost.style.left = (e.clientX - _eoOffsetX) + 'px';
+  _eoGhost.style.top  = (e.clientY - _eoOffsetY) + 'px';
+
+  // Fremhev chip under pekeren som mulig slippmål
+  document.querySelectorAll('.eo-chip').forEach(c => { c.style.borderColor = 'var(--border2)'; });
+  _eoGhost.style.display = 'none'; // ikke tell ghost selv med elementFromPoint
+  const under = document.elementFromPoint(e.clientX, e.clientY)?.closest('.eo-chip');
+  _eoGhost.style.display = '';
+  if (under && under !== _eoDragKilde) under.style.borderColor = 'var(--accent)';
+}
+
+function _eoPaDragEnd(e) {
+  const kilde = _eoDragKilde;
+  if (!kilde) return;
+
+  kilde.removeEventListener('pointermove', _eoPaDragMove);
+  kilde.removeEventListener('pointerup',   _eoPaDragEnd);
+  kilde.removeEventListener('pointercancel', _eoPaDragEnd);
+  kilde.style.opacity = '';
+
+  if (_eoGhost) { _eoGhost.style.display = 'none'; }
+  const under = document.elementFromPoint(e.clientX, e.clientY)?.closest('.eo-chip');
+  if (_eoGhost) { _eoGhost.remove(); _eoGhost = null; }
+
+  document.querySelectorAll('.eo-chip').forEach(c => { c.style.borderColor = 'var(--border2)'; });
+
+  if (under && under !== kilde) {
+    const posA = kilde.dataset.pos;
+    const posB = under.dataset.pos;
+    const tmp = _eoPosisjoner[posA];
+    _eoPosisjoner[posA] = _eoPosisjoner[posB];
+    _eoPosisjoner[posB] = tmp;
+    _eoRenderGrid();
+  }
+
+  _eoDragKilde = null;
+}
+
+// Fallback for de som heller vil skrive inn navn direkte (f.eks. rette en skrivefeil)
+window.apneEndreOppstillingTekstmodus = function() {
+  const grid = document.getElementById('eo-grid');
+  if (!grid) return;
+  const posisjoner = ['A1', 'A2', 'B1', 'B2'];
+  grid.innerHTML = posisjoner.map(pos => `
+    <div>
+      <div style="font-size:11px;color:var(--muted2);margin-bottom:4px">${pos}</div>
+      <input id="eo-tekst-${pos}" value="${escHtml(_eoPosisjoner[pos] ?? '')}"
+        oninput="_eoPosisjoner['${pos}'] = this.value.trim()"
+        style="width:100%;background:var(--navy3);border:1px solid var(--border2);border-radius:9px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:16px;outline:none"/>
+    </div>`).join('');
+  window._eoPosisjoner = _eoPosisjoner; // eksponer for inline oninput over
 };
 
 window.lagreEndretOppstilling = async function(lagId) {
-  const spillere = {
-    A1: document.getElementById('eo-A1')?.value?.trim(),
-    A2: document.getElementById('eo-A2')?.value?.trim(),
-    B1: document.getElementById('eo-B1')?.value?.trim(),
-    B2: document.getElementById('eo-B2')?.value?.trim(),
-  };
   const feilEl = document.getElementById('eo-feil');
   try {
-    await endreLagspillOppstilling(_aktivTurneringId, lagId, spillere);
+    await endreLagspillOppstilling(_aktivTurneringId, lagId, _eoPosisjoner);
     const t = await hentTurnering(_aktivTurneringId);
     app.aktivTurnering = t;
     document.getElementById('modal-endre-oppstilling')?.remove();

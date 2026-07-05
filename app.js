@@ -759,8 +759,9 @@ async function init() {
 
   // Koble turnering-ui.js
   turneringUIInit({
-    naviger:   naviger,
-    krevAdmin: krevAdminMedDemo,
+    naviger:         naviger,
+    krevAdmin:       krevAdminMedDemo,
+    getAktivKlubbId: () => aktivKlubbId,
   });
 
   // Koble resultat.js
