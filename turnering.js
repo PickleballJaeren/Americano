@@ -32,6 +32,13 @@ import {
   beregnFremgang,
   beregnBestOf3,
   validerGame,
+  LAGSPILL_POENGSYSTEM,
+  LAGSPILL_DREAMBREAKER_FORMAT,
+  lagLagspillKampformat,
+  genererLagspillDelspill,
+  beregnLagspill,
+  validerLagspillDelspill,
+  genererLagspillPulje,
 } from './turnering-logikk.js';
 
 // Re-eksporter logikk-funksjoner slik at eksisterende import-setninger
@@ -58,6 +65,13 @@ export {
   beregnFremgang,
   beregnBestOf3,
   validerGame,
+  LAGSPILL_POENGSYSTEM,
+  LAGSPILL_DREAMBREAKER_FORMAT,
+  lagLagspillKampformat,
+  genererLagspillDelspill,
+  beregnLagspill,
+  validerLagspillDelspill,
+  genererLagspillPulje,
 };
 
 // ── Avhengigheter injisert fra app.js ────────────────────
@@ -88,6 +102,7 @@ export async function opprettTurnering(konfig) {
 
   const {
     navn                  = 'Ny turnering',
+    spillformat           = 'standard',       // 'standard' | 'lagspill'
     antallPuljer          = 2,
     antallBaner           = 6,
     seedingModus          = SEEDING_MODUS.STANDARD,
@@ -97,7 +112,31 @@ export async function opprettTurnering(konfig) {
     kampformatKvartfinale = { ...STANDARD_KAMPFORMAT },
     kampformatSemifinale  = { ...STANDARD_KAMPFORMAT },
     kampformatFinale      = lagKampformat('single', 15),
+    lagspillPoengsystem   = 'rally',           // 'rally' | 'sideout' — kun for spillformat 'lagspill'
   } = konfig;
+
+  const erLagspill = spillformat === 'lagspill';
+
+  const konfigData = erLagspill
+    ? {
+        spillformat: 'lagspill',
+        // Lagspill spilles alltid som én serieturnering (round-robin) mellom lagene.
+        antallPuljer: 1,
+        antallBaner,
+        kampformatLagspill: lagLagspillKampformat(lagspillPoengsystem),
+      }
+    : {
+        spillformat: 'standard',
+        antallPuljer,
+        antallBaner,
+        seedingModus,
+        plasseringskamperA,
+        plasseringskamperBC,
+        kampformatPulje,
+        kampformatKvartfinale,
+        kampformatSemifinale,
+        kampformatFinale,
+      };
 
   const doc_ = await addDoc(collection(db, TS.TURNERINGER), {
     klubbId,
@@ -108,22 +147,12 @@ export async function opprettTurnering(konfig) {
     lag:        [],
     puljer:     [],
     sluttspill: { A: null, B: null, C: null },
-    konfig: {
-      antallPuljer,
-      antallBaner,
-      seedingModus,
-      plasseringskamperA,
-      plasseringskamperBC,
-      kampformatPulje,
-      kampformatKvartfinale,
-      kampformatSemifinale,
-      kampformatFinale,
-    },
+    konfig: konfigData,
   });
 
   app.turnering = {
     id: doc_.id, status: T_STATUS.SETUP,
-    lag: [], puljer: [], sluttspill: { A: null, B: null, C: null }, konfig,
+    lag: [], puljer: [], sluttspill: { A: null, B: null, C: null }, konfig: konfigData,
   };
   return doc_.id;
 }
@@ -225,8 +254,12 @@ export async function hentKjenteSpillere() {
       lag.forEach(l => {
         if (l.spiller1) leggTil(l.spiller1);
         if (l.spiller2) leggTil(l.spiller2);
+        // Lagspill — 4 spillere (A1/A2/B1/B2) i stedet for par
+        if (l.spillere) {
+          ['A1', 'A2', 'B1', 'B2'].forEach(pos => { if (l.spillere[pos]) leggTil(l.spillere[pos]); });
+        }
         // Fallback: split navn på ' / ' for eldre data
-        if (!l.spiller1 && l.navn?.includes(' / ')) {
+        if (!l.spiller1 && !l.spillere && l.navn?.includes(' / ')) {
           const [s1, s2] = l.navn.split(' / ');
           leggTil(s1); leggTil(s2);
         }
@@ -276,6 +309,77 @@ export async function oppdaterLagNavn(turneringId, lagId, spiller1, spiller2) {
   if (t.status !== T_STATUS.SETUP) throw new Error('Kan kun endre lag i oppsettfasen.');
   const nyeLag = t.lag.map(l => l.id === lagId
     ? { ...l, navn: `${s1} / ${s2}`, spiller1: s1, spiller2: s2 }
+    : l
+  );
+  await updateDoc(doc(db, TS.TURNERINGER, turneringId), { lag: nyeLag });
+}
+
+// ════════════════════════════════════════════════════════
+// LAGSPILL — lag med 4 spillere (A1/A2/B1/B2)
+// ════════════════════════════════════════════════════════
+
+/** Oppretter et Lagspill-lag med navn og 4 navngitte spillere. */
+export async function leggTilLagspillLag(turneringId, navn, spillere) {
+  const lagnavn = navn?.trim();
+  if (!lagnavn) throw new Error('Lagnavn kan ikke være tomt.');
+  ['A1', 'A2', 'B1', 'B2'].forEach(pos => {
+    if (!spillere?.[pos]?.trim()) throw new Error(`Spiller ${pos} kan ikke være tomt.`);
+  });
+
+  const t = await hentTurnering(turneringId);
+  if (t.status !== T_STATUS.SETUP) throw new Error('Kan kun endre lag i oppsettfasen.');
+  if (t.lag.length >= 32) throw new Error('Maks 32 lag per turnering.');
+
+  const nyttLag = {
+    id:       `lag_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,
+    navn:     lagnavn,
+    spillere: {
+      A1: spillere.A1.trim(), A2: spillere.A2.trim(),
+      B1: spillere.B1.trim(), B2: spillere.B2.trim(),
+    },
+    seed: t.lag.length + 1,
+  };
+  await updateDoc(doc(db, TS.TURNERINGER, turneringId), { lag: [...t.lag, nyttLag] });
+  return nyttLag;
+}
+
+/** Oppdaterer navn og/eller spillere for et Lagspill-lag (kun i oppsettfasen). */
+export async function oppdaterLagspillLag(turneringId, lagId, navn, spillere) {
+  const lagnavn = navn?.trim();
+  if (!lagnavn) throw new Error('Lagnavn kan ikke være tomt.');
+  ['A1', 'A2', 'B1', 'B2'].forEach(pos => {
+    if (!spillere?.[pos]?.trim()) throw new Error(`Spiller ${pos} kan ikke være tomt.`);
+  });
+
+  const t = await hentTurnering(turneringId);
+  if (t.status !== T_STATUS.SETUP) throw new Error('Kan kun endre lag i oppsettfasen.');
+  const nyeLag = t.lag.map(l => l.id === lagId
+    ? { ...l, navn: lagnavn, spillere: {
+        A1: spillere.A1.trim(), A2: spillere.A2.trim(),
+        B1: spillere.B1.trim(), B2: spillere.B2.trim(),
+      } }
+    : l
+  );
+  await updateDoc(doc(db, TS.TURNERINGER, turneringId), { lag: nyeLag });
+}
+
+/**
+ * Endrer hvem som er A1/A2/B1/B2 på et Lagspill-lag MELLOM runder
+ * (i motsetning til oppdaterLagspillLag, som kun virker i oppsettfasen).
+ * Endrer ikke navn eller antall spillere — kun posisjonene.
+ */
+export async function endreLagspillOppstilling(turneringId, lagId, spillere) {
+  ['A1', 'A2', 'B1', 'B2'].forEach(pos => {
+    if (!spillere?.[pos]?.trim()) throw new Error(`Spiller ${pos} kan ikke være tomt.`);
+  });
+  const t = await hentTurnering(turneringId);
+  if (t.status !== T_STATUS.GROUP_PLAY) throw new Error('Oppstilling kan kun endres mens puljespill pågår.');
+
+  const nyeLag = t.lag.map(l => l.id === lagId
+    ? { ...l, spillere: {
+        A1: spillere.A1.trim(), A2: spillere.A2.trim(),
+        B1: spillere.B1.trim(), B2: spillere.B2.trim(),
+      } }
     : l
   );
   await updateDoc(doc(db, TS.TURNERINGER, turneringId), { lag: nyeLag });
@@ -347,8 +451,13 @@ export async function lagrePuljer(turneringId, puljer) {
 export async function startPuljespill(turneringId) {
   const t = await hentTurnering(turneringId);
   if (t.status !== T_STATUS.SETUP) throw new Error('Turneringen er allerede startet.');
-  if (!t.puljer?.length) throw new Error('Generer puljer først.');
   if (!t.lag?.length) throw new Error('Ingen lag registrert.');
+
+  // Lagspill: generer automatisk den ene puljen (alle lag) hvis den ikke finnes ennå.
+  if (t.konfig?.spillformat === 'lagspill' && !t.puljer?.length) {
+    t.puljer = genererLagspillPulje(t.lag);
+  }
+  if (!t.puljer?.length) throw new Error('Generer puljer først.');
 
   const puljeMedKamper = (() => {
     const antallPuljer  = t.puljer.length;
@@ -390,9 +499,26 @@ export async function registrerPuljeresultat(turneringId, puljeId, kampId, lag1P
   const t = await hentTurnering(turneringId);
   if (t.status !== T_STATUS.GROUP_PLAY) throw new Error('Puljespill er ikke aktivt.');
 
-  const format = t.konfig?.kampformatPulje ?? STANDARD_KAMPFORMAT;
+  const erLagspill = t.konfig?.spillformat === 'lagspill';
+  const format = erLagspill
+    ? (t.konfig?.kampformatLagspill ?? lagLagspillKampformat())
+    : (t.konfig?.kampformatPulje ?? STANDARD_KAMPFORMAT);
 
-  if (format.type === 'best_of_3' && games?.length) {
+  if (erLagspill) {
+    if (!games?.length || games.length < 4) throw new Error('Alle 4 delspill må registreres.');
+    for (let i = 0; i < 4; i++) {
+      const val = validerLagspillDelspill(games[i].l1, games[i].l2, false, format);
+      if (!val.ok) throw new Error(`Delspill ${i + 1}: ${val.feil}`);
+    }
+    if (games[4]) {
+      const valDb = validerLagspillDelspill(games[4].l1, games[4].l2, true, format);
+      if (!valDb.ok) throw new Error(`Dreambreaker: ${valDb.feil}`);
+    }
+    const stilling = beregnLagspill(games);
+    if (!stilling.ferdig) throw new Error('Kampen er ikke avgjort ennå — sjekk om dreambreaker mangler.');
+    lag1Poeng = stilling.lag1Seire;
+    lag2Poeng = stilling.lag2Seire;
+  } else if (format.type === 'best_of_3' && games?.length) {
     for (let i = 0; i < games.length; i++) {
       const val = validerResultat(games[i].l1, games[i].l2, format);
       if (!val.ok) throw new Error(`Game ${i + 1}: ${val.feil}`);

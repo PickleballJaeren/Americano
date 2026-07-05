@@ -18,6 +18,8 @@ import {
   beregnEndeligRangering, beregnFremgang,
   avsluttTurnering, slettTurnering,
   validerResultat, startnivaa,
+  leggTilLagspillLag, oppdaterLagspillLag, endreLagspillOppstilling,
+  lagLagspillKampformat,
 } from './turnering.js';
 import {
   visPulje,
@@ -368,6 +370,11 @@ window.visInnstillingerModal = async function() {
     b.style.pointerEvents = erSetup ? '' : 'none';
     b.style.opacity       = erSetup ? '' : '0.6';
   });
+  // Spillformat kan aldri endres etter opprettelse, uansett status
+  document.querySelectorAll('.t-spillformat-velger .t-velger-knapp').forEach(b => {
+    b.style.pointerEvents = 'none';
+    b.style.opacity = '0.6';
+  });
   document.querySelectorAll('#modal-ny-turnering input[type=checkbox]').forEach(cb => {
     cb.disabled = !erSetup;
   });
@@ -382,6 +389,17 @@ window.visInnstillingerModal = async function() {
   document.getElementById('modal-ny-turnering').style.display = 'flex';
 };
 
+// Bytter mellom "Standard" og "Lagspill" i oppsettmodalen — viser/skjuler riktig seksjon.
+window.velgSpillformat = function(verdi) {
+  document.querySelectorAll('.t-spillformat-velger .t-velger-knapp').forEach(b => {
+    b.classList.toggle('aktiv', b.dataset.verdi === verdi);
+  });
+  const standardSeksjon = document.getElementById('ny-turnering-standard-seksjon');
+  const lagspillSeksjon = document.getElementById('ny-turnering-lagspill-seksjon');
+  if (standardSeksjon) standardSeksjon.style.display = verdi === 'lagspill' ? 'none' : 'block';
+  if (lagspillSeksjon) lagspillSeksjon.style.display = verdi === 'lagspill' ? 'block' : 'none';
+};
+
 // Fyller modal med verdier — null gir defaults, turnering-objekt gir eksisterende verdier
 function _fylltInnstillingerModal(t) {
   const k  = t?.konfig ?? {};
@@ -389,10 +407,17 @@ function _fylltInnstillingerModal(t) {
   const kf = k.kampformatKvartfinale ?? lagKampformat('single', 11);
   const sf = k.kampformatSemifinale  ?? lagKampformat('single', 11);
   const ff = k.kampformatFinale      ?? lagKampformat('single', 15);
+  const erLagspill = k.spillformat === 'lagspill';
 
   // Navn
   const inp = document.getElementById('ny-turnering-navn');
   if (inp) inp.value = t?.navn ?? '';
+
+  // Spillformat — kun valgbart ved opprettelse (låst i redigeringsmodus, se visInnstillingerModal)
+  window.velgSpillformat(erLagspill ? 'lagspill' : 'standard');
+
+  // Lagspill — poengsystem for delspill
+  velgAlternativ('t-lagspill-poengsystem-velger', k.kampformatLagspill?.poengsystem ?? 'rally');
 
   // Puljer
   velgAlternativ('t-puljer-velger', String(k.antallPuljer ?? 2));
@@ -424,39 +449,48 @@ window.lagreInnstillinger = async function() {
   const t = app.aktivTurnering;
   if (!t) return;
 
-  const navn         = document.getElementById('ny-turnering-navn')?.value?.trim();
-  const antallPuljer = parseInt(document.querySelector('.t-puljer-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? '2');
-  const antallBaner  = parseInt(document.querySelector('.t-baner-velger .t-velger-knapp.aktiv')?.dataset?.verdi  ?? '6');
-  const seedingModus = document.querySelector('.t-seeding-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? SEEDING_MODUS.STANDARD;
-  const plasseringA  = document.getElementById('toggle-plasseringskamper-a')?.checked !== false;
-  const plasseringBC = document.getElementById('toggle-plasseringskamper-bc')?.checked === true;
-  const puljeType    = document.querySelector('.t-pulje-type-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? 'single';
-  const puljePoeng   = parseInt(document.querySelector('.t-pulje-poeng-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? '11');
-  const kvartType    = document.querySelector('.t-kvart-type-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? 'single';
-  const kvartPoeng   = parseInt(document.querySelector('.t-kvart-poeng-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? '11');
-  const semiType     = document.querySelector('.t-semi-type-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? 'single';
-  const semiPoeng    = parseInt(document.querySelector('.t-semi-poeng-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? '11');
-  const finaleType   = document.querySelector('.t-finale-type-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? 'single';
-  const finalePoeng  = parseInt(document.querySelector('.t-finale-poeng-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? '15');
-
+  const navn = document.getElementById('ny-turnering-navn')?.value?.trim();
   if (!navn) { visMelding('Skriv inn turneringsnavn.', 'advarsel'); return; }
 
   const knapp = document.getElementById('modal-innstillinger-knapp');
   if (knapp) { knapp.disabled = true; knapp.textContent = 'Lagrer…'; }
 
   try {
-    await oppdaterTurneringKonfig(_aktivTurneringId, {
-      navn,
-      antallPuljer,
-      antallBaner,
-      seedingModus,
-      plasseringskamperA:    plasseringA,
-      plasseringskamperBC:   plasseringBC,
-      kampformatPulje:       lagKampformat(puljeType,  puljePoeng),
-      kampformatKvartfinale: lagKampformat(kvartType,  kvartPoeng),
-      kampformatSemifinale:  lagKampformat(semiType,   semiPoeng),
-      kampformatFinale:      lagKampformat(finaleType, finalePoeng),
-    });
+    if (t.konfig?.spillformat === 'lagspill') {
+      // Lagspill — kun navn og poengsystem for delspill kan endres etter opprettelse.
+      const poengsystem = document.querySelector('.t-lagspill-poengsystem-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? 'rally';
+      await oppdaterTurneringKonfig(_aktivTurneringId, {
+        navn,
+        kampformatLagspill: lagLagspillKampformat(poengsystem),
+      });
+    } else {
+      const antallPuljer = parseInt(document.querySelector('.t-puljer-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? '2');
+      const antallBaner  = parseInt(document.querySelector('.t-baner-velger .t-velger-knapp.aktiv')?.dataset?.verdi  ?? '6');
+      const seedingModus = document.querySelector('.t-seeding-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? SEEDING_MODUS.STANDARD;
+      const plasseringA  = document.getElementById('toggle-plasseringskamper-a')?.checked !== false;
+      const plasseringBC = document.getElementById('toggle-plasseringskamper-bc')?.checked === true;
+      const puljeType    = document.querySelector('.t-pulje-type-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? 'single';
+      const puljePoeng   = parseInt(document.querySelector('.t-pulje-poeng-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? '11');
+      const kvartType    = document.querySelector('.t-kvart-type-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? 'single';
+      const kvartPoeng   = parseInt(document.querySelector('.t-kvart-poeng-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? '11');
+      const semiType     = document.querySelector('.t-semi-type-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? 'single';
+      const semiPoeng    = parseInt(document.querySelector('.t-semi-poeng-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? '11');
+      const finaleType   = document.querySelector('.t-finale-type-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? 'single';
+      const finalePoeng  = parseInt(document.querySelector('.t-finale-poeng-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? '15');
+
+      await oppdaterTurneringKonfig(_aktivTurneringId, {
+        navn,
+        antallPuljer,
+        antallBaner,
+        seedingModus,
+        plasseringskamperA:    plasseringA,
+        plasseringskamperBC:   plasseringBC,
+        kampformatPulje:       lagKampformat(puljeType,  puljePoeng),
+        kampformatKvartfinale: lagKampformat(kvartType,  kvartPoeng),
+        kampformatSemifinale:  lagKampformat(semiType,   semiPoeng),
+        kampformatFinale:      lagKampformat(finaleType, finalePoeng),
+      });
+    }
     lukkNyTurneringModal();
     const oppdatert = await hentTurnering(_aktivTurneringId);
     app.aktivTurnering = oppdatert;
@@ -470,33 +504,41 @@ window.lagreInnstillinger = async function() {
 };
 
 window.bekreftNyTurnering = async function() {
-  const navn         = document.getElementById('ny-turnering-navn')?.value?.trim();
-  const antallPuljer = parseInt(document.querySelector('.t-puljer-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? '2');
-  const antallBaner  = parseInt(document.querySelector('.t-baner-velger .t-velger-knapp.aktiv')?.dataset?.verdi  ?? '6');
-  const seedingModus = document.querySelector('.t-seeding-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? SEEDING_MODUS.STANDARD;
-  const plasseringA  = document.getElementById('toggle-plasseringskamper-a')?.checked !== false;
-  const plasseringBC = document.getElementById('toggle-plasseringskamper-bc')?.checked === true;
-  const puljeType    = document.querySelector('.t-pulje-type-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? 'single';
-  const puljePoeng   = parseInt(document.querySelector('.t-pulje-poeng-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? '11');
-  const kvartType    = document.querySelector('.t-kvart-type-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? 'single';
-  const kvartPoeng   = parseInt(document.querySelector('.t-kvart-poeng-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? '11');
-  const semiType     = document.querySelector('.t-semi-type-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? 'single';
-  const semiPoeng    = parseInt(document.querySelector('.t-semi-poeng-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? '11');
-  const finaleType   = document.querySelector('.t-finale-type-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? 'single';
-  const finalePoeng  = parseInt(document.querySelector('.t-finale-poeng-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? '15');
-
+  const navn = document.getElementById('ny-turnering-navn')?.value?.trim();
   if (!navn) { visMelding('Skriv inn turneringsnavn.', 'advarsel'); return; }
 
+  const spillformat = document.querySelector('.t-spillformat-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? 'standard';
+  const antallBaner = parseInt(document.querySelector('.t-baner-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? '6');
+
   try {
-    const id = await opprettTurnering({
-      navn, antallPuljer, antallBaner, seedingModus,
-      plasseringskamperA:   plasseringA,
-      plasseringskamperBC:  plasseringBC,
-      kampformatPulje:       lagKampformat(puljeType,  puljePoeng),
-      kampformatKvartfinale: lagKampformat(kvartType,  kvartPoeng),
-      kampformatSemifinale:  lagKampformat(semiType,   semiPoeng),
-      kampformatFinale:      lagKampformat(finaleType, finalePoeng),
-    });
+    let id;
+    if (spillformat === 'lagspill') {
+      const lagspillPoengsystem = document.querySelector('.t-lagspill-poengsystem-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? 'rally';
+      id = await opprettTurnering({ navn, spillformat: 'lagspill', antallBaner, lagspillPoengsystem });
+    } else {
+      const antallPuljer = parseInt(document.querySelector('.t-puljer-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? '2');
+      const seedingModus = document.querySelector('.t-seeding-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? SEEDING_MODUS.STANDARD;
+      const plasseringA  = document.getElementById('toggle-plasseringskamper-a')?.checked !== false;
+      const plasseringBC = document.getElementById('toggle-plasseringskamper-bc')?.checked === true;
+      const puljeType    = document.querySelector('.t-pulje-type-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? 'single';
+      const puljePoeng   = parseInt(document.querySelector('.t-pulje-poeng-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? '11');
+      const kvartType    = document.querySelector('.t-kvart-type-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? 'single';
+      const kvartPoeng   = parseInt(document.querySelector('.t-kvart-poeng-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? '11');
+      const semiType     = document.querySelector('.t-semi-type-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? 'single';
+      const semiPoeng    = parseInt(document.querySelector('.t-semi-poeng-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? '11');
+      const finaleType   = document.querySelector('.t-finale-type-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? 'single';
+      const finalePoeng  = parseInt(document.querySelector('.t-finale-poeng-velger .t-velger-knapp.aktiv')?.dataset?.verdi ?? '15');
+
+      id = await opprettTurnering({
+        navn, antallPuljer, antallBaner, seedingModus,
+        plasseringskamperA:   plasseringA,
+        plasseringskamperBC:  plasseringBC,
+        kampformatPulje:       lagKampformat(puljeType,  puljePoeng),
+        kampformatKvartfinale: lagKampformat(kvartType,  kvartPoeng),
+        kampformatSemifinale:  lagKampformat(semiType,   semiPoeng),
+        kampformatFinale:      lagKampformat(finaleType, finalePoeng),
+      });
+    }
     lukkNyTurneringModal();
     visMelding('Turnering opprettet!');
     await apneTurnering(id);
@@ -631,10 +673,17 @@ export async function visOppsett(turnering) {
   _velgerSpillerA = null;
 
   document.getElementById('oppsett-turnering-navn').textContent = t.navn;
+
+  const erLagspill = t.konfig?.spillformat === 'lagspill';
+  const standardPanel  = document.getElementById('oppsett-standard-lagpanel');
+  const lagspillPanel   = document.getElementById('oppsett-lagspill-lagpanel');
+  if (standardPanel) standardPanel.style.display = erLagspill ? 'none' : 'block';
+  if (lagspillPanel)  lagspillPanel.style.display  = erLagspill ? 'block' : 'none';
+
   oppdaterLagListe(t);
   oppdaterPuljePreview(t);
   oppdaterOppsettKnapper(t);
-  lastSpillerListe();
+  if (!erLagspill) lastSpillerListe();
 }
 
 function oppdaterLagListe(t) {
@@ -643,6 +692,26 @@ function oppdaterLagListe(t) {
 
   if (!t.lag?.length) {
     liste.innerHTML = `<div style="text-align:center;padding:20px;color:var(--muted2);font-size:15px">Ingen lag lagt til ennå</div>`;
+    return;
+  }
+
+  const erLagspill = t.konfig?.spillformat === 'lagspill';
+
+  if (erLagspill) {
+    const kanEndreOppstilling = t.status === T_STATUS.GROUP_PLAY;
+    liste.innerHTML = t.lag.map((l, i) => {
+      const sp = l.spillere ?? {};
+      return `<div class="t-lag-element" data-id="${escHtml(l.id)}">
+        <div class="t-lag-seed">${i + 1}</div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:2px;cursor:pointer" onclick="redigerLagNavn('${escHtml(l.id)}')" title="Klikk for å redigere">
+          <div class="t-lag-navn" style="font-size:15px">${escHtml(l.navn ?? '')}</div>
+          <div style="font-size:12px;color:var(--muted2)">${escHtml(sp.A1 ?? '?')} · ${escHtml(sp.A2 ?? '?')} · ${escHtml(sp.B1 ?? '?')} · ${escHtml(sp.B2 ?? '?')}</div>
+        </div>
+        ${kanEndreOppstilling ? `<button class="t-rediger-knapp" title="Endre oppstilling" onclick="event.stopPropagation();apneEndreOppstillingModal('${escHtml(l.id)}')">↻</button>` : ''}
+        <button class="t-lag-fjern" onclick="fjernLagUI('${escHtml(l.id)}')" title="Fjern lag">✕</button>
+      </div>`;
+    }).join('');
+    document.getElementById('turnering-lag-teller').textContent = `${t.lag.length} lag`;
     return;
   }
 
@@ -662,9 +731,74 @@ function oppdaterLagListe(t) {
   document.getElementById('turnering-lag-teller').textContent = `${t.lag.length} lag`;
 }
 
+// ════════════════════════════════════════════════════════
+// LAGSPILL — endre oppstilling (A1/A2/B1/B2) mellom runder
+// Bygger en enkel modal dynamisk — ingen ny statisk markup nødvendig.
+// ════════════════════════════════════════════════════════
+window.apneEndreOppstillingModal = function(lagId) {
+  const lag = app.aktivTurnering?.lag?.find(l => l.id === lagId);
+  if (!lag?.spillere) return;
+
+  const gammel = document.getElementById('modal-endre-oppstilling');
+  if (gammel) gammel.remove();
+
+  const sp = lag.spillere;
+  const felt = (pos, verdi) => `
+    <div style="margin-bottom:10px">
+      <div style="font-size:12px;color:var(--muted2);margin-bottom:4px">${pos}</div>
+      <input id="eo-${pos}" value="${escHtml(verdi ?? '')}"
+        style="width:100%;background:var(--navy3);border:1px solid var(--border2);border-radius:9px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:16px;outline:none"/>
+    </div>`;
+
+  const div = document.createElement('div');
+  div.id = 'modal-endre-oppstilling';
+  div.className = 'modal-bakgrunn';
+  div.style.display = 'flex';
+  div.onclick = (e) => { if (e.target === div) div.remove(); };
+  div.innerHTML = `
+    <div class="modal" style="border-radius:22px 22px 0 0">
+      <div class="modal-tittel">Endre oppstilling — ${escHtml(lag.navn ?? '')}</div>
+      ${felt('A1', sp.A1)}${felt('A2', sp.A2)}${felt('B1', sp.B1)}${felt('B2', sp.B2)}
+      <div id="eo-feil" style="color:var(--red2);font-size:14px;min-height:18px;margin-bottom:6px"></div>
+      <div class="modal-knapper">
+        <button class="knapp knapp-omriss" style="flex:1" onclick="document.getElementById('modal-endre-oppstilling').remove()">Avbryt</button>
+        <button class="knapp knapp-gronn" style="flex:2;font-family:'Bebas Neue',cursive;font-size:22px;letter-spacing:1px"
+          onclick="lagreEndretOppstilling('${escHtml(lagId)}')">LAGRE →</button>
+      </div>
+    </div>`;
+  document.body.appendChild(div);
+  setTimeout(() => document.getElementById('eo-A1')?.focus(), 200);
+};
+
+window.lagreEndretOppstilling = async function(lagId) {
+  const spillere = {
+    A1: document.getElementById('eo-A1')?.value?.trim(),
+    A2: document.getElementById('eo-A2')?.value?.trim(),
+    B1: document.getElementById('eo-B1')?.value?.trim(),
+    B2: document.getElementById('eo-B2')?.value?.trim(),
+  };
+  const feilEl = document.getElementById('eo-feil');
+  try {
+    await endreLagspillOppstilling(_aktivTurneringId, lagId, spillere);
+    const t = await hentTurnering(_aktivTurneringId);
+    app.aktivTurnering = t;
+    document.getElementById('modal-endre-oppstilling')?.remove();
+    oppdaterLagListe(t);
+    visMelding('Oppstilling oppdatert.');
+  } catch (e) {
+    if (feilEl) feilEl.textContent = e?.message ?? 'Feil ved lagring.';
+  }
+};
+
 function oppdaterPuljePreview(t) {
   const container = document.getElementById('pulje-preview');
   if (!container || !t.lag?.length) return;
+
+  // Lagspill spilles alltid som én serieturnering — ingen puljeforhåndsvisning nødvendig.
+  if (t.konfig?.spillformat === 'lagspill') {
+    container.innerHTML = `<div style="color:var(--muted2);font-size:15px">Alle ${t.lag.length} lag møter hverandre én gang (serieturnering).</div>`;
+    return;
+  }
 
   const antall = t.konfig?.antallPuljer ?? 2;
   if (t.lag.length < antall * 2) {
@@ -701,10 +835,11 @@ function oppdaterPuljePreview(t) {
 function oppdaterOppsettKnapper(t) {
   const startBtn = document.getElementById('start-puljespill-knapp');
   if (!startBtn) return;
-  const antall = t.konfig?.antallPuljer ?? 2;
-  const nok    = (t.lag?.length ?? 0) >= antall * 2;
+  const erLagspill = t.konfig?.spillformat === 'lagspill';
+  const antall = erLagspill ? 1 : (t.konfig?.antallPuljer ?? 2);
+  const nok    = erLagspill ? (t.lag?.length ?? 0) >= 2 : (t.lag?.length ?? 0) >= antall * 2;
   startBtn.disabled = !nok;
-  startBtn.title    = nok ? '' : `Trenger minst ${antall * 2} lag`;
+  startBtn.title    = nok ? '' : (erLagspill ? 'Trenger minst 2 lag' : `Trenger minst ${antall * 2} lag`);
 }
 
 window.leggTilLagUI = async function() {
@@ -731,6 +866,35 @@ window.leggTilLagUI = async function() {
   }
 };
 
+// Lagspill — legg til lag med navn + 4 spillere (A1/A2/B1/B2)
+window.leggTilLagspillLagUI = async function() {
+  const navnInp = document.getElementById('nytt-lagspill-navn');
+  const felt = ['A1', 'A2', 'B1', 'B2'].map(pos => document.getElementById(`nytt-lagspill-${pos}`));
+  const navn = navnInp?.value?.trim();
+  const spillere = {
+    A1: felt[0]?.value?.trim(), A2: felt[1]?.value?.trim(),
+    B1: felt[2]?.value?.trim(), B2: felt[3]?.value?.trim(),
+  };
+  if (!navn) { navnInp?.focus(); return; }
+  for (let i = 0; i < felt.length; i++) {
+    if (!Object.values(spillere)[i]) { felt[i]?.focus(); return; }
+  }
+  try {
+    await leggTilLagspillLag(_aktivTurneringId, navn, spillere);
+    navnInp.value = '';
+    felt.forEach(f => { if (f) f.value = ''; });
+    navnInp.focus();
+    const t = await hentTurnering(_aktivTurneringId);
+    app.aktivTurnering = t;
+    oppdaterLagListe(t);
+    oppdaterPuljePreview(t);
+    oppdaterOppsettKnapper(t);
+    await lastSpillerListe();
+  } catch (e) {
+    visMelding(e?.message ?? 'Feil ved legg til lag.', 'feil');
+  }
+};
+
 window.fjernLagUI = async function(lagId) {
   try {
     await fjernLag(_aktivTurneringId, lagId);
@@ -750,6 +914,63 @@ window.redigerLagNavn = function(lagId) {
   if (!el) return;
   const lag = app.aktivTurnering?.lag?.find(l => l.id === lagId);
   if (!lag) return;
+
+  if (lag.spillere) {
+    // Lagspill — kun redigerbart i oppsettfasen (etter oppstart: bruk "Endre oppstilling")
+    if (app.aktivTurnering?.status !== T_STATUS.SETUP) return;
+    const gammelNavn = lag.navn ?? '';
+    const gammel = { ...lag.spillere };
+    const midtKol = el.querySelector('[style*="flex-direction:column"]');
+    if (!midtKol) return;
+
+    midtKol.innerHTML = `
+      <input class="t-lag-rediger-navn" value="${escHtml(gammelNavn)}" placeholder="Lagnavn"
+        style="font-size:15px;background:var(--navy3);border:1px solid var(--accent);border-radius:6px;padding:3px 7px;color:var(--white);width:100%;margin-bottom:3px"/>
+      <div style="display:flex;gap:3px">
+        ${['A1','A2','B1','B2'].map(pos => `
+          <input class="t-lag-rediger-${pos}" value="${escHtml(gammel[pos] ?? '')}" placeholder="${pos}"
+            style="font-size:12px;background:var(--navy3);border:1px solid var(--accent);border-radius:6px;padding:3px 5px;color:var(--white);width:100%"/>
+        `).join('')}
+      </div>`;
+
+    const navnEl = midtKol.querySelector('.t-lag-rediger-navn');
+    const posEl  = pos => midtKol.querySelector(`.t-lag-rediger-${pos}`);
+    navnEl.focus(); navnEl.select();
+
+    const lagre = async () => {
+      const nyNavn = navnEl.value.trim();
+      const nySpillere = {
+        A1: posEl('A1').value.trim(), A2: posEl('A2').value.trim(),
+        B1: posEl('B1').value.trim(), B2: posEl('B2').value.trim(),
+      };
+      const uendret = nyNavn === gammelNavn && Object.entries(nySpillere).every(([k, v]) => v === gammel[k]);
+      if (!nyNavn || Object.values(nySpillere).some(v => !v) || uendret) {
+        const t = await hentTurnering(_aktivTurneringId);
+        app.aktivTurnering = t; oppdaterLagListe(t); return;
+      }
+      try {
+        await oppdaterLagspillLag(_aktivTurneringId, lagId, nyNavn, nySpillere);
+        const t = await hentTurnering(_aktivTurneringId);
+        app.aktivTurnering = t;
+        oppdaterLagListe(t);
+        await lastSpillerListe();
+      } catch (e) {
+        visMelding(e?.message ?? 'Feil.', 'feil');
+        const t = await hentTurnering(_aktivTurneringId);
+        app.aktivTurnering = t; oppdaterLagListe(t);
+      }
+    };
+
+    ['A1','A2','B1','B2'].forEach((pos, i, arr) => {
+      posEl(pos).onkeydown = e => {
+        if (e.key === 'Enter') { e.preventDefault(); (posEl(arr[i+1]) ?? posEl(arr[0])).focus(); }
+        if (e.key === 'Escape') lagre();
+      };
+    });
+    posEl('B2').onblur = () => setTimeout(lagre, 150);
+    navnEl.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); posEl('A1').focus(); } };
+    return;
+  }
 
   const gammelS1 = lag.spiller1 ?? lag.navn ?? '';
   const gammelS2 = lag.spiller2 ?? '';
@@ -801,10 +1022,13 @@ window.startPuljespillUI = function() {
     const knapp = document.getElementById('start-puljespill-knapp');
     if (knapp) { knapp.disabled = true; knapp.textContent = 'Starter…'; }
     try {
-      const t      = await hentTurnering(_aktivTurneringId);
-      const antall = t.konfig?.antallPuljer ?? 2;
-      const puljer = genererPuljer(t.lag, antall);
-      await lagrePuljer(_aktivTurneringId, puljer);
+      const t = await hentTurnering(_aktivTurneringId);
+      if (t.konfig?.spillformat !== 'lagspill') {
+        const antall = t.konfig?.antallPuljer ?? 2;
+        const puljer = genererPuljer(t.lag, antall);
+        await lagrePuljer(_aktivTurneringId, puljer);
+      }
+      // Lagspill: startPuljespill() genererer selv den ene puljen (alle lag mot alle).
       await startPuljespill(_aktivTurneringId);
       const oppdatert = await hentTurnering(_aktivTurneringId);
       app.aktivTurnering = oppdatert;

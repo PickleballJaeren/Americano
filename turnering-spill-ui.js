@@ -30,6 +30,9 @@ import {
   validerResultat,
   beregnBestOf3,
   nullstillSluttspill,
+  beregnLagspill,
+  validerLagspillDelspill,
+  genererLagspillDelspill,
 } from './turnering.js';
 import {
   getAktivTurneringId,
@@ -64,7 +67,9 @@ export async function visPulje(turnering) {
 
   innhold.innerHTML = (t.puljer ?? []).map(p => {
     const tabell = beregnPuljetabell(p, t.lag);
-    const format = t.konfig?.kampformatPulje ?? STANDARD_KAMPFORMAT;
+    const format = t.konfig?.spillformat === 'lagspill'
+      ? (t.konfig?.kampformatLagspill ?? STANDARD_KAMPFORMAT)
+      : (t.konfig?.kampformatPulje ?? STANDARD_KAMPFORMAT);
     return `
       <div class="seksjon-etikett">${escHtml(p.navn)}</div>
       <div class="kort"><div class="kort-innhold" style="padding:0">
@@ -108,6 +113,7 @@ function lagTabellHTML(tabell, lagMap, puljeId = null) {
 
   const harInnbyrdes = tabell.some(r => r.tiebreakType === 'innbyrdes');
   const harPoengdiff = tabell.some(r => r.tiebreakType === 'poengdiff');
+  const harPoengProsent = tabell.some(r => ((r.poengF ?? 0) + (r.poengM ?? 0)) > 0);
 
   const kanterCSS = `
     .tb-kant-inn  { border-left: 3px solid var(--accent2); padding-left: 5px; }
@@ -135,6 +141,7 @@ function lagTabellHTML(tabell, lagMap, puljeId = null) {
         <th class="th-center">S</th>
         <th class="th-center">T</th>
         <th class="th-center">+/-</th>
+        ${harPoengProsent ? '<th class="th-center">Poeng%</th>' : ''}
         ${puljeId ? '<th></th>' : ''}
       </tr></thead>
       <tbody>
@@ -150,6 +157,7 @@ function lagTabellHTML(tabell, lagMap, puljeId = null) {
             <td class="pulje-td-seire td-center">${r.seire}</td>
             <td class="td-center" style="color:var(--red2)">${r.tap}</td>
             <td class="td-center" style="color:${r.pd >= 0 ? 'var(--green2)' : 'var(--red2)'}">${r.pd > 0 ? '+' : ''}${r.pd}</td>
+            ${harPoengProsent ? `<td class="td-center" style="color:var(--muted2)">${(r.poengProsent * 100).toFixed(1)}%</td>` : ''}
             <td class="td-center"><button class="t-rediger-knapp" title="Flytt lag til annen pulje" onclick="apneFlyttLagModal('${escHtml(r.lagId)}','${escHtml(puljeId)}')">↕</button></td>
           </tr>`;
         }).join('')}
@@ -163,13 +171,14 @@ function kampRadHTML(kamp, puljeId, lagMap, format) {
   const l2 = lagMap[kamp.lag2Id]?.navn ?? '?';
   const l1Vant = kamp.ferdig && kamp.lag1Poeng > kamp.lag2Poeng;
   const l2Vant = kamp.ferdig && kamp.lag2Poeng > kamp.lag1Poeng;
-  const typeLabel = format.type === 'best_of_3' ? 'B3' : '1G';
+  const erLagspill = format.type === 'lagspill';
+  const typeLabel = erLagspill ? 'Lagspill' : (format.type === 'best_of_3' ? 'B3' : '1G');
   const poeng = format.points_to_win;
   const erOverstyrt = kamp.format != null;
   const erB3 = format.type === 'best_of_3';
 
-  // Game-detaljer for best-av-3 — vises under kampresultatet
-  const gameDetaljer = erB3 && kamp.ferdig && kamp.games?.length
+  // Game-detaljer for best-av-3 og Lagspill — vises under kampresultatet
+  const gameDetaljer = (erB3 || erLagspill) && kamp.ferdig && kamp.games?.length
     ? `<div style="font-size:12px;color:var(--muted2);margin-top:3px;letter-spacing:.3px">
         ${kamp.games.map((g, i) => {
           const g1Vant = g.l1 > g.l2;
@@ -180,16 +189,24 @@ function kampRadHTML(kamp, puljeId, lagMap, format) {
        </div>`
     : '';
 
+  // Lagspill: total poengsum (rå poeng, ikke delspillseire) som ekstra kontekst
+  const poengSumHTML = erLagspill && kamp.ferdig && kamp.games?.length
+    ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">
+        ${kamp.games.reduce((s, g) => s + (g.l1 ?? 0), 0)}–${kamp.games.reduce((s, g) => s + (g.l2 ?? 0), 0)} poeng
+       </div>`
+    : '';
+
   return `
     <div class="kamp-rad" style="opacity:${kamp.walkover ? 0.6 : 1}">
       <div class="lb-navn" style="min-width:0">
         <div class="kamp-lag-${l1Vant ? 'vinner' : 'taper'}" style="font-size:16px">${escHtml(l1)}</div>
         <div class="kamp-lag-${l2Vant ? 'vinner' : 'taper'}" style="font-size:16px">${escHtml(l2)}</div>
         <div style="font-size:12px;color:var(--muted2);margin-top:4px">
-          ${typeLabel} · ${poeng} pts${erOverstyrt ? ' ✎' : ''}
+          ${typeLabel}${erLagspill ? '' : ` · ${poeng} pts`}${erOverstyrt ? ' ✎' : ''}
           ${kamp.walkover ? ' · walkover' : ''}
         </div>
         ${gameDetaljer}
+        ${poengSumHTML}
       </div>
       <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
         ${kamp.ferdig
@@ -245,10 +262,11 @@ let _modalNivaa    = null;   // null = pulje | 'A' | 'B' | 'C'
 let _modalFormat   = null;
 
 // ── Best av 3 state ──────────────────────────────────────
-let _games         = [null, null, null]; // [{l1, l2}, ...]
+let _games         = [null, null, null, null, null]; // [{l1, l2}, ...] — 5. slot brukes kun av Lagspill (dreambreaker)
 let _aktivGame     = 0;                  // 0-indeksert
 let _tAktivLag     = 1;
 let _tMaxPoeng     = 15;
+let _lagspillDelspill = null; // [{par, navn1, navn2}, ...] — kun satt når _modalFormat.type === 'lagspill'
 
 // ════════════════════════════════════════════════════════
 // ÅPNE / LUKK
@@ -262,10 +280,14 @@ window.apneResultatModal = function(puljeEllerNivaa, kampId, lag1Id, lag2Id, erS
 
   const t      = app.aktivTurnering;
   const lagMap = Object.fromEntries((t?.lag ?? []).map(l => [l.id, l]));
+  const erLagspill = !erSluttspill && t?.konfig?.spillformat === 'lagspill';
 
   if (erSluttspill) {
     const kamp  = t?.sluttspill?.[puljeEllerNivaa]?.kamper?.find(k => k.id === kampId);
     _modalFormat = hentFormatForRunde(kamp?.runde ?? '', t?.konfig ?? {}, kamp?.format ?? null);
+  } else if (erLagspill) {
+    _modalFormat = t?.konfig?.kampformatLagspill;
+    _lagspillDelspill = genererLagspillDelspill(lagMap[lag1Id], lagMap[lag2Id]);
   } else {
     _modalFormat = t?.konfig?.kampformatPulje ?? STANDARD_KAMPFORMAT;
   }
@@ -273,26 +295,32 @@ window.apneResultatModal = function(puljeEllerNivaa, kampId, lag1Id, lag2Id, erS
   _tMaxPoeng = _modalFormat.max_points ?? 15;
 
   // Hent eksisterende score for forhåndsutfylling
-  let eksisterendeL1 = null, eksisterendeL2 = null;
+  let eksisterendeL1 = null, eksisterendeL2 = null, eksisterendeGames = null;
   if (erSluttspill) {
     const kamp = t?.sluttspill?.[puljeEllerNivaa]?.kamper?.find(k => k.id === kampId);
     if (kamp?.ferdig) { eksisterendeL1 = kamp.lag1Poeng; eksisterendeL2 = kamp.lag2Poeng; }
   } else {
     const pulje = t?.puljer?.find(p => p.id === puljeEllerNivaa);
     const kamp  = pulje?.kamper?.find(k => k.id === kampId);
-    if (kamp?.ferdig) { eksisterendeL1 = kamp.lag1Poeng; eksisterendeL2 = kamp.lag2Poeng; }
+    if (kamp?.ferdig) {
+      eksisterendeL1 = kamp.lag1Poeng; eksisterendeL2 = kamp.lag2Poeng;
+      if (erLagspill && kamp.games?.length) eksisterendeGames = kamp.games;
+    }
   }
 
   // Nullstill game-state
-  _games     = [null, null, null];
+  _games     = [null, null, null, null, null];
   _aktivGame = 0;
   _tAktivLag = 1;
 
   // Sett lagnavn og format-tekst
-  document.getElementById('modal-resultat-lag1').textContent = lagMap[lag1Id]?.navn ?? 'Lag 1';
-  document.getElementById('modal-resultat-lag2').textContent = lagMap[lag2Id]?.navn ?? 'Lag 2';
-  document.getElementById('modal-resultat-format').textContent =
-    `${_modalFormat.type === 'best_of_3' ? 'Best av 3 · ' : ''}Til ${_modalFormat.points_to_win} · maks ${_modalFormat.max_points}`;
+  if (!erLagspill) {
+    document.getElementById('modal-resultat-lag1').textContent = lagMap[lag1Id]?.navn ?? 'Lag 1';
+    document.getElementById('modal-resultat-lag2').textContent = lagMap[lag2Id]?.navn ?? 'Lag 2';
+  }
+  document.getElementById('modal-resultat-format').textContent = erLagspill
+    ? `Lagspill · Til ${_modalFormat.points_to_win} · maks ${_modalFormat.max_points}`
+    : `${_modalFormat.type === 'best_of_3' ? 'Best av 3 · ' : ''}Til ${_modalFormat.points_to_win} · maks ${_modalFormat.max_points}`;
   document.getElementById('modal-resultat-feil').textContent = '';
 
   // Fyll inn poeng-boksene (eksisterende eller blank)
@@ -309,7 +337,9 @@ window.apneResultatModal = function(puljeEllerNivaa, kampId, lag1Id, lag2Id, erS
     if (picker) { picker.style.display = 'none'; }
   });
   // Forhåndsutfyll _games for single game
-  if (eksisterendeL1 != null && eksisterendeL2 != null && _modalFormat?.type !== 'best_of_3') {
+  if (erLagspill && eksisterendeGames) {
+    _games = [...eksisterendeGames, null, null, null, null].slice(0, 5);
+  } else if (eksisterendeL1 != null && eksisterendeL2 != null && _modalFormat?.type !== 'best_of_3' && !erLagspill) {
     _games[0] = { l1: eksisterendeL1, l2: eksisterendeL2 };
   }
 
@@ -328,7 +358,30 @@ window.lukkResultatModal = function() {
 
 /** Oppdaterer hele modalen basert på gjeldende game-state. */
 function _tOppdaterModalUI() {
-  const erB3 = _modalFormat?.type === 'best_of_3';
+  const erB3       = _modalFormat?.type === 'best_of_3';
+  const erLagspill = _modalFormat?.type === 'lagspill';
+
+  // Lagspill: oppdater par-navn og delspill-etikett for aktivt delspill
+  if (erLagspill) {
+    const erDreambreaker = _aktivGame === 4;
+    const navn1El = document.getElementById('modal-resultat-lag1');
+    const navn2El = document.getElementById('modal-resultat-lag2');
+    if (erDreambreaker) {
+      if (navn1El) navn1El.textContent = 'Dreambreaker';
+      if (navn2El) navn2El.textContent = '';
+    } else {
+      const d = _lagspillDelspill?.[_aktivGame];
+      if (navn1El) navn1El.textContent = d?.navn1 ?? '';
+      if (navn2El) navn2El.textContent = d?.navn2 ?? '';
+    }
+    const formatEl = document.getElementById('modal-resultat-format');
+    if (formatEl) {
+      formatEl.textContent = erDreambreaker
+        ? 'Dreambreaker · Til 21 · maks 25'
+        : `Delspill ${_aktivGame + 1} av 4 · Til ${_modalFormat.points_to_win} · maks ${_modalFormat.max_points}`;
+    }
+    _tMaxPoeng = erDreambreaker ? 25 : (_modalFormat.max_points ?? 25);
+  }
 
   // Game-indikatorer
   const indEl = document.getElementById('t-game-indikatorer');
@@ -345,6 +398,23 @@ function _tOppdaterModalUI() {
       }).join('');
 
       // Stillingsdisplay
+      const stEl = document.getElementById('t-game-stilling');
+      if (stEl) {
+        stEl.style.display = 'block';
+        stEl.textContent = `${stilling.lag1Seire} – ${stilling.lag2Seire}`;
+      }
+    } else if (erLagspill) {
+      const stilling = beregnLagspill(_games);
+      const antallSirkler = stilling.trengerDreambreaker ? 5 : 4;
+      indEl.style.display = 'flex';
+      indEl.innerHTML = Array.from({ length: antallSirkler }, (_, i) => {
+        const g = _games[i];
+        let klasse = 'game-sirkel';
+        if (g?.l1 != null && g?.l2 != null) klasse += g.l1 > g.l2 ? ' game-vunnet-lag1' : ' game-vunnet-lag2';
+        else if (i === _aktivGame) klasse += ' game-aktiv';
+        return `<span class="${klasse}"></span>`;
+      }).join('');
+
       const stEl = document.getElementById('t-game-stilling');
       if (stEl) {
         stEl.style.display = 'block';
@@ -374,6 +444,10 @@ function _tOppdaterModalUI() {
   if (lagreKnapp) {
     if (erB3) {
       const stilling = beregnBestOf3(_games.filter(Boolean));
+      lagreKnapp.disabled = !stilling.ferdig;
+      lagreKnapp.style.opacity = stilling.ferdig ? '1' : '0.4';
+    } else if (erLagspill) {
+      const stilling = beregnLagspill(_games);
       lagreKnapp.disabled = !stilling.ferdig;
       lagreKnapp.style.opacity = stilling.ferdig ? '1' : '0.4';
     } else {
@@ -502,6 +576,33 @@ window.tVelgPoeng = function(verdi) {
           _tOppdaterModalUI();
         }
       }
+    } else if (_modalFormat?.type === 'lagspill') {
+      const erDreambreaker = _aktivGame === 4;
+      const val = validerLagspillDelspill(game.l1, game.l2, erDreambreaker, _modalFormat);
+      if (!val.ok) {
+        document.getElementById('modal-resultat-feil').textContent = val.feil;
+        _games[_aktivGame] = null;
+        _tAktivLag = 1;
+        _tOppdaterModalUI();
+        return;
+      }
+      document.getElementById('modal-resultat-feil').textContent = '';
+
+      const stilling = beregnLagspill(_games);
+      if (stilling.ferdig) {
+        // Kampen er avgjort (3+ delspillseire) — aktiver LAGRE
+        _tOppdaterModalUI();
+      } else if (stilling.trengerDreambreaker && _aktivGame < 4) {
+        // 2-2 etter 4 delspill — gå til dreambreaker
+        _aktivGame = 4;
+        _tAktivLag = 1;
+        _tOppdaterModalUI();
+      } else if (_aktivGame < 3) {
+        // Gå til neste av de 4 ordinære delspillene
+        _aktivGame = _aktivGame + 1;
+        _tAktivLag = 1;
+        _tOppdaterModalUI();
+      }
     } else {
       // Single game — bytt til lag 2 hvis lag 1 nettopp valgte
       if (_tAktivLag === 1) {
@@ -520,13 +621,23 @@ window.tVelgPoeng = function(verdi) {
 // LAGRE
 // ════════════════════════════════════════════════════════
 window.bekreftResultat = async function() {
-  const erB3     = _modalFormat?.type === 'best_of_3';
+  const erB3       = _modalFormat?.type === 'best_of_3';
+  const erLagspill = _modalFormat?.type === 'lagspill';
   const feilEl   = document.getElementById('modal-resultat-feil');
   const lagreBtn = document.querySelector('#modal-resultat .knapp-gronn');
 
   let lag1Poeng, lag2Poeng, games = null;
 
-  if (erB3) {
+  if (erLagspill) {
+    const stilling = beregnLagspill(_games);
+    if (!stilling.ferdig) {
+      feilEl.textContent = 'Kampen er ikke avgjort ennå.';
+      return;
+    }
+    games = _games.filter(Boolean).map(g => ({ l1: g.l1, l2: g.l2 }));
+    lag1Poeng = stilling.lag1Seire;
+    lag2Poeng = stilling.lag2Seire;
+  } else if (erB3) {
     const fullteGames = _games.filter(Boolean);
     const stilling    = beregnBestOf3(fullteGames);
     if (!stilling.ferdig) {

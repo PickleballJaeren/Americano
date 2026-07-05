@@ -947,7 +947,8 @@
     </div>
   </div>
   <div class="scroll-omrade">
-    <!-- Kjente spillere — A/B-velger -->
+    <!-- Kjente spillere — A/B-velger (kun Standard-format) -->
+    <div id="oppsett-standard-lagpanel">
     <div class="seksjon-etikett">Velg spillere</div>
     <div class="kort"><div class="kort-innhold" style="padding:0">
       <div id="ab-status" style="padding:10px 14px;font-size:13px;color:var(--muted2);border-bottom:1px solid var(--border)">
@@ -976,6 +977,35 @@
         </button>
       </div>
     </div></div>
+    </div>
+    <!-- /oppsett-standard-lagpanel -->
+
+    <!-- Legg til Lagspill-lag (kun Lagspill-format) -->
+    <div id="oppsett-lagspill-lagpanel" style="display:none">
+      <div class="seksjon-etikett">Legg til lag</div>
+      <div class="kort"><div class="kort-innhold" style="display:flex;flex-direction:column;gap:8px">
+        <input id="nytt-lagspill-navn" placeholder="Lagnavn…"
+          style="width:100%;background:var(--navy3);border:1px solid var(--border2);border-radius:9px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:15px;outline:none"/>
+        <div style="display:flex;gap:6px">
+          <input id="nytt-lagspill-A1" placeholder="A1…"
+            style="flex:1;min-width:0;background:var(--navy3);border:1px solid var(--border2);border-radius:9px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:15px;outline:none"/>
+          <input id="nytt-lagspill-A2" placeholder="A2…"
+            style="flex:1;min-width:0;background:var(--navy3);border:1px solid var(--border2);border-radius:9px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:15px;outline:none"/>
+        </div>
+        <div style="display:flex;gap:6px">
+          <input id="nytt-lagspill-B1" placeholder="B1…"
+            style="flex:1;min-width:0;background:var(--navy3);border:1px solid var(--border2);border-radius:9px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:15px;outline:none"/>
+          <input id="nytt-lagspill-B2" placeholder="B2…"
+            onkeydown="if(event.key==='Enter')leggTilLagspillLagUI()"
+            style="flex:1;min-width:0;background:var(--navy3);border:1px solid var(--border2);border-radius:9px;padding:10px 12px;color:var(--white);font-family:'DM Sans',sans-serif;font-size:15px;outline:none"/>
+        </div>
+        <button onclick="leggTilLagspillLagUI()"
+          style="width:100%;padding:12px;background:#16a34a;border:none;border-radius:9px;color:#fff;font-size:15px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
+          + Legg til lag
+        </button>
+      </div></div>
+    </div>
+    <!-- /oppsett-lagspill-lagpanel -->
 
     <!-- Lag-liste -->
     <div class="seksjon-etikett">
@@ -1464,11 +1494,10 @@
         onkeydown="if(event.key==='Enter')bekreftNyTurnering()"/>
     </div>
     <div style="margin-bottom:16px">
-      <div class="config-etikett" style="margin-bottom:8px">Antall puljer</div>
-      <div class="t-velger-gruppe t-puljer-velger">
-        <button class="t-velger-knapp aktiv" data-verdi="2" onclick="velgAlternativ('t-puljer-velger','2')">2 puljer</button>
-        <button class="t-velger-knapp" data-verdi="3" onclick="velgAlternativ('t-puljer-velger','3')">3 puljer</button>
-        <button class="t-velger-knapp" data-verdi="4" onclick="velgAlternativ('t-puljer-velger','4')">4 puljer</button>
+      <div class="config-etikett" style="margin-bottom:8px">Spillformat</div>
+      <div class="t-velger-gruppe t-spillformat-velger">
+        <button class="t-velger-knapp aktiv" data-verdi="standard" onclick="velgSpillformat('standard')">Standard</button>
+        <button class="t-velger-knapp" data-verdi="lagspill" onclick="velgSpillformat('lagspill')">Lagspill</button>
       </div>
     </div>
     <div style="margin-bottom:16px">
@@ -1479,6 +1508,36 @@
         <button class="t-velger-knapp" data-verdi="5" onclick="velgAlternativ('t-baner-velger','5')">5</button>
         <button class="t-velger-knapp aktiv" data-verdi="6" onclick="velgAlternativ('t-baner-velger','6')">6</button>
         <button class="t-velger-knapp" data-verdi="8" onclick="velgAlternativ('t-baner-velger','8')">8</button>
+      </div>
+    </div>
+
+    <!-- Lagspill-innstillinger — vises kun når Spillformat = Lagspill -->
+    <div id="ny-turnering-lagspill-seksjon" style="display:none;margin-bottom:16px">
+      <div class="config-etikett" style="margin-bottom:8px">Poengsystem for delspill</div>
+      <div class="t-velger-gruppe t-lagspill-poengsystem-velger">
+        <button class="t-velger-knapp aktiv" data-verdi="rally" onclick="velgAlternativ('t-lagspill-poengsystem-velger','rally')">Rally til 21</button>
+        <button class="t-velger-knapp" data-verdi="sideout" onclick="velgAlternativ('t-lagspill-poengsystem-velger','sideout')">Side-out til 11</button>
+      </div>
+      <div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--navy3);border:1px solid var(--border);border-radius:10px">
+        <div>
+          <div style="font-size:15px;font-weight:500">Dreambreaker</div>
+          <div style="font-size:13px;color:var(--muted2)">Rally til 21, vinn med 2 — kan ikke endres</div>
+        </div>
+        <span style="font-size:11px;color:var(--muted2);background:var(--navy2, #0a1628);padding:4px 10px;border-radius:8px">Fast</span>
+      </div>
+      <div style="margin-top:8px;font-size:13px;color:var(--muted2)">
+        Lagspill spilles som én serieturnering — alle lag møter hverandre én gang. Hvert lag har 4 spillere (A1, A2, B1, B2), og hver kamp består av 4 faste delspill.
+      </div>
+    </div>
+
+    <!-- Standard-innstillinger — skjules når Spillformat = Lagspill -->
+    <div id="ny-turnering-standard-seksjon">
+    <div style="margin-bottom:16px">
+      <div class="config-etikett" style="margin-bottom:8px">Antall puljer</div>
+      <div class="t-velger-gruppe t-puljer-velger">
+        <button class="t-velger-knapp aktiv" data-verdi="2" onclick="velgAlternativ('t-puljer-velger','2')">2 puljer</button>
+        <button class="t-velger-knapp" data-verdi="3" onclick="velgAlternativ('t-puljer-velger','3')">3 puljer</button>
+        <button class="t-velger-knapp" data-verdi="4" onclick="velgAlternativ('t-puljer-velger','4')">4 puljer</button>
       </div>
     </div>
 
@@ -1606,6 +1665,8 @@
 
       </div>
     </div>
+    </div>
+    <!-- /ny-turnering-standard-seksjon -->
 
     <div class="modal-knapper">
       <button class="knapp knapp-omriss" style="flex:1" onclick="lukkNyTurneringModal()">Avbryt</button>

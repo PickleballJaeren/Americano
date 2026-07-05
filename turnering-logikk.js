@@ -39,6 +39,103 @@ export function lagKampformat(type, points_to_win) {
 }
 
 // ════════════════════════════════════════════════════════
+// LAGSPILL — 4-spiller lagformat (A1/A2/B1/B2)
+// Hver kamp mellom to lag består av 4 faste delspill
+// (A1A2, B1B2, A1B1, A2B2) + valgfri dreambreaker ved 2–2.
+// ════════════════════════════════════════════════════════
+
+/** De to poengsystem-forhåndsinnstillingene som kan velges for delspillene. */
+export const LAGSPILL_POENGSYSTEM = {
+  rally:   { type: 'lagspill', poengsystem: 'rally',   points_to_win: 21, win_by: 2, max_points: 25 },
+  sideout: { type: 'lagspill', poengsystem: 'sideout', points_to_win: 11, win_by: 2, max_points: 15 },
+};
+
+/** Dreambreaker-formatet er fast — alltid rally-scoring til 21, uansett valg over. */
+export const LAGSPILL_DREAMBREAKER_FORMAT = {
+  type: 'lagspill_dreambreaker', points_to_win: 21, win_by: 2, max_points: 25,
+};
+
+/** De fire faste par-kombinasjonene i en Lagspill-kamp, i fast rekkefølge. */
+const LAGSPILL_PAR_REKKEFOLGE = [
+  { par: 'A1A2', p1: 'A1', p2: 'A2' },
+  { par: 'B1B2', p1: 'B1', p2: 'B2' },
+  { par: 'A1B1', p1: 'A1', p2: 'B1' },
+  { par: 'A2B2', p1: 'A2', p2: 'B2' },
+];
+
+/**
+ * Bygg kampformat for Lagspill-delspill fra valgt poengsystem.
+ * @param {'rally'|'sideout'} poengsystem
+ */
+export function lagLagspillKampformat(poengsystem = 'rally') {
+  return LAGSPILL_POENGSYSTEM[poengsystem] ?? LAGSPILL_POENGSYSTEM.rally;
+}
+
+/**
+ * Genererer de 4 faste delspillene for en Lagspill-kamp, med spillernavn
+ * hentet automatisk fra lagenes faste A1/A2/B1/B2-oppstilling.
+ * Brukeren velger aldri par selv — rekkefølgen er alltid A1A2 → B1B2 → A1B1 → A2B2.
+ * @param {{spillere: {A1,A2,B1,B2}}} lag1
+ * @param {{spillere: {A1,A2,B1,B2}}} lag2
+ * @returns {Array<{par, navn1, navn2}>}
+ */
+export function genererLagspillDelspill(lag1, lag2) {
+  const s1 = lag1?.spillere ?? {};
+  const s2 = lag2?.spillere ?? {};
+  return LAGSPILL_PAR_REKKEFOLGE.map(({ par, p1, p2 }) => ({
+    par,
+    navn1: `${s1[p1] ?? '?'} / ${s1[p2] ?? '?'}`,
+    navn2: `${s2[p1] ?? '?'} / ${s2[p2] ?? '?'}`,
+  }));
+}
+
+/**
+ * Beregner stilling og vinner for en Lagspill-kamp.
+ * De 4 første elementene i games[] er de faste delspillene.
+ * Et eventuelt 5. element er dreambreakeren (kun relevant ved 2–2 etter 4 delspill).
+ * Dreambreaker har ingen spillernavn — alle fire spillerne på laget roterer inn.
+ * @param {Array<{par, l1, l2}>} games
+ * @returns {{ lag1Seire, lag2Seire, poeng1, poeng2, trengerDreambreaker, ferdig, vinnerLag: 1|2|null }}
+ */
+export function beregnLagspill(games) {
+  const ordinaere = (games ?? []).slice(0, 4).filter(Boolean);
+  let lag1Seire = 0, lag2Seire = 0, poeng1 = 0, poeng2 = 0;
+
+  for (const g of ordinaere) {
+    if (g.l1 == null || g.l2 == null) continue;
+    poeng1 += g.l1; poeng2 += g.l2;
+    if (g.l1 > g.l2) lag1Seire++;
+    else if (g.l2 > g.l1) lag2Seire++;
+  }
+
+  const alleOrdinaereFerdig  = ordinaere.length === 4 && ordinaere.every(g => g.l1 != null && g.l2 != null);
+  const trengerDreambreaker = alleOrdinaereFerdig && lag1Seire === 2 && lag2Seire === 2;
+
+  const db = games?.[4];
+  if (trengerDreambreaker && db?.l1 != null && db?.l2 != null) {
+    poeng1 += db.l1; poeng2 += db.l2;
+    if (db.l1 > db.l2) lag1Seire++; else if (db.l2 > db.l1) lag2Seire++;
+  }
+
+  const ferdig    = lag1Seire >= 3 || lag2Seire >= 3;
+  const vinnerLag = ferdig ? (lag1Seire > lag2Seire ? 1 : 2) : null;
+
+  return { lag1Seire, lag2Seire, poeng1, poeng2, trengerDreambreaker, ferdig, vinnerLag };
+}
+
+/**
+ * Validerer ett enkelt delspill (eller dreambreakeren) i en Lagspill-kamp.
+ * @param {number} l1
+ * @param {number} l2
+ * @param {boolean} erDreambreaker
+ * @param {object} delspillFormat — kampformatet valgt for de 4 ordinære delspillene
+ */
+export function validerLagspillDelspill(l1, l2, erDreambreaker, delspillFormat) {
+  const format = erDreambreaker ? LAGSPILL_DREAMBREAKER_FORMAT : delspillFormat;
+  return validerResultat(l1, l2, format);
+}
+
+// ════════════════════════════════════════════════════════
 // VALIDERING AV RESULTAT
 // ════════════════════════════════════════════════════════
 export function validerResultat(p1, p2, format) {
@@ -120,6 +217,15 @@ export function genererPuljer(lag, antallPuljer) {
   }
 
   return puljer;
+}
+
+/**
+ * Lagspill spilles alltid som én serieturnering mellom alle lagene —
+ * genererPuljer() krever 2–4 puljer, så dette er en egen, enklere variant.
+ */
+export function genererLagspillPulje(lag) {
+  if (!lag?.length || lag.length < 2) throw new Error('Trenger minst 2 lag.');
+  return [{ id: 'pulje_1', navn: 'Serieturnering', lagIds: lag.map(l => l.id) }];
 }
 
 // ════════════════════════════════════════════════════════
@@ -392,7 +498,11 @@ export function beregnPuljetabell(pulje, alleLag) {
   const stats  = {};
 
   for (const id of pulje.lagIds) {
-    stats[id] = { lagId: id, seire: 0, tap: 0, pf: 0, pm: 0, pd: 0, kamper: 0 };
+    stats[id] = {
+      lagId: id, seire: 0, tap: 0, pf: 0, pm: 0, pd: 0, kamper: 0,
+      // Rå poeng fra games[] (kun Lagspill/best av 3) — brukes til poeng%-tiebreak.
+      poengF: 0, poengM: 0, poengProsent: 0,
+    };
   }
 
   for (const k of (pulje.kamper ?? [])) {
@@ -407,10 +517,22 @@ export function beregnPuljetabell(pulje, alleLag) {
 
     if (k.lag1Poeng > k.lag2Poeng) { s1.seire++; s2.tap++; }
     else                            { s2.seire++; s1.tap++; }
+
+    if (k.games?.length) {
+      let rp1 = 0, rp2 = 0;
+      for (const g of k.games) {
+        if (g?.l1 == null || g?.l2 == null) continue;
+        rp1 += g.l1; rp2 += g.l2;
+      }
+      s1.poengF += rp1; s1.poengM += rp2;
+      s2.poengF += rp2; s2.poengM += rp1;
+    }
   }
 
   for (const s of Object.values(stats)) {
     s.pd = s.pf - s.pm;
+    const totalPoeng = s.poengF + s.poengM;
+    s.poengProsent = totalPoeng > 0 ? s.poengF / totalPoeng : 0;
   }
 
   return _sorterPuljeTabell(Object.values(stats), pulje.kamper ?? []);
@@ -430,11 +552,13 @@ function _sorterPuljeTabell(lagListe, kamper) {
     } else {
       // Sirkeloppgjør: bruk PD kun i kampene mellom de involverte lagene
       const ids = new Set(gruppe.map(l => l.lagId));
+      const harPoengData = gruppe.some(l => (l.poengF ?? 0) + (l.poengM ?? 0) > 0);
       const sortert = [...gruppe].sort((a, b) => {
         const sirkelA = _sirkelPd(a.lagId, ids, kamper);
         const sirkelB = _sirkelPd(b.lagId, ids, kamper);
         if (sirkelB !== sirkelA) return sirkelB - sirkelA;
         if (b.pd !== a.pd) return b.pd - a.pd;
+        if (harPoengData && b.poengProsent !== a.poengProsent) return b.poengProsent - a.poengProsent;
         return b.pf - a.pf;
       });
       sortert.forEach(l => { l.tiebreakType = 'poengdiff'; });
