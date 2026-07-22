@@ -778,6 +778,10 @@ window.bekreftResultat = async function() {
       visBracket(app.aktivTurnering);
     } else {
       await registrerPuljeresultat(id, _modalPuljeId, _modalKampId, lag1Poeng, lag2Poeng, games);
+      // Kampen er nå endelig registrert (ferdig:true) — slå av autolagring FØR
+      // lukkResultatModal() kaller _lagspillFlushAutolagre(), ellers skriver den
+      // overflødige lukke-flushen ferdig:false over det vi nettopp lagret.
+      _lagspillAutolagreAktiv = false;
       const oppdatert = await hentTurnering(id);
       app.aktivTurnering = oppdatert;
       lukkResultatModal();
@@ -796,6 +800,7 @@ window.registrerWalkoverUI = async function() {
     try {
       const id = getAktivTurneringId();
       await registrerWalkover(id, _modalPuljeId, _modalKampId, _modalLag2Id);
+      _lagspillAutolagreAktiv = false;
       const oppdatert = await hentTurnering(id);
       app.aktivTurnering = oppdatert;
       lukkResultatModal();
