@@ -86,18 +86,29 @@ export async function visPulje(turnering) {
   }).join('');
 
   // Kvalifisering-boks
-  const kvalBoks = document.getElementById('kvalifisering-boks');
-  const tilKnapp = document.getElementById('til-sluttspill-knapp');
+  const kvalBoks    = document.getElementById('kvalifisering-boks');
+  const tilKnapp    = document.getElementById('til-sluttspill-knapp');
+  const avsluttKnapp = document.getElementById('avslutt-lagspill-knapp');
+  const erLagspillFormat = t.konfig?.spillformat === 'lagspill';
 
   const alleFerdig = (t.puljer ?? []).length > 0 &&
     (t.puljer ?? []).every(p => (p.kamper ?? []).every(k => k.ferdig));
 
-  if (alleFerdig && t.status !== T_STATUS.PLAYOFFS && t.status !== T_STATUS.FINISHED) {
+  const skalViseAvslutning = alleFerdig && t.status !== T_STATUS.PLAYOFFS && t.status !== T_STATUS.FINISHED;
+
+  if (skalViseAvslutning && !erLagspillFormat) {
     if (kvalBoks) { kvalBoks.style.display = 'block'; visKvalifisering(t, lagMap); }
     if (tilKnapp) tilKnapp.style.display = 'block';
+    if (avsluttKnapp) avsluttKnapp.style.display = 'none';
+  } else if (skalViseAvslutning && erLagspillFormat) {
+    // Lagspill har ingen sluttspillfase — serien er ferdig når alle har møtt alle.
+    if (kvalBoks) kvalBoks.style.display = 'none';
+    if (tilKnapp) tilKnapp.style.display = 'none';
+    if (avsluttKnapp) avsluttKnapp.style.display = 'block';
   } else {
     if (kvalBoks) kvalBoks.style.display = 'none';
     if (tilKnapp) tilKnapp.style.display = 'none';
+    if (avsluttKnapp) avsluttKnapp.style.display = 'none';
   }
 }
 
@@ -1091,10 +1102,14 @@ window.avsluttTurneringUI = function() {
   krevAdminTurnering('Avslutt turnering', 'PIN kreves for å avslutte turneringen.', async () => {
     try {
       const id         = getAktivTurneringId();
+      // Lagspill avsluttes fra puljeskjermen (ingen bracket-fase),
+      // standardformatet avsluttes fra bracket-skjermen.
+      const fraSkjerm  = app.aktivTurnering?.konfig?.spillformat === 'lagspill'
+        ? 'turnering-pulje' : 'turnering-bracket';
       const rangering  = await avsluttTurnering(id);
       const oppdatert  = await hentTurnering(id);
       app.aktivTurnering = oppdatert;
-      navigerTurnering('turnering-bracket', 'turnering-resultat');
+      navigerTurnering(fraSkjerm, 'turnering-resultat');
       visResultat(oppdatert, rangering);
     } catch (e) {
       visMelding(e?.message ?? 'Feil ved avslutning.', 'feil');

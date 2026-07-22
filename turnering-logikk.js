@@ -1132,13 +1132,27 @@ function _erPuljeVinner(lagId, puljer) {
 // ENDELIG RANGERING
 // ════════════════════════════════════════════════════════
 export function beregnEndeligRangering(turnering) {
-  const { sluttspill, lag } = turnering;
+  const { sluttspill, lag, puljer } = turnering;
   const lagMap = {};
   for (const l of (lag ?? [])) {
     if (l.id)    lagMap[l.id]    = l;
     if (l.lagId) lagMap[l.lagId] = l;
   }
   const plasseringer = [];
+
+  // Ingen sluttspill (Lagspill — ren serieturnering, ingen bracket-fase):
+  // bruk serietabellen direkte som sluttplassering.
+  const harSluttspill = (sluttspill?.A?.kamper?.length ?? 0) > 0;
+  if (!harSluttspill) {
+    const pulje = (puljer ?? [])[0];
+    if (!pulje) return plasseringer;
+    const tabell = beregnPuljetabell(pulje, lag ?? []);
+    tabell.forEach((rad, i) => {
+      const lagObj = lagMap[rad.lagId];
+      if (lagObj) plasseringer.push({ plass: i + 1, lag: lagObj });
+    });
+    return plasseringer;
+  }
 
   if (sluttspill?.A?.kamper?.length) {
     const a = sluttspill.A.kamper;
