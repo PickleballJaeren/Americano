@@ -274,6 +274,49 @@
   .pd-neg { color: var(--red2); font-family: monospace; }
   .pd-nøy { color: var(--muted2); font-family: monospace; }
 
+  /* ── LAGSPILL-KAMPSKJEMA ── */
+  .ls-tabell-seksjon { padding: 14px 16px; }
+  .ls-tabell-tittel { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--yellow); margin-bottom: 8px; }
+  .ls-tabell { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .ls-tabell th { text-align: left; padding: 4px 6px; font-size: 11px; color: var(--muted2); font-weight: 500; border-bottom: 1px solid var(--border2); }
+  .ls-tabell th.sentr, .ls-tabell td.sentr { text-align: center; }
+  .ls-tabell td { padding: 6px; border-bottom: 1px solid var(--border); }
+  .ls-tabell tr:last-child td { border-bottom: none; }
+  .ls-tabell-plass { font-family: 'Bebas Neue', cursive; font-size: 15px; }
+  .ls-tabell-fotnote { font-size: 10px; color: var(--muted); margin-top: 6px; }
+
+  .ls-runde-tittel { padding: 14px 16px 4px; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted2); border-top: 1px solid var(--border2); }
+  .ls-oppgjor-scroll { display: flex; gap: 16px; overflow-x: auto; -webkit-overflow-scrolling: touch; padding: 8px 16px 16px; scrollbar-width: none; }
+  .ls-oppgjor-scroll::-webkit-scrollbar { display: none; }
+  .ls-oppgjor-kol { flex-shrink: 0; width: 300px; }
+  .ls-oppgjor-tittel { font-size: 12px; font-weight: 600; color: var(--white); padding-bottom: 4px; margin-bottom: 8px; border-bottom: 2px solid var(--border2); }
+  .ls-oppgjor-tittel.gronn { border-bottom-color: var(--green2); }
+  .ls-gruppe-label { font-size: 10px; color: var(--muted); margin: 0 0 6px; }
+  .ls-gruppe-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+  .ls-gruppe-grid.venter { opacity: .5; }
+
+  .ls-kort { background: var(--navy3); border: 1px solid var(--border2); border-radius: 10px; padding: 8px 10px; }
+  .ls-kort.aktiv { border-color: var(--green2); }
+  .ls-kort.pagaar { border-color: var(--yellow); }
+  .ls-kort-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; }
+  .ls-par-merke { font-size: 10px; font-weight: 600; color: var(--muted2); background: rgba(255,255,255,.06); border: 1px solid var(--border2); border-radius: 4px; padding: 1px 5px; }
+  .ls-bane-tekst { font-size: 9px; color: var(--muted); }
+  .ls-lag-etikett { font-size: 8px; font-weight: 700; letter-spacing: .3px; }
+  .ls-lag-etikett.a { color: var(--green2); }
+  .ls-lag-etikett.b { color: var(--accent2); }
+  .ls-spillernavn { font-size: 12px; color: var(--white); line-height: 1.4; margin: 2px 0; }
+  .ls-vs { text-align: center; font-size: 10px; color: var(--muted2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 2px 0; margin: 4px 0; }
+  .ls-resultat { text-align: center; font-size: 15px; font-weight: 700; color: var(--white); padding-top: 5px; }
+  .ls-status { text-align: center; font-size: 11px; padding-top: 5px; }
+  .ls-status.gul { color: var(--yellow); }
+  .ls-status.graa { color: var(--muted); }
+
+  .ls-db-kort { border: 2px solid var(--yellow); border-radius: 10px; padding: 9px 11px; background: var(--navy3); }
+  .ls-db-merke { font-size: 10px; font-weight: 700; letter-spacing: .5px; color: #412402; background: var(--yellow); border-radius: 4px; padding: 2px 7px; }
+  .ls-db-lagnavn { text-align: center; font-size: 13px; color: var(--white); font-weight: 600; }
+  .ls-db-sub { text-align: center; font-size: 10px; color: var(--muted2); margin-bottom: 4px; }
+  .ls-db-avgjort { text-align: center; font-size: 11px; color: var(--muted); padding: 6px; }
+
   /* ── KAMPER ── */
   .kamp-liste-item {
     padding: 10px 12px; border-bottom: 1px solid var(--border);
@@ -473,7 +516,7 @@ function render(t) {
       ${renderKamper(t, lagMap)}
     </div>
     <div id="fane-kampskjema" class="tab-innhold${_aktivFane==='kampskjema'?' aktiv':''}">
-      ${renderKampskjema(t, lagMap)}
+      ${t.konfig?.spillformat === 'lagspill' ? renderLagspillKampskjema(t, lagMap) : renderKampskjema(t, lagMap)}
     </div>
     <div id="fane-sluttspill-ks" class="tab-innhold${_aktivFane==='sluttspill-ks'?' aktiv':''}">
       ${renderSluttspillKampskjema(t, lagMap)}
@@ -1130,6 +1173,257 @@ function renderKampskjema(t, lagMap) {
   return html;
 }
 
+// ════════════════════════════════════════════════════════
+// LAGSPILL — kampskjema med delkamp-kort
+// Speiler logikken i turnering-logikk.js (genererLagspillDelspill,
+// beregnLagspill, erMixedByttet, beregnPuljetabell) siden viewer.html
+// er en frittstående fil uten modul-import. Gjelder KUN for
+// spillformat 'lagspill' — renderKampskjema() over er urørt og
+// brukes fortsatt for standardformatet.
+// ════════════════════════════════════════════════════════
+
+const LS_PAR_REKKEFOLGE = [
+  { par: 'A1A2', p1: 'A1', p2: 'A2' },
+  { par: 'B1B2', p1: 'B1', p2: 'B2' },
+  { par: 'A1B1', p1: 'A1', p2: 'B1' },
+  { par: 'A2B2', p1: 'A2', p2: 'B2' },
+];
+const LS_PAR_REKKEFOLGE_BYTTET = [
+  { par: 'A1A2', p1: 'A1', p2: 'A2' },
+  { par: 'B1B2', p1: 'B1', p2: 'B2' },
+  { par: 'A1B2', p1: 'A1', p2: 'B2' },
+  { par: 'A2B1', p1: 'A2', p2: 'B1' },
+];
+
+/** Avgjør om en kamp bruker byttet mixed-paring, basert på lagret par-etikett. Antar A1B1/A2B2 (standard) før noe er registrert. */
+function lsErMixedByttet(games) {
+  return games?.[2]?.par === 'A1B2';
+}
+
+/** De 4 faste delspillene med spillernavn hentet fra lagenes A1/A2/B1/B2-oppstilling. */
+function lsGenererDelspill(lag1, lag2, byttMixed) {
+  const s1 = lag1?.spillere ?? {};
+  const s2 = lag2?.spillere ?? {};
+  const rekkefolge = byttMixed ? LS_PAR_REKKEFOLGE_BYTTET : LS_PAR_REKKEFOLGE;
+  return rekkefolge.map(({ par, p1, p2 }) => ({
+    par, navn1: s1[p1] ?? '?', navn2: s1[p2] ?? '?',
+    mnavn1: s2[p1] ?? '?', mnavn2: s2[p2] ?? '?',
+  }));
+}
+
+/** Stilling og vinner for en Lagspill-kamp basert på games[]. */
+function lsBeregnStilling(games) {
+  const ordinaere = (games ?? []).slice(0, 4).filter(Boolean);
+  let lag1Seire = 0, lag2Seire = 0;
+  for (const g of ordinaere) {
+    if (g.l1 == null || g.l2 == null) continue;
+    if (g.l1 > g.l2) lag1Seire++; else if (g.l2 > g.l1) lag2Seire++;
+  }
+  const alleOrdinaereFerdig  = ordinaere.length === 4 && ordinaere.every(g => g.l1 != null && g.l2 != null);
+  const trengerDreambreaker = alleOrdinaereFerdig && lag1Seire === 2 && lag2Seire === 2;
+  const db = games?.[4];
+  if (trengerDreambreaker && db?.l1 != null && db?.l2 != null) {
+    if (db.l1 > db.l2) lag1Seire++; else if (db.l2 > db.l1) lag2Seire++;
+  }
+  return { lag1Seire, lag2Seire, trengerDreambreaker };
+}
+
+/** Serietabell — speiler beregnPuljetabell()/_sorterPuljeTabell() i turnering-logikk.js. */
+function lsBeregnTabell(pulje, alleLag) {
+  const stats = {};
+  for (const id of pulje.lagIds ?? []) {
+    stats[id] = { lagId: id, seire: 0, tap: 0, pf: 0, pm: 0, pd: 0, kamper: 0, poengF: 0, poengM: 0, poengProsent: 0 };
+  }
+  for (const k of (pulje.kamper ?? [])) {
+    if (!k.ferdig || k.lag1Poeng == null || k.lag2Poeng == null) continue;
+    const s1 = stats[k.lag1Id], s2 = stats[k.lag2Id];
+    if (!s1 || !s2) continue;
+    s1.pf += k.lag1Poeng; s1.pm += k.lag2Poeng;
+    s2.pf += k.lag2Poeng; s2.pm += k.lag1Poeng;
+    s1.kamper++; s2.kamper++;
+    if (k.lag1Poeng > k.lag2Poeng) { s1.seire++; s2.tap++; } else { s2.seire++; s1.tap++; }
+    if (k.games?.length) {
+      let rp1 = 0, rp2 = 0;
+      for (const g of k.games) { if (g?.l1 == null || g?.l2 == null) continue; rp1 += g.l1; rp2 += g.l2; }
+      s1.poengF += rp1; s1.poengM += rp2; s2.poengF += rp2; s2.poengM += rp1;
+    }
+  }
+  for (const s of Object.values(stats)) {
+    s.pd = s.pf - s.pm;
+    const totalPoeng = s.poengF + s.poengM;
+    s.poengProsent = totalPoeng > 0 ? s.poengF / totalPoeng : 0;
+  }
+  return lsSorterTabell(Object.values(stats), pulje.kamper ?? []);
+}
+
+function lsSirkelPd(lagId, gruppeIds, kamper) {
+  let pd = 0;
+  for (const k of kamper) {
+    if (!k.ferdig) continue;
+    if (k.lag1Id === lagId && gruppeIds.has(k.lag2Id)) pd += k.lag1Poeng - k.lag2Poeng;
+    if (k.lag2Id === lagId && gruppeIds.has(k.lag1Id)) pd += k.lag2Poeng - k.lag1Poeng;
+  }
+  return pd;
+}
+
+function lsSorterTabell(lagListe, kamper) {
+  const grov = [...lagListe].sort((a, b) => b.seire - a.seire);
+  const resultat = [];
+  let i = 0;
+  while (i < grov.length) {
+    let j = i + 1;
+    while (j < grov.length && grov[j].seire === grov[i].seire) j++;
+    const gruppe = grov.slice(i, j);
+    if (gruppe.length === 1) {
+      gruppe[0].tiebreakType = null;
+      resultat.push(gruppe[0]);
+    } else {
+      const ids = new Set(gruppe.map(l => l.lagId));
+      const harPoengData = gruppe.some(l => (l.poengF ?? 0) + (l.poengM ?? 0) > 0);
+      const sortert = [...gruppe].sort((a, b) => {
+        const sirkelA = lsSirkelPd(a.lagId, ids, kamper);
+        const sirkelB = lsSirkelPd(b.lagId, ids, kamper);
+        if (sirkelB !== sirkelA) return sirkelB - sirkelA;
+        if (b.pd !== a.pd) return b.pd - a.pd;
+        if (harPoengData && b.poengProsent !== a.poengProsent) return b.poengProsent - a.poengProsent;
+        return b.pf - a.pf;
+      });
+      sortert.forEach(l => { l.tiebreakType = 'poengdiff'; });
+      resultat.push(...sortert);
+    }
+    i = j;
+  }
+  return resultat;
+}
+
+/** Serietabell øverst i Lagspill-kampskjemaet — vises én gang, uavhengig av antall lag. */
+function renderLagspillSerieTabell(t, lagMap) {
+  const pulje = (t.puljer ?? [])[0];
+  if (!pulje) return '';
+  const tabell = lsBeregnTabell(pulje, t.lag ?? []);
+  if (!tabell.length) return '';
+  const harPoengProsent = tabell.some(r => (r.poengF ?? 0) + (r.poengM ?? 0) > 0);
+
+  return `<div class="ls-tabell-seksjon">
+    <div class="ls-tabell-tittel">${esc(pulje.navn ?? 'Serieturnering')}</div>
+    <table class="ls-tabell">
+      <thead><tr>
+        <th>#</th><th>Lag</th>
+        <th class="sentr">K</th><th class="sentr">S</th><th class="sentr">T</th>
+        <th class="sentr">+/-</th>${harPoengProsent ? '<th class="sentr">Poeng %</th>' : ''}
+      </tr></thead>
+      <tbody>
+        ${tabell.map((r, i) => `
+          <tr>
+            <td class="ls-tabell-plass" style="color:${i===0?'var(--yellow)':i===1?'var(--accent2)':'var(--muted)'}">${i+1}</td>
+            <td style="font-weight:${i<2?600:400}">${esc(lagMap[r.lagId]?.navn ?? r.lagId)}</td>
+            <td class="sentr">${r.kamper}</td>
+            <td class="sentr" style="color:var(--green2)">${r.seire}</td>
+            <td class="sentr" style="color:var(--red2)">${r.tap}</td>
+            <td class="sentr" style="color:${r.pd>=0?'var(--green2)':'var(--red2)'}">${r.pd>0?'+':''}${r.pd}</td>
+            ${harPoengProsent ? `<td class="sentr" style="color:var(--muted2)">${r.kamper>0?(r.poengProsent*100).toFixed(1)+'%':'—'}</td>` : ''}
+          </tr>`).join('')}
+      </tbody>
+    </table>
+    <div class="ls-tabell-fotnote">Oppdateres live etter hvert delspill</div>
+  </div>`;
+}
+
+/** Ett delkamp-kort (A1A2 / B1B2 / mixed-par). */
+function lsKort(d, kampLag1, kampLag2, gameResultat, erAktivGruppe, baneTekst) {
+  let kantKl = '', statusHTML = '';
+  if (gameResultat) {
+    const v1 = gameResultat.l1 > gameResultat.l2;
+    statusHTML = `<div class="ls-resultat">${gameResultat.l1} &ndash; ${gameResultat.l2}</div>`;
+  } else if (erAktivGruppe) {
+    kantKl = 'aktiv';
+    statusHTML = `<div class="ls-status graa">Ikke registrert</div>`;
+  } else {
+    statusHTML = `<div class="ls-status graa">Venter</div>`;
+  }
+  return `<div class="ls-kort ${kantKl}">
+    <div class="ls-kort-hdr">
+      <span class="ls-par-merke">${esc(d.par)}${d.par.length>4?' · mixed':''}</span>
+      ${baneTekst ? `<span class="ls-bane-tekst">${esc(baneTekst)}</span>` : ''}
+    </div>
+    <div class="ls-lag-etikett a">${esc((kampLag1?.navn ?? 'Lag A').toUpperCase())}</div>
+    <div class="ls-spillernavn">${esc(d.navn1)}<br>${esc(d.navn2)}</div>
+    <div class="ls-vs">VS</div>
+    <div class="ls-lag-etikett b">${esc((kampLag2?.navn ?? 'Lag B').toUpperCase())}</div>
+    <div class="ls-spillernavn">${esc(d.mnavn1)}<br>${esc(d.mnavn2)}</div>
+    ${statusHTML}
+  </div>`;
+}
+
+/** Dreambreaker-kort — vises kun dynamisk når kampen faktisk står 2–2. */
+function lsDreambreakerKort(lag1, lag2, gameResultat) {
+  const statusHTML = gameResultat
+    ? `<div class="ls-resultat">${gameResultat.l1} &ndash; ${gameResultat.l2}</div>`
+    : `<div class="ls-status gul">Avgjør kampen &middot; 2&ndash;2</div>`;
+  return `<div class="ls-db-kort">
+    <div class="ls-kort-hdr"><span class="ls-db-merke">DREAMBREAKER</span></div>
+    <div class="ls-db-lagnavn">${esc(lag1?.navn ?? '?')}</div>
+    <div class="ls-db-sub">alle fire spiller inn</div>
+    <div class="ls-vs">VS</div>
+    <div class="ls-db-lagnavn">${esc(lag2?.navn ?? '?')}</div>
+    <div class="ls-db-sub">alle fire spiller inn</div>
+    ${statusHTML}
+  </div>`;
+}
+
+/** Bygger én lagoppgjør-kolonne (delkamp-kortene for én kamp mellom to lag). */
+function lsOppgjorKolonne(kamp, lagMap) {
+  const lag1 = lagMap[kamp.lag1Id];
+  const lag2 = lagMap[kamp.lag2Id];
+  const games = kamp.games ?? [];
+  const byttMixed = lsErMixedByttet(games);
+  const delspill = lsGenererDelspill(lag1, lag2, byttMixed);
+  const stilling = lsBeregnStilling(games);
+
+  const gruppe1Ferdig = games[0]?.l1 != null && games[0]?.l2 != null && games[1]?.l1 != null && games[1]?.l2 != null;
+
+  const gruppe1 = [0, 1].map(i => lsKort(delspill[i], lag1, lag2, games[i] ?? null, true));
+  const gruppe2 = [2, 3].map(i => lsKort(delspill[i], lag1, lag2, games[i] ?? null, gruppe1Ferdig));
+
+  const dbHTML = stilling.trengerDreambreaker
+    ? lsDreambreakerKort(lag1, lag2, games[4] ?? null)
+    : '';
+
+  return `<div class="ls-oppgjor-kol">
+    <div class="ls-oppgjor-tittel${kamp.ferdig ? '' : ' gronn'}">${esc(lag1?.navn ?? '?')} &ndash; ${esc(lag2?.navn ?? '?')}</div>
+    <div class="ls-gruppe-label">Spilles samtidig</div>
+    <div class="ls-gruppe-grid">${gruppe1.join('')}</div>
+    <div class="ls-gruppe-label">Mixed-par ${gruppe1Ferdig ? '' : '&middot; venter på gruppen over'}</div>
+    <div class="ls-gruppe-grid${gruppe1Ferdig ? '' : ' venter'}">${gruppe2.join('')}</div>
+    ${dbHTML}
+  </div>`;
+}
+
+/** Lagspill-variant av kampskjemaet — ett kort per delkamp, gruppert etter hva som spilles samtidig. */
+function renderLagspillKampskjema(t, lagMap) {
+  const puljer = t.puljer ?? [];
+  if (!puljer.length) return '<div class="tom">Kampskjema vises når serieturneringen er startet.</div>';
+
+  const alleKamper = [];
+  for (const p of puljer) for (const k of p.kamper ?? []) alleKamper.push(k);
+  if (!alleKamper.length) return '<div class="tom">Ingen kamper planlagt ennå.</div>';
+
+  const perRunde = {};
+  for (const k of alleKamper) {
+    if (!perRunde[k.runde]) perRunde[k.runde] = [];
+    perRunde[k.runde].push(k);
+  }
+  const rundeNr = Object.keys(perRunde).map(Number).sort((a, b) => a - b);
+
+  let html = renderLagspillSerieTabell(t, lagMap);
+  for (const r of rundeNr) {
+    html += `<div class="ls-runde-tittel">Runde ${r}</div>
+      <div class="ls-oppgjor-scroll">
+        ${perRunde[r].map(k => lsOppgjorKolonne(k, lagMap)).join('')}
+      </div>`;
+  }
+  return html;
+}
 
 // ── SLUTTSPILL-KAMPSKJEMA ─────────────────────────────────
 function renderSluttspillKampskjema(t, lagMap) {
