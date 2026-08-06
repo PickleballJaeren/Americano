@@ -3,7 +3,7 @@
 //                 spillersammenligning og rating-redigering
 // ════════════════════════════════════════════════════════
 import {
-  db, SAM, STARTRATING,
+  db, SAM, STARTRATING, Timestamp,
   collection, doc, getDocs, updateDoc,
   query, where, writeBatch,
 } from './firebase.js';
@@ -148,7 +148,10 @@ window.oppdaterGlobalLedertavle = oppdaterGlobalLedertavle;
 const SESONG_MIN_KAMPER = 10;
 
 let _sesongCache = null;
-const SESONG_TTL_MS = 2 * 60 * 1000;
+// 20 min — sesongkåring trenger ikke være sanntid. Kortere TTL koster
+// mange unødvendige fulle kamp-lesinger når flere enheter bytter
+// til Spillere-fanen ofte i løpet av en økt.
+const SESONG_TTL_MS = 20 * 60 * 1000;
 
 async function beregnSesongsKaaring(spillereListe) {
   const sesongLaster  = document.getElementById('sesong-laster');
@@ -206,15 +209,31 @@ async function beregnSesongsKaaring(spillereListe) {
       );
     }
 
-    const snap = await getDocs(query(
-      collection(db, SAM.KAMPER),
-      where('ferdig', '==', true)
-    ));
+    // Datofilter i selve spørringen — leser kun inneværende sesongs kamper
+    // i stedet for å hente HELE kamper-samlingen (alle klubber, all historikk)
+    // hver gang noen åpner Spillere-fanen. Krever en sammensatt indeks i
+    // Firestore (ferdig ASC + dato ASC) — konsollen gir en direktelenke for
+    // å opprette den automatisk første gang spørringen kjøres.
+    let snap;
+    try {
+      const spørring = periodeMs > 0
+        ? query(
+            collection(db, SAM.KAMPER),
+            where('ferdig', '==', true),
+            where('dato', '>=', Timestamp.fromMillis(periodeMs)),
+          )
+        : query(collection(db, SAM.KAMPER), where('ferdig', '==', true));
+      snap = await getDocs(spørring);
+    } catch (e) {
+      console.warn('[Sesongkåring] Datofiltrert spørring feilet, faller tilbake til ufiltrert:', e?.message ?? e);
+      snap = await getDocs(query(collection(db, SAM.KAMPER), where('ferdig', '==', true)));
+    }
     const alleKamper = snap.docs
       .map(d => ({ id: d.id, ...d.data() }))
       .filter(k =>
         k.lag1Poeng != null && k.lag2Poeng != null &&
         // Filtrer på GOAT-perioden — kun kamper i inneværende sesong
+        // (dobbeltsjekk lokalt i tillegg til server-filteret over)
         (periodeMs === 0 || (k.dato?.toMillis?.() ?? 0) >= periodeMs) &&
         // Filtrer på treningId for å sikre riktig klubb
         (gyldigeTreningIds == null || gyldigeTreningIds.has(k.treningId)) &&

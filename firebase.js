@@ -6,7 +6,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/fireba
 import {
   getFirestore, collection, doc, addDoc, updateDoc, setDoc,
   getDoc, getDocs, query, where, orderBy, limit,
-  onSnapshot, serverTimestamp, writeBatch, runTransaction,
+  onSnapshot, serverTimestamp, writeBatch, runTransaction, Timestamp,
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // ════════════════════════════════════════════════════════
@@ -92,5 +92,5 @@ export { db };
 export {
   collection, doc, addDoc, updateDoc, setDoc,
   getDoc, getDocs, query, where, orderBy, limit,
-  onSnapshot, serverTimestamp, writeBatch, runTransaction,
+  onSnapshot, serverTimestamp, writeBatch, runTransaction, Timestamp,
 };
