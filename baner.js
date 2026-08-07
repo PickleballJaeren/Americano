@@ -1581,7 +1581,7 @@ window._lagreRedigerBaner = async function() {
 
       if (erSingel && n === 2) {
         batch.set(doc(collection(db, SAM.KAMPER)), {
-          treningId: app.treningId,
+          treningId: app.treningId, klubbId: _getAktivKlubbId(),
           baneNr:    `bane${bane.baneNr}`,
           rundeNr:   app.runde,
           kampNr:    1,
@@ -1598,7 +1598,7 @@ window._lagreRedigerBaner = async function() {
         if (!s1 || !s2 || !s3 || !s4) return;
         const hvilerFelt = s5 ? { hviler_id: s5.id, hviler_navn: s5.navn } : {};
         batch.set(doc(collection(db, SAM.KAMPER)), {
-          treningId: app.treningId,
+          treningId: app.treningId, klubbId: _getAktivKlubbId(),
           baneNr:    `bane${bane.baneNr}`,
           rundeNr:   app.runde,
           kampNr:    1,
@@ -1614,7 +1614,7 @@ window._lagreRedigerBaner = async function() {
         const parter = erDobbel6 ? PARTER_6_DOBBEL : getParter(n);
         parter.forEach(par => {
           const dokData = {
-            treningId: app.treningId,
+            treningId: app.treningId, klubbId: _getAktivKlubbId(),
             baneNr:    `bane${bane.baneNr}`,
             rundeNr:   app.runde,
             kampNr:    par.nr,

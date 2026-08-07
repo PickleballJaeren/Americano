@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<title>Engangsmigrering — klubbId</title>
+<style>
+  body { font-family: system-ui, sans-serif; background:#0b1220; color:#e2e8f0; padding:24px; max-width:720px; margin:0 auto; }
+  h1 { font-size:20px; }
+  button { font-size:16px; padding:10px 18px; border-radius:8px; border:none; background:#2563eb; color:#fff; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:default; }
+  pre { background:#020617; padding:14px; border-radius:8px; white-space:pre-wrap; font-size:13px; margin-top:16px; min-height:120px; }
+  p { line-height:1.5; }
+</style>
+</head>
+<body>
+  <h1>Engangsmigrering — legg til klubbId på gamle dokumenter</h1>
+  <p>
+    Denne siden kjører <code>migrer-klubbid.js</code> — den legger til <code>klubbId</code>
+    på eksisterende <code>kamper</code>-, <code>ratingHistorikk</code>- og <code>resultater</code>-dokumenter
+    som mangler det, basert på hvilken klubb hver <code>treningId</code> tilhører.
+  </p>
+  <p><strong>Kjør dette ÉN gang</strong>, etter at koden med klubbId-fiksen er deployet.
+     Trygt å kjøre flere ganger — dokumenter som allerede har klubbId hoppes over.
+     Slett denne filen og <code>migrer-klubbid.js</code> etterpå.</p>
+  <button id="start-knapp">Start migrering</button>
+  <pre id="migrer-logg"></pre>
+
+  <script type="module">
+    import { kjørMigrering } from './migrer-klubbid.js';
+    const knapp = document.getElementById('start-knapp');
+    knapp.addEventListener('click', async () => {
+      if (!confirm('Dette skriver til produksjons-databasen. Kjør kun én gang. Fortsette?')) return;
+      knapp.disabled = true;
+      knapp.textContent = 'Migrerer…';
+      try {
+        await kjørMigrering();
+      } catch (e) {
+        document.getElementById('migrer-logg').textContent += '\n❌ Feil: ' + (e?.message ?? e);
+      }
+      knapp.textContent = 'Ferdig';
+    });
+  </script>
+</body>
+</html>

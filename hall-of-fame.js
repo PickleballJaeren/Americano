@@ -105,8 +105,16 @@ async function _hentAlleKamper(klubbId) {
   const gyldigeTreningIds = await _hentGyldigeTreningIds(klubbId);
   const alleTreningIds    = await _hentAlleTreningIds(klubbId);
 
+  // Filtrert på klubbId i selve spørringen — leser kun denne klubbens kamper
+  // i stedet for HELE kamper-samlingen (alle klubber, all historikk).
+  // Krever kamp-dokumenter skrevet med klubbId (se trening.js/baner.js) samt
+  // en sammensatt indeks (klubbId ASC, ferdig ASC) — konsollen gir en
+  // direktelenke for å opprette den automatisk første gang spørringen kjøres.
+  // Eldre kamp-dokumenter uten klubbId (skrevet før denne fiksen) fanges ikke
+  // opp her — kjør migreringsscriptet for å etterfylle klubbId på dem.
   const snap = await getDocs(query(
     collection(db, SAM.KAMPER),
+    where('klubbId', '==', klubbId),
     where('ferdig', '==', true)
   ));
   const alleDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -337,7 +345,7 @@ export async function visHallOfFame() {
     // ingen ekstra Firestore-runde for Mix-oppmøte-beregningen.
     const [kamper, historikkMap, alleKamperInklMix, goatPeriode] = await Promise.all([
       _hentAlleKamper(klubbId),
-      _hentHistorikkForAlle(spillere),
+      _hentHistorikkForAlle(spillere, klubbId),
       _hentAlleKamperInklMix(klubbId),
       _hentGoatKonfig(klubbId),
     ]);
@@ -360,12 +368,46 @@ export async function visHallOfFame() {
   }
 }
 
-async function _hentHistorikkForAlle(spillere) {
-  const map = {};
+/**
+ * Henter ratinghistorikk for ALLE spillere i klubben med ÉN spørring
+ * (filtrert på klubbId), i stedet for én spørring per spiller.
+ * Faller tilbake til _hentHistorikk() per spiller for eldre historikk-
+ * dokumenter som mangler klubbId (skrevet før denne fiksen).
+ */
+async function _hentHistorikkForAlle(spillere, klubbId) {
+  const nøkkel = `historikk_alle_${klubbId}`;
+  const cached = _fraCacheEllerNull(nøkkel);
+  if (!cached) {
+    const map = {};
+    if (klubbId && db) {
+      try {
+        const snap = await getDocs(query(
+          collection(db, SAM.HISTORIKK),
+          where('klubbId', '==', klubbId)
+        ));
+        snap.docs.forEach(d => {
+          const h = { id: d.id, ...d.data() };
+          if (!h.spillerId) return;
+          (map[h.spillerId] ??= []).push(h);
+        });
+        Object.values(map).forEach(liste =>
+          liste.sort((a, b) => (a.dato?.toMillis?.() ?? 0) - (b.dato?.toMillis?.() ?? 0))
+        );
+      } catch (e) {
+        console.warn('[HoF] Kunne ikke hente samlet historikk:', e?.message ?? e);
+      }
+    }
+    _cachet(nøkkel, map);
+  }
+  const samlet = _fraCacheEllerNull(nøkkel) ?? {};
+
+  // Fallback per spiller for de som ikke har noen treff i den klubb-filtrerte
+  // spørringen — dekker eldre historikk-dokumenter skrevet uten klubbId.
+  const resultat = {};
   await Promise.all(spillere.map(async s => {
-    map[s.id] = await _hentHistorikk(s.id);
+    resultat[s.id] = samlet[s.id]?.length ? samlet[s.id] : await _hentHistorikk(s.id);
   }));
-  return map;
+  return resultat;
 }
 
 // ════════════════════════════════════════════════════════
@@ -1185,7 +1227,7 @@ export async function beregnGOAT(klubbId, fra, til, ekskluderSpillerId = null) {
   const spillere = _getSpillere();
   const [alleKamper, historikkMap] = await Promise.all([
     _hentAlleKamper(klubbId),
-    _hentHistorikkForAlle(spillere),
+    _hentHistorikkForAlle(spillere, klubbId),
   ]);
 
   const fraMs = fra.getTime();

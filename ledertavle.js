@@ -209,25 +209,39 @@ async function beregnSesongsKaaring(spillereListe) {
       );
     }
 
-    // Datofilter i selve spørringen — leser kun inneværende sesongs kamper
-    // i stedet for å hente HELE kamper-samlingen (alle klubber, all historikk)
-    // hver gang noen åpner Spillere-fanen. Krever en sammensatt indeks i
-    // Firestore (ferdig ASC + dato ASC) — konsollen gir en direktelenke for
-    // å opprette den automatisk første gang spørringen kjøres.
+    // Filtrert på klubbId + dato i selve spørringen — leser kun denne klubbens
+    // kamper for inneværende sesong i stedet for å hente HELE kamper-samlingen
+    // (alle klubber, all historikk) hver gang noen åpner Spillere-fanen.
+    // Krever kamp-dokumenter skrevet med klubbId (se trening.js/baner.js) samt
+    // en sammensatt indeks i Firestore (klubbId ASC, ferdig ASC, dato ASC) —
+    // konsollen gir en direktelenke for å opprette den automatisk.
+    // Fallback uten dato-filter (men fortsatt klubbId-filtrert) om indeksen
+    // for det sammensatte filteret ikke finnes ennå.
     let snap;
     try {
-      const spørring = periodeMs > 0
+      const spørring = (aktivKlubbId && periodeMs > 0)
         ? query(
             collection(db, SAM.KAMPER),
+            where('klubbId', '==', aktivKlubbId),
             where('ferdig', '==', true),
             where('dato', '>=', Timestamp.fromMillis(periodeMs)),
           )
-        : query(collection(db, SAM.KAMPER), where('ferdig', '==', true));
+        : aktivKlubbId
+          ? query(collection(db, SAM.KAMPER), where('klubbId', '==', aktivKlubbId), where('ferdig', '==', true))
+          : query(collection(db, SAM.KAMPER), where('ferdig', '==', true));
       snap = await getDocs(spørring);
     } catch (e) {
-      console.warn('[Sesongkåring] Datofiltrert spørring feilet, faller tilbake til ufiltrert:', e?.message ?? e);
-      snap = await getDocs(query(collection(db, SAM.KAMPER), where('ferdig', '==', true)));
+      console.warn('[Sesongkåring] Klubbfiltrert spørring feilet, faller tilbake til bredere filter:', e?.message ?? e);
+      snap = await getDocs(
+        aktivKlubbId
+          ? query(collection(db, SAM.KAMPER), where('klubbId', '==', aktivKlubbId), where('ferdig', '==', true))
+          : query(collection(db, SAM.KAMPER), where('ferdig', '==', true))
+      );
     }
+
+    // Eldre kamp-dokumenter uten klubbId (skrevet før denne fiksen) fanges
+    // ikke opp av spørringen over — kjør migreringsscriptet (migrer-klubbid.js)
+    // for å etterfylle klubbId på dem, ellers mangler de i sesongkåringen.
     const alleKamper = snap.docs
       .map(d => ({ id: d.id, ...d.data() }))
       .filter(k =>

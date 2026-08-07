@@ -318,10 +318,10 @@ export async function startTrening() {
 
     // Skriv kamper for runde 1
     if (erMix() || erKval()) {
-      skrivMixKamper(batch, treningRef.id, 1, baneOversikt, venteliste);
+      skrivMixKamper(batch, treningRef.id, 1, baneOversikt, venteliste, _getAktivKlubbId());
     } else {
       baneOversikt.forEach(bane =>
-        skrivKamper(batch, treningRef.id, 1, bane.baneNr, bane.spillere, bane.erSingel ?? false, bane.erDobbel ?? false)
+        skrivKamper(batch, treningRef.id, 1, bane.baneNr, bane.spillere, bane.erSingel ?? false, bane.erDobbel ?? false, _getAktivKlubbId())
       );
     }
     await batch.commit();
@@ -364,12 +364,12 @@ window.delLenke = delLenke;
 
 window.startTrening = startTrening;
 
-function skrivKamper(batch, treningId, rundeNr, baneNr, spillere, erSingel = false, erDobbel6 = false) {
+function skrivKamper(batch, treningId, rundeNr, baneNr, spillere, erSingel = false, erDobbel6 = false, klubbId = null) {
   const n = spillere?.length ?? 0;
   // 6-spiller singel-bane har 2 spillere; vanlige baner trenger minst 4
   if (erSingel && n === 2) {
     const dokData = {
-      treningId, baneNr: `bane${baneNr}`, rundeNr, kampNr: 1,
+      treningId, klubbId, baneNr: `bane${baneNr}`, rundeNr, kampNr: 1,
       erSingel: true,
       lag1_s1: spillere[0].id,  lag1_s2: null,
       lag2_s1: spillere[1].id,  lag2_s2: null,
@@ -387,7 +387,7 @@ function skrivKamper(batch, treningId, rundeNr, baneNr, spillere, erSingel = fal
   const parter = erDobbel6 ? PARTER_6_DOBBEL : getParter(n);
   parter.forEach(par => {
     const dokData = {
-      treningId, baneNr: `bane${baneNr}`, rundeNr, kampNr: par.nr,
+      treningId, klubbId, baneNr: `bane${baneNr}`, rundeNr, kampNr: par.nr,
       erSingel: false,
       lag1_s1: spillere[par.lag1[0]].id,  lag1_s2: spillere[par.lag1[1]].id,
       lag2_s1: spillere[par.lag2[0]].id,  lag2_s2: spillere[par.lag2[1]].id,
@@ -406,7 +406,7 @@ function skrivKamper(batch, treningId, rundeNr, baneNr, spillere, erSingel = fal
 
 // Mix & Match — skriv én kamp per bane per runde.
 // Håndterer både dobbel (4 spl) og singel (2 spl) baner.
-function skrivMixKamper(batch, treningId, rundeNr, baneOversikt, hvilerListe = []) {
+function skrivMixKamper(batch, treningId, rundeNr, baneOversikt, hvilerListe = [], klubbId = null) {
   // Fordel venteliste-hviler-spillere på baner.
   // Hvis hviler-objektet har gruppe-felt (kvalGruppe, kvalSluttGruppe, mixAbGruppe),
   // tildeles spilleren en bane fra sin egen gruppe — ikke syklisk på tvers av grupper.
@@ -451,7 +451,7 @@ function skrivMixKamper(batch, treningId, rundeNr, baneOversikt, hvilerListe = [
       const [s1, s2] = spl;
       if (!s1 || !s2) return;
       batch.set(doc(collection(db, SAM.KAMPER)), {
-        treningId,
+        treningId, klubbId,
         baneNr:   `bane${bane.baneNr}`,
         rundeNr,
         kampNr:   1,
@@ -476,7 +476,7 @@ function skrivMixKamper(batch, treningId, rundeNr, baneOversikt, hvilerListe = [
       : {};
 
     batch.set(doc(collection(db, SAM.KAMPER)), {
-      treningId,
+      treningId, klubbId,
       baneNr:   `bane${bane.baneNr}`,
       rundeNr,
       kampNr:   1,
@@ -632,7 +632,7 @@ export async function bekreftNesteRunde() {
         mixAbLastSitOutRundeB: statistikkB.lastSitOutRunde,
         mixAbGruppeA: [...gruppeAIds], mixAbGruppeB: [...gruppeBIds],
       });
-      skrivMixKamper(batch, app.treningId, nyRunde, nyBaneOversikt, nyVenteliste);
+      skrivMixKamper(batch, app.treningId, nyRunde, nyBaneOversikt, nyVenteliste, _getAktivKlubbId());
       await batch.commit();
 
       app.runde        = nyRunde;
@@ -785,7 +785,7 @@ export async function bekreftNesteRunde() {
         } : {}),
       });
       // Mix: én kamp per bane per runde — lagene er allerede trukket i nyBaneOversikt
-      skrivMixKamper(batch, app.treningId, nyRunde, nyBaneOversikt, nyVenteliste);
+      skrivMixKamper(batch, app.treningId, nyRunde, nyBaneOversikt, nyVenteliste, _getAktivKlubbId());
       await batch.commit();
 
       app.runde        = nyRunde;
@@ -872,7 +872,7 @@ export async function bekreftNesteRunde() {
         kvalGamesPlayedB: statistikkB.gamesPlayed, kvalSitOutCountB: statistikkB.sitOutCount,
         kvalLastSitOutRundeB: statistikkB.lastSitOutRunde,
       });
-      skrivMixKamper(batch, app.treningId, nyRunde, nyBaneOversikt, nyVenteliste);
+      skrivMixKamper(batch, app.treningId, nyRunde, nyBaneOversikt, nyVenteliste, _getAktivKlubbId());
       await batch.commit();
       app.runde = nyRunde; app.baneOversikt = nyBaneOversikt; app.venteliste = nyVenteliste;
       app.kvalGruppeA = [...gruppeAIds]; app.kvalGruppeB = [...gruppeBIds];
@@ -938,7 +938,7 @@ export async function bekreftNesteRunde() {
         kvalGamesPlayedB: statistikkB.gamesPlayed, kvalSitOutCountB: statistikkB.sitOutCount,
         kvalLastSitOutRundeB: statistikkB.lastSitOutRunde,
       });
-      skrivMixKamper(batch, app.treningId, nyRunde, nyBaneOversikt, nyVenteliste);
+      skrivMixKamper(batch, app.treningId, nyRunde, nyBaneOversikt, nyVenteliste, _getAktivKlubbId());
       await batch.commit();
       app.runde = nyRunde; app.baneOversikt = nyBaneOversikt; app.venteliste = nyVenteliste;
       app.kvalToppgruppe = [...toppIds]; app.kvalBunngruppe = [...bunnIds];
@@ -993,7 +993,7 @@ export async function bekreftNesteRunde() {
         laast:         false,
       });
       baneOversikt.forEach(bane =>
-        skrivKamper(batch, app.treningId, nyRunde, bane.baneNr, bane.spillere, bane.erSingel ?? false, bane.erDobbel ?? false)
+        skrivKamper(batch, app.treningId, nyRunde, bane.baneNr, bane.spillere, bane.erSingel ?? false, bane.erDobbel ?? false, _getAktivKlubbId())
       );
       await batch.commit();
 
@@ -1099,7 +1099,7 @@ export async function bekreftNesteRunde() {
       adminSkjerm:    'baner',  // atomisk med ny runde — lyttere navigerer til baner
     });
     baneOversikt.forEach(bane =>
-      skrivKamper(batch, app.treningId, nyRunde, bane.baneNr, bane.spillere, false, false)
+      skrivKamper(batch, app.treningId, nyRunde, bane.baneNr, bane.spillere, false, false, _getAktivKlubbId())
     );
     await batch.commit();
 
@@ -1504,6 +1504,7 @@ export async function avsluttTreningUI() {
       // Begge moduser: lagre sluttresultat (plassering og poeng)
       batch.set(doc(collection(db, SAM.RESULTATER)), {
         treningId:     app.treningId,
+        klubbId:       _getAktivKlubbId(),
         spillerId:     r.spillerId,
         spillerNavn:   r.navn ?? 'Ukjent',
         sluttPlassering: r.sluttPlassering,
@@ -1524,6 +1525,7 @@ export async function avsluttTreningUI() {
         batch.set(doc(collection(db, SAM.HISTORIKK)), {
           spillerId:   r.spillerId,
           treningId:   app.treningId,
+          klubbId:     _getAktivKlubbId(),
           ratingFor:   r.ratingVedStart,
           ratingEtter: r.nyRating,
           endring:     r.endring,
@@ -1978,7 +1980,7 @@ export async function triggerSluttfase(ekstraSpillerGruppe = 'topp') {
       kvalPlayedWithA: {}, kvalPlayedAgainstA: {}, kvalGamesPlayedA: {}, kvalSitOutCountA: {}, kvalLastSitOutRundeA: {},
       kvalPlayedWithB: {}, kvalPlayedAgainstB: {}, kvalGamesPlayedB: {}, kvalSitOutCountB: {}, kvalLastSitOutRundeB: {},
     });
-    skrivMixKamper(batch, app.treningId, nyRunde, nyBaneOversikt, nyVenteliste);
+    skrivMixKamper(batch, app.treningId, nyRunde, nyBaneOversikt, nyVenteliste, _getAktivKlubbId());
     await batch.commit();
     app.runde = nyRunde; app.baneOversikt = nyBaneOversikt; app.venteliste = nyVenteliste;
     app.kvalFase = 'sluttfase';
