@@ -728,7 +728,7 @@ async function init() {
   });
 
   // Koble global-profil.js
-  globalProfilInit({ naviger });
+  globalProfilInit({ naviger, getAktivKlubbId: () => aktivKlubbId });
 
   // Koble utfordrer.js
   utfordrerInit({

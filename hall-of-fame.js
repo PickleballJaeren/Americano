@@ -708,10 +708,8 @@ function _beregnMånedsVinner(spillere, kamper) {
  * Returnerer array sortert med nyeste først.
  */
 async function _hentMånedArkiv(klubbId) {
-  try {
-    const snap = await getDoc(doc(db, 'klubber', klubbId));
-    return (snap.data()?.månedArkiv ?? []).sort((a, b) => b.måned.localeCompare(a.måned));
-  } catch { return []; }
+  const data = await _hentKlubbDokument(klubbId);
+  return (data.månedArkiv ?? []).sort((a, b) => b.måned.localeCompare(a.måned));
 }
 
 /**
@@ -751,6 +749,9 @@ async function _arkiverForrigeMånedHvisNødvendig(klubbId, spillere, kamper) {
   // Legg til i arkivet (maks 24 måneder — ca. 2 år)
   const oppdatert = [nyPost, ...arkiv].slice(0, 24);
   await setDoc(doc(db, 'klubber', klubbId), { månedArkiv: oppdatert }, { merge: true });
+  // Nullstill cachen slik at neste lesing (evt. senere i samme økt) ser
+  // det nyarkiverte resultatet i stedet for det gamle, cachede dokumentet.
+  _tømKlubbDokumentCache(klubbId);
 }
 
 /**
@@ -1165,28 +1166,43 @@ export async function hentGoatPeriode(klubbId) {
   return { fra, til, periodeLabel: `${fraStr} – ${tilStr}` };
 }
 
-async function _hentGoatKonfig(klubbId) {
+/**
+ * Henter klubb-dokumentet med caching. GOAT-konfig og månedArkiv leser
+ * begge felt fra det SAMME dokumentet ('klubber/{klubbId}') — delt cache
+ * her unngår at hver av dem gjør sitt eget getDoc-kall.
+ */
+async function _hentKlubbDokument(klubbId) {
+  const nøkkel = `klubbdok_${klubbId}`;
+  const cached = _fraCacheEllerNull(nøkkel);
+  if (cached) return cached;
+
+  let data = {};
   try {
     const snap = await getDoc(doc(db, 'klubber', klubbId));
-    const konfig = snap.data()?.goatKonfig ?? {};
-    const nå = new Date();
-    const erFørste = nå.getMonth() < 6;
-    const år = nå.getFullYear();
-    return {
-      periodeStart:      konfig.periodeStart?.toDate?.() ?? (erFørste ? new Date(år, 0, 1) : new Date(år, 6, 1)),
-      kåringsDato:       konfig.kåringsDato?.toDate?.()  ?? (erFørste ? new Date(år, 5, 30, 23, 59) : new Date(år, 11, 31, 23, 59)),
-      nestePeriodeStart: konfig.nestePeriodeStart?.toDate?.() ?? null,
-    };
-  } catch {
-    const nå = new Date();
-    const erFørste = nå.getMonth() < 6;
-    const år = nå.getFullYear();
-    return {
-      periodeStart:      erFørste ? new Date(år, 0, 1) : new Date(år, 6, 1),
-      kåringsDato:       erFørste ? new Date(år, 5, 30, 23, 59) : new Date(år, 11, 31, 23, 59),
-      nestePeriodeStart: null,
-    };
+    data = snap.data() ?? {};
+  } catch (e) {
+    console.warn('[HoF] Kunne ikke hente klubb-dokument:', e?.message ?? e);
   }
+  _cachet(nøkkel, data);
+  return data;
+}
+
+/** Nullstiller klubb-dokument-cachen — kall etter enhver skriving til dokumentet. */
+function _tømKlubbDokumentCache(klubbId) {
+  delete _cache[`klubbdok_${klubbId}`];
+}
+
+async function _hentGoatKonfig(klubbId) {
+  const data   = await _hentKlubbDokument(klubbId);
+  const konfig = data.goatKonfig ?? {};
+  const nå        = new Date();
+  const erFørste  = nå.getMonth() < 6;
+  const år        = nå.getFullYear();
+  return {
+    periodeStart:      konfig.periodeStart?.toDate?.() ?? (erFørste ? new Date(år, 0, 1) : new Date(år, 6, 1)),
+    kåringsDato:       konfig.kåringsDato?.toDate?.()  ?? (erFørste ? new Date(år, 5, 30, 23, 59) : new Date(år, 11, 31, 23, 59)),
+    nestePeriodeStart: konfig.nestePeriodeStart?.toDate?.() ?? null,
+  };
 }
 
 /** Lagrer GOAT-konfig til klubb-dokumentet. */
@@ -1200,6 +1216,9 @@ async function _lagreGoatKonfig(klubbId, { periodeStart, kåringsDato, nestePeri
       nestePeriodeStart: nestePeriodeStart ?? null,
     },
   }, { merge: true });
+  // Nullstill cachen slik at admin ser den nye konfigen med én gang,
+  // i stedet for å måtte vente på at 10-min TTL-en utløper.
+  _tømKlubbDokumentCache(klubbId);
 }
 
 /** Formatter Date til YYYY-MM-DD for input[type=date]. */
@@ -1212,6 +1231,55 @@ function _fraDatoInput(s) {
   if (!s) return null;
   const [år, mnd, dag] = s.split('-').map(Number);
   return new Date(år, mnd - 1, dag);
+}
+
+/**
+ * Bygger et treningId → dato(ms)-kart for et sett med kamper.
+ * Bruker kamp-dokumentets EGET `dato`-felt der det finnes — dette settes
+ * allerede av poeng.js/baner.js ved poenglagring, så det koster ingen
+ * ekstra Firestore-kall å bruke det. Faller kun tilbake til getDoc() på
+ * treningsdokumentet for eldre kamper som mangler `dato` (skrevet før
+ * serverTimestamp ble satt ved lagring) — et lite og krympende antall.
+ *
+ * Cachet per klubb (10 min TTL) slik at gjentatte kall i samme visning
+ * (f.eks. beregnGOAT + beregnKåringer) ikke gjør samme oppslag på nytt.
+ *
+ * Merk: bruker tidligste kamp-dato for en trening som estimat på treningens
+ * dato. I praksis samme dag som treningens avsluttetDato, siden poeng
+ * lagres fortløpende gjennom økten — godt nok presisjonsnivå for å avgjøre
+ * hvilket halvår en kamp hører til.
+ */
+async function _hentTreningDatoMap(klubbId, kamper) {
+  const nøkkel = `treningdato_${klubbId}`;
+  const cached = _fraCacheEllerNull(nøkkel);
+  if (cached) return cached;
+
+  const map = {};
+  kamper.forEach(k => {
+    if (!k.treningId) return;
+    const ms = k.dato?.toMillis?.() ?? 0;
+    if (ms > 0 && (!map[k.treningId] || ms < map[k.treningId])) map[k.treningId] = ms;
+  });
+
+  // Kun treninger der INGEN av kampene hadde en brukbar dato trenger getDoc-oppslag.
+  const manglerDato = new Set(
+    kamper
+      .map(k => k.treningId)
+      .filter(id => id && !(id in map))
+  );
+
+  if (manglerDato.size) {
+    const snaps = await Promise.all([...manglerDato].map(id => getDoc(doc(db, SAM.TRENINGER, id))));
+    snaps.forEach(snap => {
+      if (snap.exists()) {
+        const d = snap.data();
+        map[snap.id] = (d.avsluttetDato ?? d.opprettetDato)?.toMillis?.() ?? 0;
+      }
+    });
+  }
+
+  _cachet(nøkkel, map);
+  return map;
 }
 
 /**
@@ -1233,19 +1301,7 @@ export async function beregnGOAT(klubbId, fra, til, ekskluderSpillerId = null) {
   const fraMs = fra.getTime();
   const tilMs = til.getTime();
 
-  // Hent avsluttetDato fra treningsdokumentene — kamp-dokumenter mangler dato
-  // på eldre kamper (serverTimestamp ble ikke satt ved poenglagring).
-  const alleTreningIdsGOAT = [...new Set(alleKamper.map(k => k.treningId).filter(Boolean))];
-  const treningDatoMapGOAT = {};
-  if (alleTreningIdsGOAT.length) {
-    const snaps = await Promise.all(alleTreningIdsGOAT.map(id => getDoc(doc(db, SAM.TRENINGER, id))));
-    snaps.forEach(snap => {
-      if (snap.exists()) {
-        const d = snap.data();
-        treningDatoMapGOAT[snap.id] = (d.avsluttetDato ?? d.opprettetDato)?.toMillis?.() ?? 0;
-      }
-    });
-  }
+  const treningDatoMapGOAT = await _hentTreningDatoMap(klubbId, alleKamper);
 
   const periodeKamper = alleKamper.filter(k => {
     const d = treningDatoMapGOAT[k.treningId] ?? k.dato?.toMillis?.() ?? 0;
@@ -1418,24 +1474,11 @@ export async function beregnGOAT(klubbId, fra, til, ekskluderSpillerId = null) {
 export async function beregnKåringer(klubbId, fra, til) {
   const alle = await beregnGOAT(klubbId, fra, til);
 
-  // Sjekk minimum antall treninger
-  // Bruker avsluttetDato fra treningsdokumentet — kamp-dokumenter har ikke
-  // dato satt (serverTimestamp ble ikke skrevet ved poenglagring i eldre kamper).
+  // Gjenbruker samme (nå cachede) kilder som beregnGOAT — ingen ekstra
+  // Firestore-kall her, kun re-lesing fra minne/cache.
   const alleKamper = await _hentAlleKamper(klubbId);
   const fraMs = fra.getTime(), tilMs = til.getTime();
-
-  // Hent avsluttetDato for alle unike trenings-IDer i kamp-listen
-  const alleTreningIds = [...new Set(alleKamper.map(k => k.treningId).filter(Boolean))];
-  const treningDatoMap = {};
-  if (alleTreningIds.length) {
-    const snaps = await Promise.all(alleTreningIds.map(id => getDoc(doc(db, SAM.TRENINGER, id))));
-    snaps.forEach(snap => {
-      if (snap.exists()) {
-        const d = snap.data();
-        treningDatoMap[snap.id] = (d.avsluttetDato ?? d.opprettetDato)?.toMillis?.() ?? 0;
-      }
-    });
-  }
+  const treningDatoMap = await _hentTreningDatoMap(klubbId, alleKamper);
 
   // Filtrer kamper basert på treningens dato, ikke kamp-dokumentets dato
   const periodeKamper = alleKamper.filter(k => {
@@ -1460,6 +1503,135 @@ export async function beregnKåringer(klubbId, fra, til) {
     forFåTreninger: false,
     totalTreninger,
   };
+}
+
+/**
+ * Henter én spillers GOAT-poeng (A–E + totalsum) for inneværende
+ * kåringsperiode, samt hvor mange poeng spilleren mangler på lederen
+ * i sitt eget sjikt (topp/midtre/bunn — samme sjikt som GOAT/Jokeren/
+ * Krigeren kåres blant).
+ *
+ * VIKTIG for kvote: gjør INGEN egne Firestore-kall — den kaller
+ * beregnKåringer(), som gjenbruker de samme cachede kildene
+ * (_hentAlleKamper, _hentHistorikkForAlle, _hentTreningDatoMap,
+ * _hentKlubbDokument) som Hall of Fame-skjermen allerede har fylt.
+ * Har Hall of Fame vært åpnet i løpet av de siste 10 minuttene, koster
+ * dette kallet 0 ekstra reads. Er det første kallet i økten (f.eks. om
+ * spilleren åpner profilen sin uten å ha vært innom Hall of Fame),
+ * koster det akkurat det samme som å åpne Hall of Fame én gang —
+ * ikke noe ekstra utover det.
+ *
+ * @param {string} klubbId
+ * @param {string} spillerId
+ * @returns {Promise<object|null>} null hvis periode ikke er startet ennå,
+ *   { forFåTreninger:true, ... } hvis klubben ikke har nok treninger i
+ *   perioden ennå, { ingenScore:true, ... } hvis spilleren selv ikke har
+ *   møtt opp i perioden ennå, eller { A,B,C,D,E,total,sjikt,sjiktLabel,
+ *   plassering,antallISjikt,poengBakLeder,erLeder,periodeLabel,
+ *   totalTreninger } ved normal visning.
+ */
+export async function hentGoatPoengForSpiller(klubbId, spillerId) {
+  if (!db || !klubbId || !spillerId) return null;
+
+  const konfig = await _hentGoatKonfig(klubbId);
+  const nå     = new Date();
+  if (nå < konfig.periodeStart) return null; // perioden har ikke startet ennå
+
+  const fraStr = konfig.periodeStart.toLocaleDateString('no-NO', { day: 'numeric', month: 'short' });
+  const tilStr = konfig.kåringsDato.toLocaleDateString('no-NO', { day: 'numeric', month: 'short', year: 'numeric' });
+  const periodeLabel = `${fraStr} – ${tilStr}`;
+
+  const til = nå < konfig.kåringsDato ? nå : konfig.kåringsDato;
+  const { scoreboard, forFåTreninger, totalTreninger } = await beregnKåringer(klubbId, konfig.periodeStart, til);
+
+  if (forFåTreninger) return { forFåTreninger: true, totalTreninger, periodeLabel };
+
+  const meg = scoreboard.find(s => s.id === spillerId);
+  if (!meg) return { ingenScore: true, periodeLabel, totalTreninger };
+
+  const sjiktListe = scoreboard.filter(s => s.sjikt === meg.sjikt);
+  const leder       = sjiktListe[0];
+  const sjiktLabel  = { topp: '🐐 GOAT-sjiktet', midtre: '🎭 Jokeren-sjiktet', bunn: '⚔️ Krigeren-sjiktet' }[meg.sjikt];
+
+  return {
+    A: meg.A, B: meg.B, C: meg.C, D: meg.D, E: meg.E,
+    total:        meg.total,
+    sjikt:        meg.sjikt,
+    sjiktLabel,
+    plassering:   sjiktListe.findIndex(s => s.id === spillerId) + 1,
+    antallISjikt: sjiktListe.length,
+    poengBakLeder: leder.id === spillerId ? 0 : leder.total - meg.total,
+    erLeder:      leder.id === spillerId,
+    periodeLabel,
+    totalTreninger,
+  };
+}
+
+/**
+ * Rendrer den personlige GOAT-poengoversikten i spillerprofilen.
+ * Kalles fra global-profil.js: await visGoatPoengForSpiller(klubbId, spillerId)
+ */
+export async function visGoatPoengForSpiller(klubbId, spillerId) {
+  const el = document.getElementById('hof-goat-personlig-seksjon');
+  if (!el) return;
+
+  try {
+    const data = await hentGoatPoengForSpiller(klubbId, spillerId);
+    if (!data) { el.innerHTML = ''; return; }
+
+    if (data.forFåTreninger) {
+      el.innerHTML = `
+        <div class="seksjon-etikett">🐐 GOAT-kåringen</div>
+        <div class="kort" style="margin-bottom:14px"><div class="kort-innhold" style="font-size:13px;color:var(--muted2);text-align:center">
+          ${data.totalTreninger} av ${MIN_TRENINGER_GOAT} treninger gjennomført i klubben denne perioden — poengoversikt vises når kåringen er i gang.
+        </div></div>`;
+      return;
+    }
+    if (data.ingenScore) {
+      el.innerHTML = `
+        <div class="seksjon-etikett">🐐 GOAT-kåringen — ${escHtml(data.periodeLabel)}</div>
+        <div class="kort" style="margin-bottom:14px"><div class="kort-innhold" style="font-size:13px;color:var(--muted2);text-align:center">
+          Ingen registrerte kamper i inneværende periode ennå — spill en økt for å komme med på stillingen.
+        </div></div>`;
+      return;
+    }
+
+    const rad = (bokstav, poeng, maks, tittel) => `
+      <div style="display:flex;align-items:center;gap:10px;padding:6px 0">
+        <div style="width:20px;font-family:'DM Mono',monospace;font-size:13px;color:var(--muted2)">${bokstav}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;color:var(--muted2);margin-bottom:3px">${tittel}</div>
+          <div style="background:rgba(255,255,255,.06);border-radius:6px;height:6px;overflow:hidden">
+            <div style="background:var(--yellow);height:100%;width:${Math.round((poeng / maks) * 100)}%"></div>
+          </div>
+        </div>
+        <div style="font-family:'DM Mono',monospace;font-size:14px;font-weight:600;color:var(--white);width:34px;text-align:right">${poeng}p</div>
+      </div>`;
+
+    const bakLederHTML = data.erLeder
+      ? `<div style="font-size:13px;color:var(--yellow);text-align:center;margin-top:10px">🏆 Du leder ${escHtml(data.sjiktLabel)} akkurat nå</div>`
+      : `<div style="font-size:13px;color:var(--muted2);text-align:center;margin-top:10px">${data.poengBakLeder}p bak lederen i ${escHtml(data.sjiktLabel)}</div>`;
+
+    el.innerHTML = `
+      <div class="seksjon-etikett">🐐 GOAT-kåringen — ${escHtml(data.periodeLabel)}</div>
+      <div class="kort" style="margin-bottom:14px">
+        <div class="kort-innhold">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <div style="font-size:13px;color:var(--muted2)">${escHtml(data.sjiktLabel)} · plass #${data.plassering} av ${data.antallISjikt}</div>
+            <div style="font-family:'DM Mono',monospace;font-size:20px;font-weight:700;color:var(--yellow)">${data.total}p</div>
+          </div>
+          ${rad('A', data.A, 30, 'Ratingutvikling')}
+          ${rad('B', data.B, 25, 'Overprestasjon')}
+          ${rad('C', data.C, 20, 'Oppmøte')}
+          ${rad('D', data.D, 15, 'Makkereffekt')}
+          ${rad('E', data.E, 10, 'Lengste vinnstreak')}
+          ${bakLederHTML}
+        </div>
+      </div>`;
+  } catch (e) {
+    console.warn('[HoF] Kunne ikke vise personlig GOAT-poeng:', e?.message ?? e);
+    el.innerHTML = '';
+  }
 }
 
 /** Rendrer GOAT-arkiv-seksjonen (tidligere vinnere). */

@@ -13,13 +13,15 @@ import { visMelding, visFBFeil, escHtml } from './ui.js';
 import { lagInitialer } from './render-helpers.js';
 import { setAktivSlettSpillerId } from './spillere.js';
 import { visUtfordrerSeksjon } from './utfordrer.js';
-import { visRivalSeksjon, visMerker } from './hall-of-fame.js';
+import { visRivalSeksjon, visMerker, visGoatPoengForSpiller } from './hall-of-fame.js';
 
 // ── Avhengigheter injisert ───────────────────────────────
 let _naviger = () => {};
+let _getAktivKlubbId = () => null;
 
 export function globalProfilInit(deps) {
-  _naviger = deps.naviger;
+  _naviger         = deps.naviger;
+  _getAktivKlubbId = deps.getAktivKlubbId ?? (() => null);
 }
 
 // ════════════════════════════════════════════════════════
@@ -427,6 +429,9 @@ export async function apneGlobalProfil(spillerId) {
   const kampStatEl = document.getElementById('global-kampstat-innhold');
   if (kampStatEl) kampStatEl.innerHTML = '<div class="kampstat-laster">Beregner statistikk…</div>';
 
+  const goatEl = document.getElementById('hof-goat-personlig-seksjon');
+  if (goatEl) goatEl.innerHTML = '';
+
   // Sett motstanderId for refresh-kall fra utfordrer-seksjonen
   const utf = document.getElementById('utf-seksjon');
   if (utf) utf.dataset.motstanderId = spillerId;
@@ -443,6 +448,11 @@ export async function apneGlobalProfil(spillerId) {
 
   // Last rival-seksjon og utfordrer-seksjon parallelt
   visRivalSeksjon(spillerId);
+
+  // Personlig GOAT-poengoversikt — gjenbruker Hall of Fame sin cache,
+  // ingen ekstra Firestore-kall utover det (se hall-of-fame.js).
+  const klubbId = _getAktivKlubbId();
+  if (klubbId) visGoatPoengForSpiller(klubbId, spillerId);
 
   if (db && spillerId) {
     try {
