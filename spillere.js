@@ -509,17 +509,20 @@ window.leggTilSpiller = leggTilSpiller;
 // ════════════════════════════════════════════════════════
 async function visSlettAlleSpillereModal() {
   if (!db) { visMelding('Firebase ikke tilkoblet.', 'feil'); return; }
+  if (!_aktivKlubbId) { visMelding('Ingen klubb valgt.', 'feil'); return; }
   _krevAdmin(
     'Slett alle spillere',
     'Kun administrator kan slette alle spillere.',
     async () => {
       try {
-        const snap   = await getDocs(collection(db, SAM.SPILLERE));
+        const snap   = await getDocs(
+          query(collection(db, SAM.SPILLERE), where('klubbId', '==', _aktivKlubbId))
+        );
         const antall = snap.size;
         document.getElementById('slett-alle-spillere-teller').textContent =
           antall === 0
-            ? 'Ingen spillere funnet.'
-            : `${antall} spiller${antall === 1 ? '' : 'e'} vil bli slettet.`;
+            ? 'Ingen spillere funnet i denne klubben.'
+            : `${antall} spiller${antall === 1 ? '' : 'e'} i denne klubben vil bli slettet.`;
         document.getElementById('modal-slett-alle-spillere').style.display = 'flex';
       } catch (e) {
         visFBFeil('Kunne ikke telle spillere: ' + (e?.message ?? e));
@@ -531,14 +534,17 @@ window.visSlettAlleSpillereModal = visSlettAlleSpillereModal;
 
 async function utforSlettAlleSpillere() {
   if (!db) { visMelding('Firebase ikke tilkoblet.', 'feil'); return; }
+  if (!_aktivKlubbId) { visMelding('Ingen klubb valgt.', 'feil'); return; }
   document.getElementById('modal-slett-alle-spillere').style.display = 'none';
   visMelding('Sletter alle spillere… vennligst vent.', 'advarsel');
 
   try {
     const bh = lagBatchHjelper(db);
 
-    // Hent alle spiller-IDer
-    const spillerSnap = await getDocs(collection(db, SAM.SPILLERE));
+    // Hent kun spiller-IDer for AKTIV KLUBB — ikke hele players-samlingen.
+    const spillerSnap = await getDocs(
+      query(collection(db, SAM.SPILLERE), where('klubbId', '==', _aktivKlubbId))
+    );
     const spillerIds  = spillerSnap.docs.map(d => d.id);
 
     if (spillerIds.length === 0) {
