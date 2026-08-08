@@ -1535,7 +1535,10 @@ export async function hentGoatPoengForSpiller(klubbId, spillerId) {
 
   const konfig = await _hentGoatKonfig(klubbId);
   const nå     = new Date();
-  if (nå < konfig.periodeStart) return null; // perioden har ikke startet ennå
+  if (nå < konfig.periodeStart) {
+    const startDatoStr = konfig.periodeStart.toLocaleDateString('no-NO', { day: 'numeric', month: 'long' });
+    return { periodeIkkeStartet: true, startDatoStr };
+  }
 
   const fraStr = konfig.periodeStart.toLocaleDateString('no-NO', { day: 'numeric', month: 'short' });
   const tilStr = konfig.kåringsDato.toLocaleDateString('no-NO', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -1578,6 +1581,15 @@ export async function visGoatPoengForSpiller(klubbId, spillerId) {
   try {
     const data = await hentGoatPoengForSpiller(klubbId, spillerId);
     if (!data) { el.innerHTML = ''; return; }
+
+    if (data.periodeIkkeStartet) {
+      el.innerHTML = `
+        <div class="seksjon-etikett">🐐 GOAT-kåringen</div>
+        <div class="kort" style="margin-bottom:14px"><div class="kort-innhold" style="font-size:13px;color:var(--muted2);text-align:center">
+          Neste kåringsperiode starter ${escHtml(data.startDatoStr)} — poengoversikt vises da.
+        </div></div>`;
+      return;
+    }
 
     if (data.forFåTreninger) {
       el.innerHTML = `
