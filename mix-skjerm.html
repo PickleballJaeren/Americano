@@ -42,7 +42,7 @@
   ══════════════════════════════════════════════ */
   #app {
     display: grid;
-    grid-template-rows: auto 1fr;
+    grid-template-rows: auto auto 1fr;
     height: 100vh;
     width: 100vw;
   }
@@ -135,6 +135,19 @@
   .fullskjerm-knapp:hover  { background: rgba(255,255,255,.06); color: var(--white); }
   .fullskjerm-knapp.aktiv  { color: var(--accent2); border-color: var(--accent2); }
   .fullskjerm-knapp svg    { width: 20px; height: 20px; flex-shrink: 0; }
+
+  .hviler-banner {
+    flex-shrink: 0;
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 32px;
+    background: rgba(234,88,12,.1);
+    border-bottom: 1px solid rgba(234,88,12,.25);
+  }
+  .hviler-banner-ikon  { font-size: 16px; }
+  .hviler-banner-label { font-size: 14px; font-weight: 700; color: var(--orange); flex-shrink: 0; }
+  .hviler-banner-navn  { font-size: 14px; color: #fed7aa; }
+  .hviler-banner-bane  { color: rgba(254,215,170,.65); font-size: 12px; }
+  .hviler-banner-tom   { padding: 0; border-bottom: none; min-height: 0; }
 
   .klokke {
     font-family: 'DM Mono', monospace;
@@ -369,8 +382,11 @@
     padding: 16px;
     align-content: stretch;
     align-items: stretch;
-    overflow: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
+  .baner-grid::-webkit-scrollbar { display: none; }
 
   /* Dynamisk grid basert på antall baner — maks 2 kolonner for ≤5 baner */
   .baner-grid.baner-1 { grid-template-columns: 1fr; }
@@ -429,14 +445,6 @@
   }
   .bane-status-merke.ferdig {
     background: rgba(100,116,139,.15); color: var(--muted2);
-  }
-
-  .bane-hviler-merke {
-    font-size: 11px; font-weight: 700;
-    padding: 3px 8px; border-radius: 6px;
-    background: rgba(234,88,12,.12); color: var(--orange);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    max-width: 110px;
   }
 
   .bane-innhold { padding: 14px 20px 16px; flex: 1; }
@@ -840,11 +848,17 @@ function render() {
   // hvilerIds: spillere som hviler HELE runden (global venteliste) +
   // spillere som hviler denne ene kampen fordi banen har 5 spillere
   // (5. spilleren sitter over — se baneOversikt-fordelingen i trening.js).
-  const hvilerIds = new Set(venteliste.map(s => s.id));
+  // hvilereListe: samme spillere, men med navn/bane-info til visning i
+  // den alltid-synlige hviler-banneren rett under toppfeltet.
+  const hvilerIds   = new Set(venteliste.map(s => s.id));
+  const hvilereListe = venteliste.map(s => ({ navn: s.navn ?? 'Ukjent', baneNr: null }));
   baneOversikt.forEach(bane => {
     if ((bane.spillere ?? []).length === 5) {
-      const id5 = bane.spillere[4]?.id;
-      if (id5) hvilerIds.add(id5);
+      const spiller5 = bane.spillere[4];
+      if (spiller5?.id) {
+        hvilerIds.add(spiller5.id);
+        hvilereListe.push({ navn: spiller5.navn ?? 'Ukjent', baneNr: bane.baneNr ?? null });
+      }
     }
   });
 
@@ -1043,9 +1057,6 @@ function render() {
               </div>
             </div>`;
         }
-        const hvilerBadge5 = (!erSingel && spillere.length === 5)
-          ? `<span class="bane-hviler-merke" title="${esc(spillere[4]?.navn ?? '?')} hviler denne runden">😴 ${esc(spillere[4]?.navn ?? '?')}</span>`
-          : '';
 
         // Fremdriftslinje: andel av makspoeng scoret
         const maks = bane.maksPoeng ?? 15;
@@ -1057,7 +1068,6 @@ function render() {
             <div class="bane-hode">
               <div class="bane-nr-stor">${baneNr}</div>
               <span class="${typeKl}">${typeTekst}</span>
-              ${hvilerBadge5}
               <span class="${statusKl}">${statusTekst}</span>
             </div>
             <div class="bane-innhold">${lagHTML}</div>
@@ -1074,6 +1084,22 @@ function render() {
 
   // ── Historikk HTML ──
   const historikkHTML = lagHistorikkHTML(_alleKamper, runde);
+
+  // ── Hviler-banner: alltid synlig rad rett under toppfeltet ──
+  // Ligger utenfor det trange bane-rutenettet (som kan klippe innhold på
+  // lave skjermer/i fullskjerm) — derfor forsvinner denne aldri.
+  // Rendres alltid (også tom) slik at #app sitt 3-rads grid holder seg
+  // konsistent — se .hviler-banner-tom for kollaps til 0px høyde.
+  const harHvilere = !erFerdig && hvilereListe.length > 0;
+  const hvilerBannerHTML = harHvilere
+    ? `<div class="hviler-banner">
+        <span class="hviler-banner-ikon">😴</span>
+        <span class="hviler-banner-label">Hviler denne runden:</span>
+        <span class="hviler-banner-navn">${hvilereListe.map(h =>
+          esc(h.navn) + (h.baneNr != null ? ` <span class="hviler-banner-bane">(bane ${h.baneNr})</span>` : '')
+        ).join(', ')}</span>
+      </div>`
+    : `<div class="hviler-banner hviler-banner-tom"></div>`;
 
   // hvilerHTML er nå inline i kolonne-venstre
 
@@ -1102,6 +1128,7 @@ function render() {
           <span>${_erFullskjerm ? 'Avslutt' : 'Fullskjerm'}</span>
         </button>` : ''}
     </div>
+    ${hvilerBannerHTML}
 
     <div class="hoved">
       <div class="kolonne-venstre">
