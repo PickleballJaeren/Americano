@@ -96,6 +96,17 @@
   }
   @keyframes puls { 0%,100%{opacity:1} 50%{opacity:.35} }
 
+  .fullskjerm-knapp {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; flex-shrink: 0;
+    background: var(--navy3); border: 1px solid var(--border2);
+    border-radius: 9px; color: var(--muted2);
+    cursor: pointer; transition: background .15s, color .15s, border-color .15s;
+  }
+  .fullskjerm-knapp:active { background: rgba(255,255,255,.08); }
+  .fullskjerm-knapp.aktiv  { color: var(--accent2); border-color: var(--accent2); }
+  .fullskjerm-knapp svg    { width: 18px; height: 18px; }
+
   /* ── FANER ── */
   .tab-bar {
     display: flex; border-bottom: none;
@@ -448,6 +459,37 @@ function toggleHistorikk(id, hdr) {
 }
 window.toggleHistorikk = toggleHistorikk;
 
+// ── FULLSKJERM ────────────────────────────────────────────
+// Fjerner adresselinjen når storskjermen deles via QR-kode i nettleser.
+// Ikke støttet på iPhone Safari (kun iPad/Android/desktop) — knappen
+// skjules automatisk der siden Fullscreen API mangler.
+const _stotterFullskjerm = !!(
+  document.documentElement.requestFullscreen ||
+  document.documentElement.webkitRequestFullscreen
+);
+let _erFullskjerm = false;
+
+function _fullskjermEndret() {
+  _erFullskjerm = !!(document.fullscreenElement || document.webkitFullscreenElement);
+  render();
+}
+document.addEventListener('fullscreenchange', _fullskjermEndret);
+document.addEventListener('webkitfullscreenchange', _fullskjermEndret);
+
+window.toggleFullskjerm = function() {
+  const el = document.documentElement;
+  if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+    if (el.requestFullscreen)        el.requestFullscreen().catch(() => {});
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+  } else {
+    if (document.exitFullscreen)        document.exitFullscreen().catch(() => {});
+    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+  }
+};
+
+const IKON_UTVID  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>`;
+const IKON_KRYMP  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg>`;
+
 // ── Hoved-render ────────────────────────────────────────
 function render() {
   if (!_treningData) return; // vent til begge lytterne har svart
@@ -484,6 +526,13 @@ function render() {
           <div class="header-sub">${erFerdig ? 'Avsluttet' : `Kamp ${runde} pågår`}</div>
         </div>
         ${pill}
+        ${_stotterFullskjerm ? `
+          <button class="fullskjerm-knapp${_erFullskjerm ? ' aktiv' : ''}"
+            onclick="toggleFullskjerm()"
+            title="${_erFullskjerm ? 'Avslutt fullskjerm' : 'Fyll skjermen'}"
+            aria-label="${_erFullskjerm ? 'Avslutt fullskjerm' : 'Fyll skjermen'}">
+            ${_erFullskjerm ? IKON_KRYMP : IKON_UTVID}
+          </button>` : ''}
       </div>
       <div class="tab-bar">
         <button class="tab-knapp${_aktivFane==='sammenlagt'?' aktiv':''}"
