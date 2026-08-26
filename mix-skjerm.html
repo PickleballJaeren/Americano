@@ -431,6 +431,14 @@
     background: rgba(100,116,139,.15); color: var(--muted2);
   }
 
+  .bane-hviler-merke {
+    font-size: 11px; font-weight: 700;
+    padding: 3px 8px; border-radius: 6px;
+    background: rgba(234,88,12,.12); color: var(--orange);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 110px;
+  }
+
   .bane-innhold { padding: 14px 20px 16px; flex: 1; }
 
   .lag-rad {
@@ -1034,11 +1042,10 @@ function render() {
                 ${lag2p != null ? lag2p : '–'}
               </div>
             </div>`;
-          // Bane med 5 spillere — 5. spilleren hviler denne runden på denne banen.
-          if (spillere.length === 5) {
-            lagHTML += `<div class="ko-mini-hviler">😴 ${esc(spillere[4]?.navn ?? '?')} hviler denne runden</div>`;
-          }
         }
+        const hvilerBadge5 = (!erSingel && spillere.length === 5)
+          ? `<span class="bane-hviler-merke" title="${esc(spillere[4]?.navn ?? '?')} hviler denne runden">😴 ${esc(spillere[4]?.navn ?? '?')}</span>`
+          : '';
 
         // Fremdriftslinje: andel av makspoeng scoret
         const maks = bane.maksPoeng ?? 15;
@@ -1050,6 +1057,7 @@ function render() {
             <div class="bane-hode">
               <div class="bane-nr-stor">${baneNr}</div>
               <span class="${typeKl}">${typeTekst}</span>
+              ${hvilerBadge5}
               <span class="${statusKl}">${statusTekst}</span>
             </div>
             <div class="bane-innhold">${lagHTML}</div>
