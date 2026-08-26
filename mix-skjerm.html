@@ -331,6 +331,13 @@
     padding: 2px 0;
   }
 
+  .ko-mini-hviler {
+    margin-top: 8px; padding-top: 8px;
+    border-top: 1px dashed var(--border2);
+    font-size: 12px; font-weight: 600;
+    color: var(--orange);
+  }
+
   .ko-hviler-boks {
     margin: 12px 12px 4px;
     background: rgba(234,88,12,.07);
@@ -821,7 +828,18 @@ function render() {
   sammenlagt.forEach((s, i) => { _forrigeRang[s.spillerId] = i + 1; });
 
   const banner   = lagBanner(sammenlagt, runde, erFerdig, _alleKamper);
+
+  // hvilerIds: spillere som hviler HELE runden (global venteliste) +
+  // spillere som hviler denne ene kampen fordi banen har 5 spillere
+  // (5. spilleren sitter over — se baneOversikt-fordelingen i trening.js).
   const hvilerIds = new Set(venteliste.map(s => s.id));
+  baneOversikt.forEach(bane => {
+    if ((bane.spillere ?? []).length === 5) {
+      const id5 = bane.spillere[4]?.id;
+      if (id5) hvilerIds.add(id5);
+    }
+  });
+
   const maksPo   = sammenlagt.length ? sammenlagt[0].poeng : 1;
 
   const pill = erFerdig
@@ -860,6 +878,11 @@ function render() {
               <div class="ko-lag-rad"><div class="ko-lag-navn">${esc(s1)} + ${esc(s2)}</div></div>
               <div class="ko-vs">vs</div>
               <div class="ko-lag-rad"><div class="ko-lag-navn">${esc(s3)} + ${esc(s4)}</div></div>`;
+            // Bane med 5 spillere (oppstår når spillerantallet ikke går jevnt opp i
+            // 4-spiller-baner) — 5. spilleren hviler denne runden på denne banen.
+            if (spillere.length === 5) {
+              lagRadHTML += `<div class="ko-mini-hviler">😴 ${esc(spillere[4]?.navn ?? '?')} hviler denne runden</div>`;
+            }
           }
 
           return `
@@ -1011,6 +1034,10 @@ function render() {
                 ${lag2p != null ? lag2p : '–'}
               </div>
             </div>`;
+          // Bane med 5 spillere — 5. spilleren hviler denne runden på denne banen.
+          if (spillere.length === 5) {
+            lagHTML += `<div class="ko-mini-hviler">😴 ${esc(spillere[4]?.navn ?? '?')} hviler denne runden</div>`;
+          }
         }
 
         // Fremdriftslinje: andel av makspoeng scoret

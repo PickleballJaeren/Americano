@@ -277,6 +277,9 @@
     font-family: 'Bebas Neue', cursive; font-size: 18px;
     color: var(--green2); flex-shrink: 0; letter-spacing: 1px;
   }
+  .bane-lag-hviler {
+    font-size: 12px; color: var(--orange); margin-top: 3px;
+  }
 
   .hviler-rad {
     background: rgba(234,88,12,.08); border: 1px solid rgba(234,88,12,.2);
@@ -701,8 +704,15 @@ function renderSammenlagt(sammenlagt, pilar, t, runde, erFerdig, banner) {
   const baneOversikt = t.baneOversikt ?? [];
   const venteliste   = t.venteliste   ?? [];
 
-  // Hvilere denne runden
+  // Hvilere denne runden: global venteliste + 5. spiller på 5-spiller-baner
+  // (som hviler internt på egen bane mens de fire andre spiller).
   const hvilerIds = new Set(venteliste.map(s => s.id));
+  baneOversikt.forEach(bane => {
+    if ((bane.spillere ?? []).length === 5) {
+      const id5 = bane.spillere[4]?.id;
+      if (id5) hvilerIds.add(id5);
+    }
+  });
 
   // Finn på-vei-opp spiller (mest klatret)
   let paVeiOppId = null;
@@ -794,7 +804,7 @@ function renderSammenlagt(sammenlagt, pilar, t, runde, erFerdig, banner) {
       const spillere = bane.spillere ?? [];
       const kamp     = kamperDenneRunden.find(k => k.baneNr === `bane${baneNr}`);
 
-      let lag1Navn, lag2Navn, statusHTML, poengHTML = '';
+      let lag1Navn, lag2Navn, statusHTML, poengHTML = '', hvilerHTML5 = '';
 
       if (spillere.length === 2) {
         // Singel
@@ -803,6 +813,10 @@ function renderSammenlagt(sammenlagt, pilar, t, runde, erFerdig, banner) {
       } else if (spillere.length >= 4) {
         lag1Navn = `${esc(spillere[0]?.navn ?? '?')} + ${esc(spillere[1]?.navn ?? '?')}`;
         lag2Navn = `${esc(spillere[2]?.navn ?? '?')} + ${esc(spillere[3]?.navn ?? '?')}`;
+        // Bane med 5 spillere — 5. spilleren hviler denne runden på denne banen.
+        if (spillere.length === 5) {
+          hvilerHTML5 = `<div class="bane-lag-hviler">😴 ${esc(spillere[4]?.navn ?? '?')} hviler</div>`;
+        }
       } else {
         lag1Navn = '?'; lag2Navn = '?';
       }
@@ -821,6 +835,7 @@ function renderSammenlagt(sammenlagt, pilar, t, runde, erFerdig, banner) {
             <div class="bane-lag">${lag1Navn}</div>
             <div class="bane-vs">vs</div>
             <div class="bane-lag">${lag2Navn}</div>
+            ${hvilerHTML5}
           </div>
           ${statusHTML}
           ${poengHTML}
