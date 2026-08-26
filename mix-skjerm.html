@@ -124,6 +124,18 @@
   }
   @keyframes puls { 0%,100%{opacity:1} 50%{opacity:.3} }
 
+  .fullskjerm-knapp {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    height: 40px; padding: 0 16px; flex-shrink: 0;
+    background: var(--navy3); border: 1px solid var(--border2);
+    border-radius: 10px; color: var(--muted2); font-weight: 600; font-size: 14px;
+    font-family: 'DM Sans', sans-serif; cursor: pointer;
+    transition: background .15s, color .15s, border-color .15s;
+  }
+  .fullskjerm-knapp:hover  { background: rgba(255,255,255,.06); color: var(--white); }
+  .fullskjerm-knapp.aktiv  { color: var(--accent2); border-color: var(--accent2); }
+  .fullskjerm-knapp svg    { width: 20px; height: 20px; flex-shrink: 0; }
+
   .klokke {
     font-family: 'DM Mono', monospace;
     font-size: 28px; color: var(--muted);
@@ -759,6 +771,37 @@ function startKlokke() {
   setInterval(oppdater, 10000);
 }
 
+// ── FULLSKJERM ────────────────────────────────────────────
+// Fjerner adresselinjen når storskjermen deles via QR-kode i nettleser.
+// Ikke støttet på iPhone Safari (kun iPad/Android/desktop) — knappen
+// skjules automatisk der siden Fullscreen API mangler.
+const _stotterFullskjerm = !!(
+  document.documentElement.requestFullscreen ||
+  document.documentElement.webkitRequestFullscreen
+);
+let _erFullskjerm = false;
+
+function _fullskjermEndret() {
+  _erFullskjerm = !!(document.fullscreenElement || document.webkitFullscreenElement);
+  render();
+}
+document.addEventListener('fullscreenchange', _fullskjermEndret);
+document.addEventListener('webkitfullscreenchange', _fullskjermEndret);
+
+window.toggleFullskjerm = function() {
+  const el = document.documentElement;
+  if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+    if (el.requestFullscreen)        el.requestFullscreen().catch(() => {});
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+  } else {
+    if (document.exitFullscreen)        document.exitFullscreen().catch(() => {});
+    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+  }
+};
+
+const IKON_UTVID = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>`;
+const IKON_KRYMP = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg>`;
+
 // ── Hoved-render ─────────────────────────────────────────
 function render() {
   if (!_treningData) return;
@@ -1015,6 +1058,14 @@ function render() {
         ${pill}
       </div>
       <div class="klokke" id="klokke"></div>
+      ${_stotterFullskjerm ? `
+        <button class="fullskjerm-knapp${_erFullskjerm ? ' aktiv' : ''}"
+          onclick="toggleFullskjerm()"
+          title="${_erFullskjerm ? 'Avslutt fullskjerm' : 'Fyll skjermen'}"
+          aria-label="${_erFullskjerm ? 'Avslutt fullskjerm' : 'Fyll skjermen'}">
+          ${_erFullskjerm ? IKON_KRYMP : IKON_UTVID}
+          <span>${_erFullskjerm ? 'Avslutt' : 'Fullskjerm'}</span>
+        </button>` : ''}
     </div>
 
     <div class="hoved">
